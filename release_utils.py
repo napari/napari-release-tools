@@ -158,3 +158,6 @@ def iter_pull_request(additional_query):
         total=iterable.totalCount,
     ):
         yield pull_issue.as_pull_request()
+
+
+BOT_LIST = {"github-actions[bot]", "pre-commit-ci[bot]", "dependabot[bot]", "napari-bot"}

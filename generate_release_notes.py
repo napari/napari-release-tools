@@ -28,130 +28,47 @@ import argparse
 import os
 import re
 import sys
-from collections import OrderedDict
 from datetime import datetime
 from itertools import chain
 from os.path import abspath
 from pathlib import Path
 from warnings import warn
 
+from yaml import safe_load
+
 from git import Repo
 from github import Github
 
-from release_utils import get_repo, setup_cache, short_cache
-
-setup_cache()
-
-try:
-    from tqdm import tqdm
-except ModuleNotFoundError:
-    warn(
-        'tqdm not installed. This script takes approximately 5 minutes '
-        'to run. To view live progressbars, please install tqdm. '
-        'Otherwise, be patient.'
-    )
-
-    def tqdm(i, **kwargs):
-        return i
+from release_utils import setup_cache, short_cache, iter_pull_request, get_repo, BOT_LIST, GH, GH_REPO, GH_USER
 
 
-pr_num_pattern = re.compile(r'\(#(\d+)\)(?:$|\n)')
-issue_pattern = re.compile(
-    r'(?:Close|Closes|close|closes|Fix|Fixes|fix|fixes|Resolves|resolves) +#(\d+)'
-)
-
-GH = "https://github.com"
-GH_USER = 'napari'
-GH_REPO = 'napari'
-GH_TOKEN = os.environ.get('GH_TOKEN')
-if GH_TOKEN is None:
-    raise RuntimeError(
-        "It is necessary that the environment variable `GH_TOKEN` "
-        "be set to avoid running into problems with rate limiting. "
-        "One can be acquired at https://github.com/settings/tokens.\n\n"
-        "You do not need to select any permission boxes while generating "
-        "the token."
-    )
-
-g = Github(GH_TOKEN)
-repository = get_repo()
-
-local_repo = Repo(Path(abspath(__file__)).parent.parent.parent)
+LOCAL_DIR = Path(__file__).parent
 
 
 parser = argparse.ArgumentParser(usage=__doc__)
-parser.add_argument('from_commit', help='The starting tag.')
-parser.add_argument('to_commit', help='The head branch.')
-parser.add_argument(
-    '--version', help="Version you're about to release.", default='0.2.0'
-)
+parser.add_argument('milestone', help='The milestone to list')
+parser.add_argument("--correction-file", help="The file with the corrections", default=LOCAL_DIR / "name_corrections.yaml")
 
 args = parser.parse_args()
 
-for tag in repository.get_tags():
-    if tag.name == args.from_commit:
-        previous_tag = tag
-        break
-else:
-    raise RuntimeError(f'Desired tag ({args.from_commit}) not found')
 
-common_ancestor = local_repo.merge_base(args.to_commit, args.from_commit)[0]
-remote_commit = repository.get_commit(common_ancestor.hexsha)
+setup_cache()
+repo = get_repo()
 
-# For some reason, go get the github commit from the commit to get
-# the correct date
-previous_tag_date = datetime.strptime(
-    remote_commit.last_modified, '%a, %d %b %Y %H:%M:%S %Z'
-)
-
-
-def get_commits_to_ancestor(ancestor, rev="main"):
-    yield from local_repo.iter_commits(f'{ancestor.hexsha}..{rev}')
-
-
-new_commits_count = (
-    len(list(get_commits_to_ancestor(common_ancestor, args.to_commit))) + 1
-)
-release_branch_count = (
-    len(list(get_commits_to_ancestor(common_ancestor, args.from_commit))) + 1
-)
-
-with short_cache(60):
-    all_commits = list(
-        tqdm(
-            repository.get_commits(
-                sha=args.to_commit, since=previous_tag_date
-            ),
-            desc=f'Getting all commits between {remote_commit.sha} '
-            f'and {args.to_commit}',
-            total=new_commits_count,
-        )
-    )
-branch_commit = list(
-    tqdm(
-        repository.get_commits(
-            sha=local_repo.tag(args.from_commit).commit.hexsha,
-            since=previous_tag_date,
-        ),
-        desc=f'Getting all commits from release branch {args.from_commit} '
-        f'and {remote_commit.sha}',
-        total=release_branch_count,
-    )
-)
-all_hashes = {c.sha for c in all_commits}
-
-consumed_pr = set()
-
-for commit in branch_commit:
-    if match := pr_num_pattern.search(commit.commit.message):
-        consumed_pr.add(int(match[1]))
+correction_dict = {}
+with open(args.correction_file) as f:
+    corrections = safe_load(f)
+    for correction in corrections["login_to_name"]:
+        correction_dict[correction["login"]] = correction["corrected_name"]
 
 
 def add_to_users(users, new_user):
     if new_user.login in users:
         # reduce obsolete requests to GitHub API
         return
-    if new_user.name is None:
+    if new_user.login in correction_dict:
+        users[new_user.login] = correction_dict[new_user.login]
+    elif new_user.name is None:
         users[new_user.login] = new_user.login
     else:
         users[new_user.login] = new_user.name
@@ -162,24 +79,7 @@ committers = set()
 reviewers = set()
 users = {}
 
-for commit in tqdm(all_commits, desc="Getting committers and authors"):
-    if match := pr_num_pattern.search(commit.commit.message):  # noqa: SIM102
-        if int(match[1]) in consumed_pr:
-            continue
-            # omit commits from release branch
-
-    if commit.committer is not None:
-        add_to_users(users, commit.committer)
-        committers.add(commit.committer.login)
-    if commit.author is not None:
-        add_to_users(users, commit.author)
-        authors.add(commit.author.login)
-
-# remove these bots.
-committers.discard("web-flow")
-authors.discard("azure-pipelines-bot")
-
-highlights = OrderedDict()
+highlights = {}
 
 highlights['Highlights'] = {}
 highlights['New Features'] = {}
@@ -205,34 +105,24 @@ label_to_section = {
     "documentation": "Documentation",
 }
 
-pr_count = 0
 
-for commit in get_commits_to_ancestor(common_ancestor, args.to_commit):
-    if pr_num_pattern.search(commit.message) is not None:
-        pr_count += 1
+for pull in iter_pull_request(f"milestone:{args.milestone} is:merged"):
+    issue = pull.as_issue()
+    assert pull.merged 
 
-for pull in tqdm(
-    g.search_issues(
-        f'repo:{GH_USER}/{GH_REPO} '
-        f'merged:>{previous_tag_date.isoformat()} '
-        'sort:created-asc'
-    ),
-    desc='Pull Requests...',
-    total=pr_count,
-):
-    if pull.number in consumed_pr:
-        continue
-    if pull.milestone is not None and pull.milestone.title != args.version:
-        print(
-            f"PR {pull.number} is assigned to milestone {pull.milestone.title}",
-            file=sys.stderr,
-        )
-    pr = repository.get_pull(pull.number)
-    if pr.merge_commit_sha not in all_hashes:
-        continue
+    commit = repo.get_commit(pull.merge_commit_sha)
+
+    if commit.committer is not None:
+        add_to_users(users, commit.committer)
+        committers.add(commit.committer.login)
+    if commit.author is not None:
+        add_to_users(users, commit.author)
+        authors.add(commit.author.login)
+
+
     summary = pull.title
 
-    for review in pr.get_reviews():
+    for review in pull.get_reviews():
         if review.user is not None:
             add_to_users(users, review.user)
             reviewers.add(review.user.login)
@@ -243,25 +133,7 @@ for pull in tqdm(
             highlights[section][pull.number] = {'summary': summary}
             assigned_to_section = True
 
-    if assigned_to_section:
-        continue
-
-    issues_list = []
-    if pull.body:
-        for x in issue_pattern.findall(pull.body):
-            issue = repository.get_issue(int(x))
-            if issue.pull_request is None:
-                issues_list.append(issue)
-
-    issue_labels = [
-        label.name for label in chain(*[x.labels for x in issues_list])
-    ]
-
-    for label_name, section in label_to_section.items():
-        if label_name in issue_labels:
-            highlights[section][pull.number] = {'summary': summary}
-            break
-    else:
+    if not assigned_to_section:
         other_pull_requests[pull.number] = {'summary': summary}
 
 
@@ -269,13 +141,18 @@ for pull in tqdm(
 highlights['Other Pull Requests'] = other_pull_requests
 
 
+# remove these bots.
+committers -= BOT_LIST
+authors  -= BOT_LIST
+
+
 # Now generate the release notes
-title = f'# napari {args.version}'
+title = f'# napari {args.milestone}'
 print(title)
 
 print(
     f"""
-We're happy to announce the release of napari {args.version}!
+We're happy to announce the release of napari {args.milestone}!
 napari is a fast, interactive, multi-dimensional image viewer for Python.
 It's designed for browsing, annotating, and analyzing large multi-dimensional
 images. It's built on top of Qt (for the GUI), vispy (for performant GPU-based
@@ -297,7 +174,7 @@ for section, pull_request_dicts in highlights.items():
     print()
 
 
-contributors = OrderedDict()
+contributors = {}
 
 contributors['authors'] = authors
 contributors['reviewers'] = reviewers
