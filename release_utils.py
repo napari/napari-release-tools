@@ -92,7 +92,7 @@ def get_local_repo(path=None):
 
     if path is not None:
         return Repo(path)
-    return Repo(Path(__file__).parent.parent.parent)
+    return Repo(Path(__file__).parent / "napari_repo")
 
 
 def get_common_ancestor(commit1, commit2):

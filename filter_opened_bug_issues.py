@@ -40,7 +40,7 @@ setup_cache()
 repository = get_repo()
 
 if args.milestone is not None:
-    if args.mileston.lower() == "none":
+    if args.milestone.lower() == "none":
         milestone_search_string = "no:milestone"
         milestone = None
     else:
