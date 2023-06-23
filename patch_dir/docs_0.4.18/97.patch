@@ -1,0 +1,205 @@
+From 2724a3538363b7177908f8a4c88f478e339678aa Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Melissa=20Weber=20Mendon=C3=A7a?= <melissawm@gmail.com>
+Date: Tue, 7 Feb 2023 15:52:55 -0300
+Subject: [PATCH] Add cards to usage landing pages (#97)
+
+# Description
+
+Adds cards to landing pages under the usage section. Organization,
+wording and the order of the cards can be changed according to the
+review.
+
+## Type of change
+- [x] Fixes or improves existing content
+
+# References
+Closes #87
+
+## Final checklist:
+- [x] My PR is the minimum possible work for the desired functionality
+---
+ docs/guides/layers.md                         |  1 +
+ docs/tutorials/annotation/index.md            |  3 +-
+ .../tutorials/fundamentals/getting_started.md |  1 +
+ docs/tutorials/fundamentals/viewer.md         |  1 +
+ docs/tutorials/index.md                       | 32 ++++++++++++
+ docs/tutorials/processing/index.md            |  1 +
+ docs/tutorials/segmentation/index.md          |  1 +
+ docs/tutorials/start_index.md                 | 51 +++++++++++++++----
+ docs/tutorials/tracking/index.md              |  1 +
+ 9 files changed, 80 insertions(+), 12 deletions(-)
+
+diff --git a/docs/guides/layers.md b/docs/guides/layers.md
+index ac6b500e..665875da 100644
+--- a/docs/guides/layers.md
++++ b/docs/guides/layers.md
+@@ -1,3 +1,4 @@
++(layers-glance)=
+ # Layers at a glance
+ 
+ [Layers](napari.layers) are the basic viewable objects that can be added to a
+diff --git a/docs/tutorials/annotation/index.md b/docs/tutorials/annotation/index.md
+index c22554ae..48552da7 100644
+--- a/docs/tutorials/annotation/index.md
++++ b/docs/tutorials/annotation/index.md
+@@ -1,5 +1,6 @@
++(annotation)=
+ # Annotation
+ 
+-This section contains tutorials showing how to annoate images and videos using the napari points, labels, or shapes layers.
++This section contains tutorials showing how to annotate images and videos using the napari points, labels, or shapes layers.
+ 
+ * [Annotating videos with napari](annotate_points)
+diff --git a/docs/tutorials/fundamentals/getting_started.md b/docs/tutorials/fundamentals/getting_started.md
+index 26d819c7..a2d35d9a 100644
+--- a/docs/tutorials/fundamentals/getting_started.md
++++ b/docs/tutorials/fundamentals/getting_started.md
+@@ -1,3 +1,4 @@
++(getting-started)=
+ # Getting started with napari
+ 
+ Welcome to the getting started with **napari** tutorial!
+diff --git a/docs/tutorials/fundamentals/viewer.md b/docs/tutorials/fundamentals/viewer.md
+index 71949a68..25b7d1d5 100644
+--- a/docs/tutorials/fundamentals/viewer.md
++++ b/docs/tutorials/fundamentals/viewer.md
+@@ -11,6 +11,7 @@ kernelspec:
+   name: python3
+ ---
+ 
++(viewer-tutorial)=
+ # napari viewer tutorial
+ 
+ +++
+diff --git a/docs/tutorials/index.md b/docs/tutorials/index.md
+index 64d23c1a..0ef3b824 100644
+--- a/docs/tutorials/index.md
++++ b/docs/tutorials/index.md
+@@ -5,6 +5,38 @@ These tutorials will help you explore the main usage modes and methods of
+ napari, and target people who want to use napari. If you are also interested
+ in contributing to napari then please check out [the Community page](../community/index).
+ 
++::::{grid}
++:::{grid-item-card} Annotation
++:link: annotation
++:link-type: ref
++
++How to annotate images and videos using the napari points, labels, or shapes layers
++:::
++
++:::{grid-item-card} Processing
++:link: processing
++:link-type: ref
++
++Data processing with napari
++:::
++::::
++
++::::{grid}
++:::{grid-item-card} Segmentation
++:link: segmentation
++:link-type: ref
++
++Segmentation labeling with napari
++:::
++
++:::{grid-item-card} Tracking
++:link: tracking
++:link-type: ref
++
++How to work with object tracking data and how to format it for display as a napari tracks layer.
++:::
++::::
++
+ ## Improving the tutorials
+ 
+ Our tutorials are hosted on [the napari Github repository](https://github.com/napari/napari).
+diff --git a/docs/tutorials/processing/index.md b/docs/tutorials/processing/index.md
+index e226ea44..50c6b151 100644
+--- a/docs/tutorials/processing/index.md
++++ b/docs/tutorials/processing/index.md
+@@ -1,3 +1,4 @@
++(processing)=
+ # Processing
+ 
+ This section contains tutorials for data processing.
+diff --git a/docs/tutorials/segmentation/index.md b/docs/tutorials/segmentation/index.md
+index 52f0b716..23d5a5af 100644
+--- a/docs/tutorials/segmentation/index.md
++++ b/docs/tutorials/segmentation/index.md
+@@ -1,3 +1,4 @@
++(segmentation)=
+ # Segmentation
+ 
+ This section contains tutorials for segmentation [labeling](../../howtos/layers/labels).
+diff --git a/docs/tutorials/start_index.md b/docs/tutorials/start_index.md
+index b282582e..afddcbda 100644
+--- a/docs/tutorials/start_index.md
++++ b/docs/tutorials/start_index.md
+@@ -4,15 +4,44 @@ The following documents will give you an overview of how to install and use
+ napari. For more detailed use-cases, check out the [napari tutorials](./index)
+ or [How-to guides](../howtos/index).
+ 
+-- [napari quick start](./fundamentals/quick_start): This tutorial is for napari
+-first-timers, to give them a quick glance of what napari does, and give it a try
+-right away.
+-- [How to install napari on your machine](./fundamentals/installation): This
+-guide will teach you how to do a clean install of napari and launch the viewer.
+-- [Getting started with napari](./fundamentals/getting_started): This tutorial
+-will teach you all the different ways to launch napari.
+-- [napari viewer tutorial](./fundamentals/viewer): This tutorial will teach you
+-about the napari viewer, including how to use its graphical user interface (GUI)
++::::{grid}
++:::{grid-item-card} napari quick start
++:link: napari-quick-start
++:link-type: ref
++
++A quick glance of what napari does aimed at first-timers.
++:::
++::::
++
++::::{grid}
++:::{grid-item-card} How to install napari
++:link: installation
++:link-type: ref
++
++How to do a clean install of napari and launch the viewer.
++:::
++
++:::{grid-item-card} Getting started
++:link: getting-started
++:link-type: ref
++
++This tutorial will teach you all the different ways to launch napari.
++:::
++::::
++
++::::{grid}
++:::{grid-item-card} napari viewer tutorial
++:link: viewer-tutorial
++:link-type: ref
++
++This tutorial will teach you about the napari viewer, including how to use its graphical user interface (GUI)
+ and how the data within it is organized.
+-- [Layers at a glance](../guides/layers): An overview of the napari *Layers*,
+-the basic viewable objects that can be added to a viewer.
+\ No newline at end of file
++:::
++
++:::{grid-item-card} Layers at a glance
++:link: layers-glance
++:link-type: ref
++
++An overview of the napari *Layers*, the basic viewable objects that can be displayed on the canvas.
++:::
++::::
+\ No newline at end of file
+diff --git a/docs/tutorials/tracking/index.md b/docs/tutorials/tracking/index.md
+index d5ddb97a..49c793bc 100644
+--- a/docs/tutorials/tracking/index.md
++++ b/docs/tutorials/tracking/index.md
+@@ -1,3 +1,4 @@
++(tracking)=
+ # Tracking
+ 
+ This section contains tutorials showing how to work with object tracking data and how to format it for display as a napari tracks layer.

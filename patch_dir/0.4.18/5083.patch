@@ -1,0 +1,162 @@
+From 914752a1a496e48bed9f4a06b576b0e8814a60f9 Mon Sep 17 00:00:00 2001
+From: Kim Pevey <kcpevey@gmail.com>
+Date: Tue, 11 Oct 2022 14:39:46 -0500
+Subject: [PATCH] Fix failure on benchmark reporting (#5083)
+
+* fix syntax, temporarily force failing benchmark comparison
+
+* failure() was not being evaluated
+
+* revert if statement logic
+
+* attempt to trigger failure a different way
+
+* switch testcase
+
+* add ci notes
+
+* fix continuous benchmarking, add example asv commands to readme
+
+* benchmark requires
+
+* increase verbosity on benchmarks in ci
+
+* cleanup
+
+* cleanup again
+
+* Update .github/workflows/benchmarks_report.yml
+
+* Apply suggestions from code review
+
+Co-authored-by: Andy Sweet <andrew.d.sweet@gmail.com>
+
+* show asv dev usage
+
+* remove benchmarks install option
+
+Co-authored-by: Matthias Bussonnier <bussonniermatthias@gmail.com>
+Co-authored-by: Andy Sweet <andrew.d.sweet@gmail.com>
+---
+ .github/workflows/benchmarks.yml        |  4 ++--
+ .github/workflows/benchmarks_report.yml |  6 +++---
+ docs/developers/benchmarks.md           | 23 +++++++++++++++++++++++
+ napari/benchmarks/README.md             | 24 ++++++++++++++++++++++--
+ 4 files changed, 50 insertions(+), 7 deletions(-)
+
+diff --git a/.github/workflows/benchmarks.yml b/.github/workflows/benchmarks.yml
+index 6a2daa96..19340da5 100644
+--- a/.github/workflows/benchmarks.yml
++++ b/.github/workflows/benchmarks.yml
+@@ -117,7 +117,7 @@ jobs:
+           echo "CONTENDER_REF=$CONTENDER_REF" >> $GITHUB_ENV
+ 
+           # Run benchmarks for current commit against base
+-          asv continuous $ASV_OPTIONS -b '${{ matrix.selection-regex }}' ${BASE_REF} ${CONTENDER_REF} \
++          asv continuous $ASV_OPTIONS -b '${{ matrix.selection-regex }}' ${BASE_REF} ${CONTENDER_REF} -v \
+           | sed -E "/Traceback | failed$|PERFORMANCE DECREASED/ s/^/::error:: /" \
+           | tee asv_continuous.log
+ 
+@@ -126,7 +126,7 @@ jobs:
+               exit 1
+           fi
+ 
+-      - name: Report Failures
++      - name: Report Failures as Issue
+         if: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && failure() }}
+         uses: JasonEtco/create-an-issue@v2
+         env:
+diff --git a/.github/workflows/benchmarks_report.yml b/.github/workflows/benchmarks_report.yml
+index 3c55d7f6..81c96354 100644
+--- a/.github/workflows/benchmarks_report.yml
++++ b/.github/workflows/benchmarks_report.yml
+@@ -1,7 +1,7 @@
+ # We need a dual workflow to make sure the token has the needed permissions to post comments
+ # See https://stackoverflow.com/a/71683208 for more details
+ 
+-name: Report benchmarks
++name: "Benchmarks - Report"
+ 
+ on:
+   workflow_run:
+@@ -22,7 +22,7 @@ jobs:
+                repo: context.repo.repo,
+                run_id: context.payload.workflow_run.id,
+             });
+-            let artifactName = `asv-benchmark-results-${context.payload.workflow_run.id}-${context.payload.workflow_run.run_number}-${context.payload.workflow_run.run_attempt}`
++            let artifactName = `asv-benchmark-results-${github.event.workflow_run.id}-${github.event.workflow_run.run_number}-${github.event.workflow_run.run_attempt}`
+             let matchArtifact = allArtifacts.data.artifacts.filter((artifact) => {
+               return artifact.name == artifactName
+             })[0];
+@@ -38,7 +38,7 @@ jobs:
+       - name: Unzip and prepare data
+         run: |
+           unzip asv_results.zip
+-          sed -i 's/||BENCHMARK_CI_LOGS_URL||/${{ github.event.workflow_run.html_url }}/g' .asv/results/message.txt
++          sed -i 's@||BENCHMARK_CI_LOGS_URL||@${{ github.event.workflow_run.html_url }}@g' .asv/results/message.txt
+           if [[ -f .asv/results/pr_number ]]; then
+             echo "PR_NUMBER=$(cat .asv/results/pr_number)" >> $GITHUB_ENV
+           fi
+diff --git a/docs/developers/benchmarks.md b/docs/developers/benchmarks.md
+index b95e78a6..99146669 100644
+--- a/docs/developers/benchmarks.md
++++ b/docs/developers/benchmarks.md
+@@ -166,3 +166,26 @@ pip install snakeviz
+ ```
+ 
+ and we use `--python=same` to profile against our current python environment.
++
++## Running benchmarks on CI
++
++Benchmarking on CI has two main parts - the Benchmark Action and the Benchmark Reporting Action. 
++
++### The Benchmark Action
++
++The benchmarks are set to run:
++* On a schedule: once a week on Sunday
++* On PRs with the `run-benchmark` label
++* On workflow dispatch (manual trigger)
++
++If the benchmarks fail during the scheduled run, an issue is opened in the repo to flag the occurrence. 
++If an issue has already been opened, it will add to the existing issue. 
++
++The contender SHA is a Github PR merge commit - a fake commit not available to users.
++Every time you want the benchmark CI to run in a PR, you'll need to remove and re-add the `run-benchmark` label. 
++
++
++### Benchmark Reporting Action
++
++The benchmark Reporting Action will only run after the successful completion of the Benchmark Action.
++(regardless of comparison failures).
+diff --git a/napari/benchmarks/README.md b/napari/benchmarks/README.md
+index a20079b0..2e5d68b3 100644
+--- a/napari/benchmarks/README.md
++++ b/napari/benchmarks/README.md
+@@ -1,3 +1,23 @@
+-These are benchmarks to be run with
+-[asv](https://asv.readthedocs.io/en/stable/). They are not distributed with
++# Napari benchmarking with airspeed velocity (asv)
++
++These are benchmarks to be run with airspeed velocity 
++([asv](https://asv.readthedocs.io/en/stable/)). They are not distributed with
+ installs.
++
++## Example commands
++
++Run all the benchmarks:
++
++`asv run`
++
++Do a "quick" run in the current environment, where each benchmark function is run only once:
++
++`asv run --python=same -q`
++
++To run a single benchmark (Vectors3DSuite.time_refresh) with the environment you are currently in:
++
++`asv dev --bench Vectors3DSuite.time_refresh`
++
++To compare benchmarks across branches, run using conda environments (instead of virtualenv), and limit to the `Labels2DSuite` benchmarks:
++
++`asv continuous main fix_benchmark_ci -q --environment conda --bench Labels2DSuite`
+-- 
+2.34.1

@@ -1,0 +1,205 @@
+From a3d7b4f0a15036152c07fff65082180010d13099 Mon Sep 17 00:00:00 2001
+From: Grzegorz Bokota <bokota+github@gmail.com>
+Date: Wed, 2 Nov 2022 10:38:23 +0100
+Subject: [PATCH] Add option to check if plugin try to set viewer attr outside
+ main thread (#5195)
+
+Co-authored-by: Andy Sweet <andrew.d.sweet@gmail.com>
+Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.github.com>
+---
+ napari/_qt/_tests/test_proxy_fixture.py | 22 +++++++++++++++++
+ napari/_qt/_tests/test_qt_utils.py      | 20 ++++++++++++++++
+ napari/_qt/utils.py                     | 14 +++++++++++
+ napari/plugins/_tests/test_npe2.py      |  3 +++
+ napari/utils/_tests/test_proxies.py     | 20 ++++++++++++++++
+ napari/utils/_testsupport.py            | 32 +++++++++++++++++++++++++
+ 6 files changed, 111 insertions(+)
+ create mode 100644 napari/_qt/_tests/test_proxy_fixture.py
+
+diff --git a/napari/_qt/_tests/test_proxy_fixture.py b/napari/_qt/_tests/test_proxy_fixture.py
+new file mode 100644
+index 00000000..ce73a7f7
+--- /dev/null
++++ b/napari/_qt/_tests/test_proxy_fixture.py
+@@ -0,0 +1,22 @@
++import pytest
++
++from napari.utils import misc
++
++
++def test_proxy_fixture_warning(make_napari_viewer_proxy, monkeypatch):
++    viewer = make_napari_viewer_proxy()
++
++    monkeypatch.setattr(misc, 'ROOT_DIR', '/some/other/package')
++    with pytest.warns(FutureWarning, match='Private attribute access'):
++        viewer.window._qt_window
++
++
++def test_proxy_fixture_thread_error(
++    make_napari_viewer_proxy, single_threaded_executor
++):
++    viewer = make_napari_viewer_proxy()
++    future = single_threaded_executor.submit(
++        viewer.__setattr__, 'status', 'hi'
++    )
++    with pytest.raises(RuntimeError, match='Setting attributes'):
++        future.result()
+diff --git a/napari/_qt/_tests/test_qt_utils.py b/napari/_qt/_tests/test_qt_utils.py
+index d21ad293..1c09d79c 100644
+--- a/napari/_qt/_tests/test_qt_utils.py
++++ b/napari/_qt/_tests/test_qt_utils.py
+@@ -11,6 +11,7 @@ from napari._qt.utils import (
+     qt_signals_blocked,
+     str_to_qbytearray,
+ )
++from napari.utils._proxies import PublicOnlyProxy
+ 
+ 
+ class Emitter(QObject):
+@@ -101,3 +102,22 @@ def test_qt_might_be_rich_text(qtbot):
+     qtbot.addWidget(widget)
+     assert qt_might_be_rich_text("<b>rich text</b>")
+     assert not qt_might_be_rich_text("plain text")
++
++
++def test_thread_proxy_guard(monkeypatch, qapp, single_threaded_executor):
++    class X:
++        a = 1
++
++    monkeypatch.setenv('NAPARI_ENSURE_PLUGIN_MAIN_THREAD', 'True')
++
++    x = X()
++    x_proxy = PublicOnlyProxy(x)
++
++    f = single_threaded_executor.submit(x.__setattr__, 'a', 2)
++    f.result()
++    assert x.a == 2
++
++    f = single_threaded_executor.submit(x_proxy.__setattr__, 'a', 3)
++    with pytest.raises(RuntimeError):
++        f.result()
++    assert x.a == 2
+diff --git a/napari/_qt/utils.py b/napari/_qt/utils.py
+index a3cbb8e5..76a26a86 100644
+--- a/napari/_qt/utils.py
++++ b/napari/_qt/utils.py
+@@ -12,11 +12,13 @@ import numpy as np
+ import qtpy
+ from qtpy.QtCore import (
+     QByteArray,
++    QCoreApplication,
+     QPoint,
+     QPropertyAnimation,
+     QSize,
+     QSocketNotifier,
+     Qt,
++    QThread,
+ )
+ from qtpy.QtGui import QColor, QCursor, QDrag, QImage, QPainter, QPen, QPixmap
+ from qtpy.QtWidgets import (
+@@ -470,3 +472,15 @@ def qt_might_be_rich_text(text) -> bool:
+         return Qt_.mightBeRichText(text)
+     except AttributeError:
+         return bool(RICH_TEXT_PATTERN.search(text))
++
++
++def in_qt_main_thread():
++    """
++    Check if we are in the thread in which QApplication object was created.
++
++    Returns
++    -------
++    thread_flag : bool
++        True if we are in the main thread, False otherwise.
++    """
++    return QCoreApplication.instance().thread() == QThread.currentThread()
+diff --git a/napari/plugins/_tests/test_npe2.py b/napari/plugins/_tests/test_npe2.py
+index 10887e21..e423baf2 100644
+--- a/napari/plugins/_tests/test_npe2.py
++++ b/napari/plugins/_tests/test_npe2.py
+@@ -20,6 +20,9 @@ MANIFEST_PATH = Path(__file__).parent / '_sample_manifest.yaml'
+ 
+ @pytest.fixture
+ def mock_pm(npe2pm: 'TestPluginManager'):
++    from napari.plugins import _initialize_plugins
++
++    _initialize_plugins.cache_clear()
+     mock_reg = MagicMock()
+     npe2pm._command_registry = mock_reg
+     with npe2pm.tmp_plugin(manifest=MANIFEST_PATH):
+diff --git a/napari/utils/_tests/test_proxies.py b/napari/utils/_tests/test_proxies.py
+index 72566e3b..9d8a1ebb 100644
+--- a/napari/utils/_tests/test_proxies.py
++++ b/napari/utils/_tests/test_proxies.py
+@@ -77,6 +77,26 @@ def test_PublicOnlyProxy(patched_root_dir):
+     assert '_private' in dir(t)
+ 
+ 
++@pytest.mark.filterwarnings("ignore:Qt libs are available but")
++def test_thread_proxy_guard(monkeypatch, single_threaded_executor):
++    class X:
++        a = 1
++
++    monkeypatch.setenv('NAPARI_ENSURE_PLUGIN_MAIN_THREAD', 'True')
++
++    x = X()
++    x_proxy = PublicOnlyProxy(x)
++
++    f = single_threaded_executor.submit(x.__setattr__, 'a', 2)
++    f.result()
++    assert x.a == 2
++
++    f = single_threaded_executor.submit(x_proxy.__setattr__, 'a', 3)
++    with pytest.raises(RuntimeError):
++        f.result()
++    assert x.a == 2
++
++
+ def test_public_proxy_limited_to_napari(patched_root_dir):
+     """Test that the recursive public proxy goes no farther than napari."""
+     viewer = ViewerModel()
+diff --git a/napari/utils/_testsupport.py b/napari/utils/_testsupport.py
+index 96dd0254..e2ff7639 100644
+--- a/napari/utils/_testsupport.py
++++ b/napari/utils/_testsupport.py
+@@ -305,6 +305,38 @@ def make_napari_viewer(
+                 warnings.warn(msg)
+ 
+ 
++@pytest.fixture
++def make_napari_viewer_proxy(make_napari_viewer, monkeypatch):
++    """Fixture that returns a function for creating a napari viewer wrapped in proxy.
++    Use in the same way like `make_napari_viewer` fixture.
++
++    Parameters
++    ----------
++    make_napari_viewer : fixture
++        The make_napari_viewer fixture.
++
++    Returns
++    -------
++    function
++        A function that creates a napari viewer.
++    """
++    from napari.utils._proxies import PublicOnlyProxy
++
++    proxies = []
++
++    def actual_factory(*model_args, ensure_main_thread=True, **model_kwargs):
++        monkeypatch.setenv(
++            "NAPARI_ENSURE_PLUGIN_MAIN_THREAD", str(ensure_main_thread)
++        )
++        viewer = make_napari_viewer(*model_args, **model_kwargs)
++        proxies.append(PublicOnlyProxy(viewer))
++        return proxies[-1]
++
++    proxies.clear()
++
++    yield actual_factory
++
++
+ @pytest.fixture
+ def MouseEvent():
+     """Create a subclass for simulating vispy mouse events.
+-- 
+2.34.1

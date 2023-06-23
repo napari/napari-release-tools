@@ -1,0 +1,28 @@
+From cf273a3fc06f84240a3c7a02faf06659fbe549bc Mon Sep 17 00:00:00 2001
+From: Ashley Anderson <aganders3@gmail.com>
+Date: Sat, 1 Apr 2023 20:46:06 -0400
+Subject: [PATCH] Add matplotlib image scraper for gallery (#130)
+
+# Description
+As described in #129, adding this scraper allows the use of matplotlib
+to create plots, etc. in gallery examples.
+
+# References
+closes #129
+---
+ docs/conf.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/docs/conf.py b/docs/conf.py
+index 8273e4d2..2808d293 100644
+--- a/docs/conf.py
++++ b/docs/conf.py
+@@ -220,7 +220,7 @@ def reset_napari_theme(gallery_conf, fname):
+     'download_all_examples': False,
+     'min_reported_time': 10,
+     'only_warn_on_example_error': True,
+-    'image_scrapers': (qtgallery.qtscraper,),
++    'image_scrapers': ("matplotlib", qtgallery.qtscraper,),
+     'reset_modules': (reset_napari_theme,),
+     'reference_url': {'napari': None},
+     'within_subsection_order': ExampleTitleSortKey,

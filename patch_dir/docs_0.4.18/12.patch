@@ -1,0 +1,314 @@
+From d1571dac3f75edcde1839293ab6146a058f59539 Mon Sep 17 00:00:00 2001
+From: Matthias Bussonnier <bussonniermatthias@gmail.com>
+Date: Fri, 16 Dec 2022 01:21:11 +0100
+Subject: [PATCH] Add and/or update documentation alt text (#12)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+* Add white space for images diff
+
+* Add missing images to diff
+
+* Apply event alt text!
+
+Co-authored-by: Draga Doncila Pop <17995243+DragaDoncila@users.noreply.github.com>
+Co-authored-by: Andy Sweet <andrew.d.sweet@gmail.com>
+Co-authored-by: Kandarp Khandwala <kandarpksk@users.noreply.github.com>
+
+* Copy edits and clean up
+
+* Remove white space placeholders
+
+* Remove typos and white space
+
+* Update docs/howtos/layers/shapes.md
+
+Co-authored-by: Melissa Weber Mendonça <melissawm@gmail.com>
+
+Co-authored-by: isabela-pf <irpf.design@gmail.com>
+Co-authored-by: Isabela Presedo-Floyd <50221806+isabela-pf@users.noreply.github.com>
+Co-authored-by: Draga Doncila Pop <17995243+DragaDoncila@users.noreply.github.com>
+Co-authored-by: Andy Sweet <andrew.d.sweet@gmail.com>
+Co-authored-by: Kandarp Khandwala <kandarpksk@users.noreply.github.com>
+Co-authored-by: Melissa Weber Mendonça <melissawm@gmail.com>
+---
+ README.md                                    |  2 +-
+ docs/developers/testing.md                   |  2 +-
+ docs/guides/3D_interactivity.md              |  6 ++--
+ docs/guides/contexts_expressions.md          |  2 +-
+ docs/guides/rendering-explanation.md         |  2 +-
+ docs/howtos/layers/image.md                  |  6 ++--
+ docs/howtos/layers/shapes.md                 |  3 +-
+ docs/plugins/find_and_install_plugin.md      |  4 +--
+ docs/tutorials/annotation/annotate_points.md |  4 +--
+ docs/tutorials/fundamentals/installation.md  | 38 +++++++-------------
+ 10 files changed, 28 insertions(+), 41 deletions(-)
+
+diff --git a/README.md b/README.md
+index eb71878d..0051abb6 100644
+--- a/README.md
++++ b/README.md
+@@ -37,4 +37,4 @@ the bug report template. If you think something isn't working, don't hesitate to
+ 
+ ## institutional and funding partners
+ 
+-![CZI logo](https://chanzuckerberg.com/wp-content/themes/czi/img/logo.svg)
++![Chan Zuckerberg Initiative logo](https://chanzuckerberg.com/wp-content/themes/czi/img/logo.svg)
+diff --git a/docs/developers/testing.md b/docs/developers/testing.md
+index e7ee5ac5..1a9e63c8 100644
+--- a/docs/developers/testing.md
++++ b/docs/developers/testing.md
+@@ -20,7 +20,7 @@ much as we can with unit tests, requiring fewer integration tests, and the least
+ of functional tests as depicted in the test pyramid below from
+ [softwaretestinghelp.com](https://www.softwaretestinghelp.com/the-difference-between-unit-integration-and-functional-testing/):
+ 
+-![tests](../images/tests.png)
++![Pyramid diagram depicting the relationship between time to write/execute three different types of tests and return on investment for those tests.  The pyramid is split into three sections: the bottom, largest section is Unit testing, the middle section is Integration testing and the top is Functional testing. The size of the section is proportional to the quantity of tests of that type you should write. Moving up the pyramid, tests take longer to write and have a lower return on investment.](../images/tests.png)
+ 
+ Unit tests are at the base of the pyramid because they are the easiest to write and
+ the quickest to run. The time and effort to implement and maintain tests increases
+diff --git a/docs/guides/3D_interactivity.md b/docs/guides/3D_interactivity.md
+index 5ba278f8..509691cb 100644
+--- a/docs/guides/3D_interactivity.md
++++ b/docs/guides/3D_interactivity.md
+@@ -5,12 +5,12 @@
+ ## Coordinate systems in napari
+ In napari, there are three main coordinate systems: (1) canvas, (2) world, and (3) layer. The canvas coordinates system is the 2D coordinate system of the canvas on which the scene is rendered. World coordinates are the nD coordinates of the entire scene. As the name suggests, layer coordinates are the nD coordinate system of the data in a given layer. Layer coordinates are specific to each layer's data and are related to the world coordinate system via the layer transforms.
+ 
+-![coordinate-systems](images/3d_interaction_coordianates.png)
++![A diagram of the coordinate systems and components involved when interacting with layers in napari. The camera faces the 3D scene to generate a 2D image that is presented on the canvas.](images/3d_interaction_coordianates.png)
+ 
+ ## In 3D mode, clicks are lines
+ Since the 3D scene is rendered on a 2D surface (your screen), your mouse click does not map to a specific point in space. As the view is a [parallel projection](https://en.wikipedia.org/wiki/Parallel_projection), napari can determine a line through 3D space that intersects the canvas where the user clicked.
+ 
+-![click-line](images/3d_interaction_click_line.png)
++![A diagram that shows how clicking on a 2D position on the canvas corresponds to a 3D click line in the scene that starts from the 3D camera position.](images/3d_interaction_click_line.png)
+ 
+ When a user clicks or moves the mouse in the canvas, napari emits a mouse event with the following properties:
+ 
+@@ -25,7 +25,7 @@ When a user clicks or moves the mouse in the canvas, napari emits a mouse event
+ ## Determining where the click intersects the data
+ Each napari layer has a method called `get_ray_intersections()` that will return the points on the data bounding box that a given line will intersect (`start_point ` and `end_point `). When the click line (`view_direction`) and position (`position`) are used as inputs, `start_point` and `end_point` are the end points of the segment click line that intersects the layer's axis-alinged data bounding box. `start_point` is the end point that is closest to the camera (i.e, the "first" intersection) and `end_point` is the end point that is farthest from the camera (i.e., the "last" intersection). You can use the line segment between `start_point` and `end_point` to interrogate the layer data that is "under" your cursor.
+ 
+-![click-intersection](images/3d_interaction_ray_intersection.png)
++![A diagram that shows how the 3D click line starting from the camera position intersects with the 3D bounding box associated with a layer's data. There are two intersection points. A start point, which is the first intersection point, and the end point which is the second.](images/3d_interaction_ray_intersection.png)
+ 
+ See the `get_ray_intersection()` docstrings below for details. Note that if the line does not intersect the data bounding box (i.e., the click was outside of the data), `start_point` and `end_point` are `None`. The `position` and `view_direction` should be provided as world coordinates if `world` is set to True and in layer coordinates if `world` is set to `False`.
+ 
+diff --git a/docs/guides/contexts_expressions.md b/docs/guides/contexts_expressions.md
+index b6a6b0f8..3cb3e6e0 100644
+--- a/docs/guides/contexts_expressions.md
++++ b/docs/guides/contexts_expressions.md
+@@ -220,7 +220,7 @@ Out[15]: False
+ But unlike a simple string, they can also provide type hinting, linting
+ capabilities, and IDE autocompletion (for napari developers).
+ 
+-![context_types](images/context_type_hint.png)
++![An IDE showing a type hint for an attribute of the LayerListContextKeys class.](images/context_type_hint.png)
+ 
+ A record of all registered context keys can be retrieved with the class method
+ `ContextKey.info()`
+diff --git a/docs/guides/rendering-explanation.md b/docs/guides/rendering-explanation.md
+index ba38923f..f9b65dde 100644
+--- a/docs/guides/rendering-explanation.md
++++ b/docs/guides/rendering-explanation.md
+@@ -90,7 +90,7 @@ we cannot load data into VRAM in the background. Therefore to prevent
+ hurting the framerate we need to budget how much time is spent copying data
+ into VRAM, we can only do it for a few milliseconds per frame.
+ 
+-![paging-chunks](images/paging-chunks.png)
++![A diagram that shows how chunks of data are loaded from storage into RAM then VRAM. Each chunk is a row in a table. Each column represents a memory store or processing context. Paging and compute threads are used to load data from storage to RAM. The GUI thread is used to load data from RAM to VRAM. A subset of the rows are highlighted to show the working set of memory.](images/paging-chunks.png)
+ 
+ ## Chunks
+ 
+diff --git a/docs/howtos/layers/image.md b/docs/howtos/layers/image.md
+index 8e42ea51..e8ddc26a 100644
+--- a/docs/howtos/layers/image.md
++++ b/docs/howtos/layers/image.md
+@@ -85,7 +85,7 @@ napari to seamlessly browse enormous datasets that are loaded in the right way.
+ For example, here we are browsing over 100GB of lattice lightsheet data stored
+ in a zarr file:
+ 
+-![image: lattice light sheet microscopy](../../images/LLSM.webm)
++![napari viewer with an image layer of lattice lightsheet data opened. It can be browsed using the slider at the bottom of the viewer.](../../images/LLSM.webm)
+ 
+ ## Multiscale images
+ 
+@@ -102,7 +102,7 @@ viewed in 2D or incredibly large 3D images when viewed in 3D. For example this
+ easily browsed as at each moment in time we only load the level of the
+ multiscale image and the part of the image that needs to be displayed:
+ 
+-![image: pathology](../../images/pathology.webm)
++![napari viewer with a large image layer zoomed all the way in and all the way out in a matter of seconds thanks to multiscale image support.](../../images/pathology.webm)
+ 
+ This example had precomputed multiscale images stored in a zarr file, which is
+ best for performance. If, however you don't have a precomputed multiscale image
+@@ -144,7 +144,7 @@ viewer = napari.view_image(
+ 
+ ```
+ 
+-![image: multichannel image](../../images/multichannel_cells.png)
++![napari viewer with a multichannel image of cells displayed as two image layers: nuclei and membrane.](../../images/multichannel_cells.png)
+ 
+ ## Viewing RGB vs luminance (grayscale) images
+ 
+diff --git a/docs/howtos/layers/shapes.md b/docs/howtos/layers/shapes.md
+index c783888c..fd90350c 100644
+--- a/docs/howtos/layers/shapes.md
++++ b/docs/howtos/layers/shapes.md
+@@ -357,8 +357,7 @@ You can delete vertices to a selected shape using the vertex deletion tool which
+ can be selected either clicking on the vertex deletion tool in the layer
+ controls panel or pressing the `X` key while the shapes layer is selected.
+ 
+-For example see below: ![image: shape vertex
+-editing](../../images/shape_vertex_editing.webm)
++For example see below: ![animation of napari viewer with a shapes layer bounded by vertices over an initial static image. The shapes are selected and the vertices moved by the mouse pointer, resulting in new shapes.](../../images/shape_vertex_editing.webm)
+ 
+ ## Changing shape edge and face colors
+ 
+diff --git a/docs/plugins/find_and_install_plugin.md b/docs/plugins/find_and_install_plugin.md
+index e9f0e27f..ea90ace4 100644
+--- a/docs/plugins/find_and_install_plugin.md
++++ b/docs/plugins/find_and_install_plugin.md
+@@ -23,9 +23,9 @@ directly from within napari:
+ 
+ 1. From the “Plugins” menu, select “Install/Uninstall Plugins...”.
+ 
+-   ![napari viewer's Plugins menu with Install/Uninstall Plugins as thr first item.](/images/plugin-menu.png)
++   ![napari viewer's Plugins menu with Install/Uninstall Plugins as the first item.](/images/plugin-menu.png)
+ 
+-2. In the resulting window that opens, where it says “Install by name/URL”,
++2. In the Plugin dialog that opens, where it says “Install by name/URL”,
+     enter the name of the plugin you want to install (or *any* valid pip
+     [requirement
+     specifier](https://pip.pypa.io/en/stable/reference/requirement-specifiers/)
+diff --git a/docs/tutorials/annotation/annotate_points.md b/docs/tutorials/annotation/annotate_points.md
+index 8fde2931..7c31958f 100644
+--- a/docs/tutorials/annotation/annotate_points.md
++++ b/docs/tutorials/annotation/annotate_points.md
+@@ -15,7 +15,7 @@ point_annotator(im_path, labels=['ear_l', 'ear_r', 'tail'])
+ 
+ The resulting viewer looks like this (images from [Mathis et al., 2018](https://www.nature.com/articles/s41593-018-0209-y), downloaded from [here](https://github.com/DeepLabCut/DeepLabCut/tree/f21321ef8060c537f9df0ce9346189bda07701b5/examples/openfield-Pranav-2018-10-30/labeled-data/m4s1)):
+ 
+-![image: point annotator demo](../assets/tutorials/point_annotator_demo.webm)
++![Demo of point annotator shows user adding keypoint labels to a video of a mouse, frame by frame. The user navigates the viewer mostly with keyboard shortcuts, and uses the computer mouse to click on keypoints like the mouse's ears and tail.](../assets/tutorials/point_annotator_demo.webm)
+ 
+ You can explore the project in [this repository](https://github.com/kevinyamauchi/PointAnnotator) or check out the main function below.
+ We will walk through the code in the following sections.
+@@ -417,7 +417,7 @@ Once we are happy with the annotations, we can save them to a CSV file using the
+ To do so, first, select the "Points" layer in the layer list and then click "Save Selected layer(s)"  in the "File" menu or press control+S (cmd+S on Mac OS)  to bring up the file save dialog.
+ From here you can enter the file path and save the annotation coordinates as a CSV.
+ 
+-![image: points save dialog](../assets/tutorials/points_save_dialog.png)
++![Viewer with green box around a points layer in layer list. Label in green says "1. Select Points layer in the layer list". Dialog in the middle of the viewer has options to add save file name and choose save location, with Cancel and Save buttons in the bottom right.](../assets/tutorials/points_save_dialog.png)
+ 
+ Alternatively, we can use the `points_layer.save()` method to save the coordinates from the points layer to a CSV file.
+ We can enter the command either in the script (e.g., bind a save function to a hot key) or the napari terminal.
+diff --git a/docs/tutorials/fundamentals/installation.md b/docs/tutorials/fundamentals/installation.md
+index 3cbc7384..f99b0df4 100644
+--- a/docs/tutorials/fundamentals/installation.md
++++ b/docs/tutorials/fundamentals/installation.md
+@@ -143,7 +143,7 @@ napari
+ 
+ An empty napari viewer should appear as follows.
+ 
+-![image: An empty napari viewer](../assets/tutorials/launch_cli_empty.png)
++![macOS desktop with a napari viewer window without any image opened in the foreground, and a terminal in the background with the appropriate conda environment activated (if applicable) and the command to open napari entered.](../assets/tutorials/launch_cli_empty.png)
+ 
+ ## Choosing a different Qt backend
+ 
+@@ -189,8 +189,7 @@ page](https://github.com/napari/napari/releases) and scroll to the release you
+ are interested in and expand the `assets` tab to get a view that looks like
+ this:
+ 
+-![image: release bundle
+-assets](../assets/tutorials/installation/bundle_assets.png)
++![Cropped screenshot from GitHub with the Assets section (or "tab") expanded, containing links to download the app in the form of zip files for Linux, macOS, Windows, in addition to other links.](../assets/tutorials/installation/bundle_assets.png)
+ 
+ You can then download the appropriate zip file for your platform.
+ 
+@@ -202,41 +201,35 @@ name like `napari-0.3.7.dmg`. Double clicking the `dmg` will open a new finder
+ window giving you the option to install napari into your `Applications` folder
+ by dragging the `napari` icon onto the `Applications` icon.
+ 
+-![image: MacOS install to
+-Applications](../assets/tutorials/installation/bundle_install.png)
++![Finder window of the napari bundle dmg file, containing the napari app icon and a shortcut icon to the Applications folder.](../assets/tutorials/installation/bundle_install.png)
+ 
+ After you drag the `napari` icon onto the `Applications` icon napari will be
+ installed in your Applications folder and available for opening by double
+ clicking on it.
+ 
+-![image: MacOS Applications folder with
+-napari](../assets/tutorials/installation/bundle_applications_folder.png)
++![Finder window of the Applications folder containing the napari app.](../assets/tutorials/installation/bundle_applications_folder.png)
+ 
+ The first time you try and open napari you will get the "unverified developer
+ warning" that appears below:
+ 
+-![image: MacOS developer
+-warning](../assets/tutorials/installation/bundle_dev_warning.png)
++![Finder pop up with the warning "napari cannot be opened because the developer cannot be verified" and the options "Move to Trash" or "Cancel."](../assets/tutorials/installation/bundle_dev_warning.png)
+ 
+ Don't be alarmed, this is because the napari team has not yet obtained a
+ developer certificate from Apple, but we will be doing this promptly. It is safe
+ to click "Cancel". To get napari to open you must enter "Systems Preferences"
+ and click the "Security & Privacy" icon, circled in red below:
+ 
+-![image: MacOS Security & Privacy
+-settings](../assets/tutorials/installation/bundle_security_privacy.png)
++![MacOS System Preferences with the Security & Privacy settings on the far right of the second row.](../assets/tutorials/installation/bundle_security_privacy.png)
+ 
+ Once inside the "Security & Privacy" tab, you should see a message about napari
+ being blocked and an "Open Anyway" button, circled in red below:
+ 
+-![image: MacOS "Open Anyway"
+-settings](../assets/tutorials/installation/bundle_open_anyway.png)
++![System Preferences Security & Privacy section's General tab. At the bottom of the window there is a notification that napari was blocked and the button to "Open Anyway."](../assets/tutorials/installation/bundle_open_anyway.png)
+ 
+ After clicking this button you'll get one final warning about napari not being
+ verified, but now you'll have an "Open" button, as seen below:
+ 
+-![image: MacOS open bundle dialog
+-box](../assets/tutorials/installation/bundle_open.png)
++![Finder pop up with the warning "macOS cannot verify the developer of napari. Are you sure you want to open it?" and the options "Move to Trash," "Open," or "Cancel."](../assets/tutorials/installation/bundle_open.png)
+ 
+ After clicking "Open", the viewer should appear. Don't worry, you only have to
+ go through this process once when you install a new bundle.
+@@ -250,16 +243,13 @@ file, eg: `napari-0.3.7.msi`
+ 
+ The napari setup wizard will then open. Click "Next" to begin the installation.
+ 
+-![image: Windows napari setup
+-wizard](../assets/tutorials/installation/windows_bundle_installer_start.png)
++![napari Setup window with a welcome message and button to continue with "Next."](../assets/tutorials/installation/windows_bundle_installer_start.png)
+ 
+-![image: Windows napari setup wizard in
+-progress](../assets/tutorials/installation/windows_bundle_installer_progress.png)
++![napari Setup window in the process of installing napari. The progress bar has a Status that describes which step is in progress.](../assets/tutorials/installation/windows_bundle_installer_progress.png)
+ 
+ After the setup wizard has installed napari, click "Finish" to exit.
+ 
+-![image: Windows napari setup wizard
+-finished](../assets/tutorials/installation/windows_bundle_installer_finish.png)
++![napari Setup window success message with the button to "Finish" installation.](../assets/tutorials/installation/windows_bundle_installer_finish.png)
+ 
+ When you launch the bundled napari app on Windows, first you'll see an empty
+ command terminal appear (do not close this window - you can ignore it). The
+@@ -268,13 +258,11 @@ napari user interface window will appear a few seconds later. Note that errors
+ which might occur during your napari session will appear on the command terminal - 
+ so if something is not working, it might pay to take a look at the terminal!
+ 
+-![image: Windows command terminal on napari
+-launch](../assets/tutorials/installation/windows_bundle_command_terminal.png)
++![Windows command terminal on napari launch.](../assets/tutorials/installation/windows_bundle_command_terminal.png)
+ 
+ You can launch napari from the Windows start menu.
+ 
+-![image: Windows launch napari from start
+-menu](../assets/tutorials/installation/windows_launch_napari.png)
++![Windows start menu with napari listed as a launchable app.](../assets/tutorials/installation/windows_launch_napari.png)
+ 
+ The very first time you launch napari the startup time will be fairly slow, but
+ after that you will find that napari launches more quickly.

@@ -1,0 +1,127 @@
+From 153467c85be4ec52d41c40704aa30f9c1d2e65c7 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Christopher=20Nauroth-Kre=C3=9F?=
+ <56394171+Chris-N-K@users.noreply.github.com>
+Date: Thu, 5 Jan 2023 03:52:45 +0100
+Subject: [PATCH] Added info for conda installation problems (#51)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+* Added info for conda installation problems
+
+* Update docs/tutorials/fundamentals/installation.md
+
+Co-authored-by: Peter Sobolewski <76622105+psobolewskiPhD@users.noreply.github.com>
+
+* Update docs/tutorials/fundamentals/installation.md
+
+Co-authored-by: Peter Sobolewski <76622105+psobolewskiPhD@users.noreply.github.com>
+
+* Conda per @jaimergp
+Version by @melissawm
+
+* Add note about checking napari version
+
+* Add the myst_subs for napari version
+
+* use python 3.9 in the example, add link to mamba
+
+* Don't use versions in codeblock
+
+* Fix version?
+
+* make 0.x.y version string
+
+* work around no substitution in code blocks
+
+* Tweak version Note
+
+* @czaki trick to sub the whole strong
+
+Co-authored-by: Grzegorz Bokota <bokota+github@gmail.com>
+
+* @czaki fix
+
+Co-authored-by: Grzegorz Bokota <bokota+github@gmail.com>
+
+* tweak wording
+
+* fix the non-code version substitution
+
+* Update docs/tutorials/fundamentals/installation.md
+
+Co-authored-by: Jaime Rodríguez-Guerra <jaimergp@users.noreply.github.com>
+
+Co-authored-by: Christopher Nauroth-Kreß <56394171+ch-n@users.noreply.github.com>
+Co-authored-by: Peter Sobolewski <76622105+psobolewskiPhD@users.noreply.github.com>
+Co-authored-by: Peter Sobolewski <pete.sd@gmail.com>
+Co-authored-by: Grzegorz Bokota <bokota+github@gmail.com>
+Co-authored-by: Jaime Rodríguez-Guerra <jaimergp@users.noreply.github.com>
+---
+ docs/conf.py                                |  8 ++++++++
+ docs/tutorials/fundamentals/installation.md | 18 +++++++++++++++++-
+ 2 files changed, 25 insertions(+), 1 deletion(-)
+
+diff --git a/docs/conf.py b/docs/conf.py
+index 1b13ca8d..55991dbe 100644
+--- a/docs/conf.py
++++ b/docs/conf.py
+@@ -23,6 +23,7 @@
+ from jinja2.filters import FILTERS
+ 
+ import napari
++from napari._version import __version_tuple__
+ 
+ release = napari.__version__
+ version = "dev" if "dev" in release else release
+@@ -159,6 +160,13 @@
+ 
+ myst_heading_anchors = 3
+ 
++version_string = '.'.join(str(x) for x in __version_tuple__[:3])
++
++myst_substitutions = {
++   "napari_conda_version": f"`napari={version_string}`",
++   "napari_version": version_string,
++ }
++
+ nb_output_stderr = 'show'
+ 
+ panels_add_bootstrap_css = False
+diff --git a/docs/tutorials/fundamentals/installation.md b/docs/tutorials/fundamentals/installation.md
+index f99b0df4..2af135ba 100644
+--- a/docs/tutorials/fundamentals/installation.md
++++ b/docs/tutorials/fundamentals/installation.md
+@@ -116,8 +116,20 @@ If you want to install napari with PySide2 as the backend you need to install it
+ 
+ ```sh
+ conda install -c conda-forge "napari=*=*pyside2"
+-```  
++``` 
++````
+ 
++````{note}
++In some cases, `conda`'s default solver can struggle to find out which packages need to be
++installed for napari. If it takes too long or you get the wrong version of napari 
++(see below), consider:
++1. Overriding your default channels to use only `conda-forge` by adding `--override-channels`
++and specifying the napari and Python versions explicitly. For example, use `python=3.9` to get 
++Python 3.9 and {{ napari_conda_version }} to specify the napari version as 
++{{ napari_version }}, the current release.
++2. You can try installing [`mamba`](https://github.com/mamba-org/mamba) in your base
++environment with `conda install -n base -c conda-forge mamba` and use its faster solver
++by replacing `conda` for `mamba` in the above instructions.
+ ````
+ 
+ 
+@@ -143,6 +155,10 @@ napari
+ 
+ An empty napari viewer should appear as follows.
+ 
++````{note}
++You can check the napari version, to ensure it's what you expect, for example
++the current release {{ napari_version }}, using command: `napari --version` .
++````
+ ![macOS desktop with a napari viewer window without any image opened in the foreground, and a terminal in the background with the appropriate conda environment activated (if applicable) and the command to open napari entered.](../assets/tutorials/launch_cli_empty.png)
+ 
+ ## Choosing a different Qt backend

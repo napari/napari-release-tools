@@ -1,0 +1,22 @@
+From 713df7f3bd9b8ba7c9c682cc6c019599b74e9a51 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Melissa=20Weber=20Mendon=C3=A7a?= <melissawm@gmail.com>
+Date: Tue, 9 May 2023 10:35:22 -0300
+Subject: [PATCH] Fix version switcher URL for the latest docs version (#148)
+
+---
+ docs/conf.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/docs/conf.py b/docs/conf.py
+index 72fae9df..b75f9ae2 100644
+--- a/docs/conf.py
++++ b/docs/conf.py
+@@ -98,7 +98,7 @@
+     "navbar_start": ["navbar-project"],
+     "navbar_end": ["version-switcher", "navbar-icon-links"],
+     "switcher": {
+-        "json_url": "https://napari.org/version_switcher.json",
++        "json_url": json_url,
+         "version_match": version_match,
+     },
+ }

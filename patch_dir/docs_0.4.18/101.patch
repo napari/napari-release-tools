@@ -1,0 +1,23 @@
+From c3d08e346a1b91a5e72ef0b3e9b07f965d964c92 Mon Sep 17 00:00:00 2001
+From: Oren Amsalem <oren.amsalem1@mail.huji.ac.il>
+Date: Thu, 2 Feb 2023 13:41:51 +0200
+Subject: [PATCH] change blob example to be self contained (#101)
+
+Labels layer how-to, ensure imports are in code snippet so it can be copy-pasted and run.
+---
+ docs/howtos/layers/labels.md | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/docs/howtos/layers/labels.md b/docs/howtos/layers/labels.md
+index 48c1684d..d84196d3 100644
+--- a/docs/howtos/layers/labels.md
++++ b/docs/howtos/layers/labels.md
+@@ -143,6 +143,8 @@ browse volumetric timeseries data and other high dimensional data.
+ 
+ ```{code-cell} python
+ :tags: [remove-output]
++import napari
++from skimage import data
+ from scipy import ndimage as ndi
+ 
+ blobs = data.binary_blobs(length=128, volume_fraction=0.1, n_dim=3)

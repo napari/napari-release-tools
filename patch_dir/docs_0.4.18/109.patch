@@ -1,0 +1,32 @@
+From b8440927ff8a938732777a295ae67b52c52f442b Mon Sep 17 00:00:00 2001
+From: Juan Nunez-Iglesias <jni@fastmail.com>
+Date: Wed, 12 Apr 2023 23:50:28 +1000
+Subject: [PATCH] Update version switcher json (#109)
+
+---
+ docs/_static/version_switcher.json | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
+
+diff --git a/docs/_static/version_switcher.json b/docs/_static/version_switcher.json
+index 3fb59a35..02cd1efc 100644
+--- a/docs/_static/version_switcher.json
++++ b/docs/_static/version_switcher.json
+@@ -5,10 +5,15 @@
+ 		"url": "https://napari.org/dev/"
+ 	},
+ 	{
+-		"name": "stable",
+-		"version": "0.4.16",
++		"name": "stable (0.4.17)",
++		"version": "0.4.17",
+ 		"url": "https://napari.org/stable/"
+-	}
++	},
++	{
++		"name": "0.4.16",
++		"version": "0.4.16",
++		"url": "https://napari.org/0.4.16/"
++	},
+ 	{
+ 		"name": "0.4.15",
+ 		"version": "0.4.15",

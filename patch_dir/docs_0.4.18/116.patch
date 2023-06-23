@@ -1,0 +1,27 @@
+From 114c0ffd88b9b9f73b669832902d8bea100810b0 Mon Sep 17 00:00:00 2001
+From: Juan Nunez-Iglesias <jni@fastmail.com>
+Date: Fri, 3 Mar 2023 00:40:21 +1100
+Subject: [PATCH] Update requirements and config for sphinx-favicon for 1.0
+ (#116)
+
+# Description
+
+Closes #115
+---
+ docs/conf.py     | 2 +-
+ requirements.txt | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/docs/conf.py b/docs/conf.py
+index 41db90c2..8273e4d2 100644
+--- a/docs/conf.py
++++ b/docs/conf.py
+@@ -61,7 +61,7 @@
+     'myst_nb',
+     #    "sphinx_comments",
+     "sphinx.ext.viewcode",
+-    "sphinx-favicon",
++    "sphinx_favicon",
+     "sphinx_copybutton",
+     "sphinx_gallery.gen_gallery",
+     "sphinx_tags",
