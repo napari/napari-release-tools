@@ -60,3 +60,5 @@ for pull in iter_pull_request(f"milestone:{args.milestone} is:merged"):
 
 for login, name in sorted(missing_authors):
     print(f"@{login} ", end="")# ({name})")
+
+print()

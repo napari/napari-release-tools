@@ -1,0 +1,204 @@
+From 642574d1a960bd15a2c3c6f7928539c6d58ccb6f Mon Sep 17 00:00:00 2001
+From: Grzegorz Bokota <bokota+github@gmail.com>
+Date: Thu, 13 Apr 2023 14:05:53 +0200
+Subject: [PATCH] Improve preferences genration (#5696)
+
+<!-- What does this pull request (PR) do? Why is it necessary? -->
+<!-- Tell us about your new feature, improvement, or fix! -->
+<!-- If your change includes user interface changes, please add an
+image, or an animation "An image is worth a thousand words!" -->
+<!-- You can use https://www.cockos.com/licecap/ or similar to create
+animations -->
+
+Improvements in settings generation when settings have only one field.
+Also, update name show on top of group to use `title` instead of class
+name
+
+This PR:
+
+![obraz](https://user-images.githubusercontent.com/3826210/230038230-f65c26d9-29b9-4725-9626-a54d558ad9a4.png)
+
+Current main:
+
+![obraz](https://user-images.githubusercontent.com/3826210/230038392-f77d9ecf-260c-46db-82d2-e5eec26d9804.png)
+
+<!-- What resources, documentation, and guides were used in the creation
+of this PR? -->
+
+This PR is inspired by #5679 showed on community meeting
+
+<!-- Please delete options that are not relevant. -->
+- [ ] Refactor
+
+<!-- Please describe the tests that you ran to verify your changes. -->
+- [ ] example: the test suite for my feature covers cases x, y, and z
+- [ ] example: all tests pass with my change
+- [ ] example: I check if my changes works with both PySide and PyQt
+backends
+      as there are small differences between the two Qt bindings.
+
+- [ ] My PR is the minimum possible work for the desired functionality
+- [ ] I have commented my code, particularly in hard-to-understand areas
+- [ ] I have made corresponding changes to the documentation
+- [ ] I have added tests that prove my fix is effective or that my
+feature works
+- [ ] If I included new strings, I have used `trans.` to make them
+localizable.
+For more information see our [translations
+guide](https://napari.org/developers/translations.html).
+---
+ napari/_qt/dialogs/preferences_dialog.py      | 30 ++++++++++++-
+ .../qt_jsonschema_form/form.py                |  3 ++
+ .../qt_jsonschema_form/widgets.py             | 43 +++++++++----------
+ napari/settings/_shortcuts.py                 |  3 +-
+ 4 files changed, 53 insertions(+), 26 deletions(-)
+
+diff --git a/napari/_qt/dialogs/preferences_dialog.py b/napari/_qt/dialogs/preferences_dialog.py
+index 216a1feb..d3d2a1f9 100644
+--- a/napari/_qt/dialogs/preferences_dialog.py
++++ b/napari/_qt/dialogs/preferences_dialog.py
+@@ -153,7 +153,35 @@ class PreferencesDialog(QDialog):
+         """Provides the schema, set of values for each setting, and the
+         properties for each setting."""
+         ftype = cast('BaseModel', field.type_)
+-        schema = json.loads(ftype.schema_json())
++
++        # TODO make custom shortcuts dialog to properly capture new
++        #      functionality once we switch to app-model's keybinding system
++        #      then we can remove the below code used for autogeneration
++        if field.name == 'shortcuts':
++            # hardcode workaround because pydantic's schema generation
++            # does not allow you to specify custom JSON serialization
++            schema = {
++                "title": "ShortcutsSettings",
++                "type": "object",
++                "properties": {
++                    "shortcuts": {
++                        "title": field.type_.__fields__[
++                            "shortcuts"
++                        ].field_info.title,
++                        "description": field.type_.__fields__[
++                            "shortcuts"
++                        ].field_info.description,
++                        "type": "object",
++                    }
++                },
++            }
++        else:
++            schema = json.loads(ftype.schema_json())
++
++        if field.field_info.title:
++            schema["title"] = field.field_info.title
++        if field.field_info.description:
++            schema["description"] = field.field_info.description
+ 
+         # find enums:
+         for name, subfield in ftype.__fields__.items():
+diff --git a/napari/_vendor/qt_json_builder/qt_jsonschema_form/form.py b/napari/_vendor/qt_json_builder/qt_jsonschema_form/form.py
+index b7af425e..41505d0a 100644
+--- a/napari/_vendor/qt_json_builder/qt_jsonschema_form/form.py
++++ b/napari/_vendor/qt_json_builder/qt_jsonschema_form/form.py
+@@ -120,6 +120,9 @@ class WidgetBuilder:
+         if "enum" in schema:
+             default_variant = "enum"
+ 
++        if schema.get("description"):
++            description = schema["description"]
++
+         widget_variant = ui_schema.get('ui:widget', default_variant)
+         widget_cls = self.widget_map[schema_type][widget_variant]
+         widget = widget_cls(schema, ui_schema, self)
+diff --git a/napari/_vendor/qt_json_builder/qt_jsonschema_form/widgets.py b/napari/_vendor/qt_json_builder/qt_jsonschema_form/widgets.py
+index 4e245901..175270c5 100644
+--- a/napari/_vendor/qt_json_builder/qt_jsonschema_form/widgets.py
++++ b/napari/_vendor/qt_json_builder/qt_jsonschema_form/widgets.py
+@@ -685,6 +685,20 @@ class ObjectSchemaWidgetMinix(SchemaWidgetMixin):
+     ) -> Dict[str, QtWidgets.QWidget]:
+         raise NotImplementedError
+ 
++    def _prepare_widget(self, name: str, sub_schema: dict, widget_builder: 'WidgetBuilder', ui_schema: dict):
++        description = sub_schema.get('description', "")
++
++        label = QtWidgets.QLabel(sub_schema.get("title", name))
++
++        sub_ui_schema = ui_schema.get(name, {})
++        widget = widget_builder.create_widget(
++            sub_schema, sub_ui_schema, description=description
++        )  # TODO on changed
++        widget._name = name
++        widget.on_changed.connect(partial(self.widget_on_changed, name))
++
++        return label, widget
++
+ class HorizontalObjectSchemaWidget(ObjectSchemaWidgetMinix, QtWidgets.QWidget):
+     def populate_from_schema(
+         self,
+@@ -697,20 +711,9 @@ class HorizontalObjectSchemaWidget(ObjectSchemaWidgetMinix, QtWidgets.QWidget):
+ 
+         widgets = {}
+         for name, sub_schema in schema['properties'].items():
+-            description = sub_schema.get('description', "")
+-
+-            label = QtWidgets.QLabel(sub_schema.get("title", name))
++            label, widget = self._prepare_widget(name, sub_schema, widget_builder, ui_schema)
+             layout.addWidget(label)
+-
+-            sub_ui_schema = ui_schema.get(name, {})
+-            widget = widget_builder.create_widget(
+-                sub_schema, sub_ui_schema, description=description
+-            )  # TODO onchanged
+-            widget._name = name
+-            widget.on_changed.connect(partial(self.widget_on_changed, name))
+             layout.addWidget(widget)
+-
+-
+             widgets[name] = widget
+ 
+         return widgets
+@@ -737,17 +740,11 @@ class ObjectSchemaWidget(ObjectSchemaWidgetMinix, QtWidgets.QGroupBox):
+         widgets = {}
+         layout.setFieldGrowthPolicy(QtWidgets.QFormLayout.FieldGrowthPolicy(1))
+         for name, sub_schema in schema['properties'].items():
+-            description = sub_schema.get('description', "")
+-
+-
+-            sub_ui_schema = ui_schema.get(name, {})
+-            widget = widget_builder.create_widget(
+-                sub_schema, sub_ui_schema, description=description
+-            )  # TODO onchanged
+-            widget._name = name
+-            widget.on_changed.connect(partial(self.widget_on_changed, name))
+-            label = sub_schema.get("title", name)
+-            layout.addRow(label, widget)
++            label, widget = self._prepare_widget(name, sub_schema, widget_builder, ui_schema)
++            if len(schema['properties']) == 1:
++                layout.addRow(widget)
++            else:
++                layout.addRow(label, widget)
+             widgets[name] = widget
+ 
+         return widgets
+diff --git a/napari/settings/_shortcuts.py b/napari/settings/_shortcuts.py
+index de3b36db..fb86de4c 100644
+--- a/napari/settings/_shortcuts.py
++++ b/napari/settings/_shortcuts.py
+@@ -8,7 +8,6 @@ from napari.utils.translations import trans
+ 
+ 
+ class ShortcutsSettings(EventedModel):
+-    # FIXME user with modified shortcut will not see new shortcut
+     shortcuts: Dict[str, List[str]] = Field(
+         default_shortcuts,
+         title=trans._("shortcuts"),
+@@ -21,7 +20,7 @@ class ShortcutsSettings(EventedModel):
+         # Napari specific configuration
+         preferences_exclude = ['schema_version']
+ 
+-    @validator('shortcuts')
++    @validator('shortcuts', allow_reuse=True)
+     def shortcut_validate(cls, v):
+         for name, value in default_shortcuts.items():
+             if name not in v:
+-- 
+2.34.1
+

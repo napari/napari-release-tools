@@ -15,6 +15,7 @@ from release_utils import (
     iter_pull_request,
     pr_num_pattern,
     setup_cache,
+    GH, GH_REPO, GH_USER
 )
 
 
@@ -49,13 +50,6 @@ parser.add_argument(
     '--stop-after', help='Stop after this commit', default=0, type=int
 )
 parser.add_argument(
-    "--git-repository",
-    help="The git repository",
-    default=os.environ.get(
-        "GIT_RELEASE_REPOSITORY", "git@github.com:napari/napari.git"
-    ),
-)
-parser.add_argument(
     "--git-main-branch",
     help="The git main branch",
     default=os.environ.get("GIT_RELEASE_MAIN_BRANCH", "main"),
@@ -63,8 +57,6 @@ parser.add_argument(
 
 LOCAL_DIR = Path(__file__).parent
 
-if not (LOCAL_DIR / "patch_dir").exists():
-    (LOCAL_DIR / "patch_dir").mkdir()
 
 
 args = parser.parse_args()
@@ -72,7 +64,7 @@ args = parser.parse_args()
 target_branch = f"v{args.milestone}x"
 
 if not (LOCAL_DIR / "napari_repo").exists():
-    repo = Repo.clone_from(args.git_repository, LOCAL_DIR / "napari_repo")
+    repo = Repo.clone_from(f"git@{GH}:{GH_USER}/{GH_REPO}.git", LOCAL_DIR / "napari_repo")
 else:
     repo = Repo(LOCAL_DIR / "napari_repo")
 
@@ -89,6 +81,16 @@ else:
 setup_cache()
 
 milestone = get_milestone(args.milestone)
+
+
+
+if not (LOCAL_DIR / "patch_dir").exists():
+    (LOCAL_DIR / "patch_dir").mkdir()
+
+patch_dir_path =  LOCAL_DIR / "patch_dir" / milestone.title
+
+if not patch_dir_path.exists():
+    patch_dir_path.mkdir()
 
 # with short_cache(60):
 iterable = [
@@ -133,7 +135,7 @@ for pull in tqdm(pr_list):
     # commit = repo.commit(pr_commits_dict[pull.number])
     # print("hash",  pr_commits_dict[pull.number])
     # break
-    patch_file = LOCAL_DIR / "patch_dir" / f"{pull.number}.patch"
+    patch_file = patch_dir_path / f"{pull.number}.patch"
     if patch_file.exists():
         print(f"Apply patch {patch_file}")
         repo.git.am(str(patch_file))
@@ -144,5 +146,5 @@ for pull in tqdm(pr_list):
         print(pull, pr_commits_dict[pull.number])
         repo.git.mergetool()
         repo.git.cherry_pick('--continue')
-        with open(LOCAL_DIR / "patch_dir" / f"{pull.number}.patch", "w") as f:
+        with open(patch_file, "w") as f:
             f.write(repo.git.format_patch("HEAD~1", '--stdout'))

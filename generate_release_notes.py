@@ -193,6 +193,6 @@ for section_name, contributor_set in contributors.items():
     print()
 
     for c in sorted(contributor_set, key=lambda x: users[x].lower()):
-        commit_link = f"{GH}/{GH_USER}/{GH_REPO}/commits?author={c}"
+        commit_link = f"https://{GH}/{GH_USER}/{GH_REPO}/commits?author={c}"
         print(f"- [{users[c]}]({commit_link}) - @{c}")
     print()

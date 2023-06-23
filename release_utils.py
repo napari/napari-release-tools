@@ -54,9 +54,9 @@ def setup_cache(timeout=3600):
     )
 
 
-GH = "https://github.com"
-GH_USER = 'napari'
-GH_REPO = 'napari'
+GH =  os.environ.get("GH", "github.com")
+GH_USER = os.environ.get("GH_USER" ,'napari')
+GH_REPO = os.environ.get("GH_REPO", 'napari')
 GH_TOKEN = os.environ.get('GH_TOKEN')
 if GH_TOKEN is None:
     raise RuntimeError(
@@ -77,7 +77,7 @@ def get_github():
     return _G
 
 
-def get_repo():
+def get_repo(user=GH_USER, repo=GH_REPO):
     g = get_github()
     return g.get_repo(f'{GH_USER}/{GH_REPO}')
 
@@ -142,9 +142,9 @@ def get_split_date(previous_release, rev="main"):
     )
 
 
-def iter_pull_request(additional_query):
+def iter_pull_request(additional_query, user=GH_USER, repo=GH_REPO):
     iterable = get_github().search_issues(
-        f"repo:{GH_USER}/{GH_REPO} "
+        f"repo:{user}/{repo} "
         "is:pr "
         "sort:created-asc " + additional_query
     )
