@@ -100,9 +100,7 @@ pr_list_base = sorted(
     key=lambda x: x.closed_at,  
     )
 
-skip_pr = {58, 106, 149, 151, 181} | get_consumed_pr()
-
-
+skip_pr = {58, 106, 149, 151, 181, 175} | get_consumed_pr()
 
 
 for pull in tqdm(pr_list_base):
