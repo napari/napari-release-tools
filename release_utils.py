@@ -160,4 +160,4 @@ def iter_pull_request(additional_query, user=GH_USER, repo=GH_REPO):
         yield pull_issue.as_pull_request()
 
 
-BOT_LIST = {"github-actions[bot]", "pre-commit-ci[bot]", "dependabot[bot]", "napari-bot"}
+BOT_LIST = {"github-actions[bot]", "pre-commit-ci[bot]", "dependabot[bot]", "napari-bot", None}

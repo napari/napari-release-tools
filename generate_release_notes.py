@@ -47,6 +47,7 @@ LOCAL_DIR = Path(__file__).parent
 
 parser = argparse.ArgumentParser(usage=__doc__)
 parser.add_argument('milestone', help='The milestone to list')
+parser.add_argument('--target-directory', type=Path, default=None)
 parser.add_argument("--correction-file", help="The file with the corrections", default=LOCAL_DIR / "name_corrections.yaml")
 
 args = parser.parse_args()
@@ -76,7 +77,10 @@ def add_to_users(users, new_user):
 
 authors = set()
 committers = set()
+docs_authors = set()
+docs_committers = set()
 reviewers = set()
+docs_reviewers = set()
 users = {}
 
 highlights = {}
@@ -130,12 +134,36 @@ for pull in iter_pull_request(f"milestone:{args.milestone} is:merged"):
     pr_lables = {label.name.lower() for label in pull.labels}
     for label_name, section in label_to_section.items():
         if label_name in pr_lables:
-            highlights[section][pull.number] = {'summary': summary}
+            highlights[section][pull.number] = {'summary': summary, "repo": "napari"}
             assigned_to_section = True
 
     if not assigned_to_section:
-        other_pull_requests[pull.number] = {'summary': summary}
+        other_pull_requests[pull.number] = {'summary': summary, "repo": "napari"}
 
+
+for pull in iter_pull_request(f"milestone:{args.milestone} is:merged" ,repo="docs"):
+    issue = pull.as_issue()
+    assert pull.merged 
+
+    issue.user.login
+
+    add_to_users(users, issue.user)
+    docs_authors.add(issue.user.login)
+
+
+    summary = pull.title
+
+    for review in pull.get_reviews():
+        if review.user is not None:
+            add_to_users(users, review.user)
+            docs_reviewers.add(review.user.login)
+    assigned_to_section = False
+    pr_lables = {label.name.lower() for label in pull.labels}
+    if "maintenance" in pr_lables:
+        other_pull_requests[pull.number] = {'summary': summary, "repo": "docs"}
+    else:
+        highlights["Documentation"][pull.number] = {'summary': summary, "repo": "docs"}
+    
 
 # add Other PRs to the ordered dict to make doc generation easier.
 highlights['Other Pull Requests'] = other_pull_requests
@@ -144,11 +172,29 @@ highlights['Other Pull Requests'] = other_pull_requests
 # remove these bots.
 committers -= BOT_LIST
 authors  -= BOT_LIST
+docs_committers -= BOT_LIST
+docs_authors -= BOT_LIST
+
+
+user_name_pattern = re.compile(r"@([\w-]+)")  # pattern for GitHub user names
+
+old_contributors = set()
+
+if args.target_directory is None:
+    file_handle = sys.stdout
+else:
+    res_file_name = f"release_{args.milestone.replace('.', '_')}.md"
+    file_handle = open(args.target_directory / res_file_name, "w")
+    for file_path in args.target_directory.glob("release_*.md"):
+        if file_path.name == res_file_name:
+            continue
+        with open(file_path) as f:
+            old_contributors.update(user_name_pattern.findall(f.read()))
 
 
 # Now generate the release notes
 title = f'# napari {args.milestone}'
-print(title)
+print(title, file=file_handle)
 
 print(
     f"""
@@ -157,42 +203,59 @@ napari is a fast, interactive, multi-dimensional image viewer for Python.
 It's designed for browsing, annotating, and analyzing large multi-dimensional
 images. It's built on top of Qt (for the GUI), vispy (for performant GPU-based
 rendering), and the scientific Python stack (numpy, scipy).
-"""
+""",
+file=file_handle,
 )
 
 print(
     """
 For more information, examples, and documentation, please visit our website:
 https://github.com/napari/napari
-"""
+""",
+file=file_handle,
 )
 
 for section, pull_request_dicts in highlights.items():
-    print(f'## {section}\n')
+    print(f'## {section}\n', file=file_handle)
     for number, pull_request_info in pull_request_dicts.items():
-        print(f'- {pull_request_info["summary"]} (#{number})')
-    print()
+        repo_str = pull_request_info["repo"]
+        print(f'- {pull_request_info["summary"]} ([napari/{repo_str}/#{number}](https://{GH}/{GH_USER}/{repo_str}/pull/{number}))', file=file_handle)
+    print("", file=file_handle)
 
 
 contributors = {}
 
 contributors['authors'] = authors
 contributors['reviewers'] = reviewers
+contributors['docs authors'] = docs_authors
+contributors['docs reviewers'] = docs_reviewers
 # ignore committers
 # contributors['committers'] = committers
 
 for section_name, contributor_set in contributors.items():
-    print()
+    print("", file=file_handle)
     if None in contributor_set:
         contributor_set.remove(None)
     committer_str = (
         f'## {len(contributor_set)} {section_name} added to this '
         'release (alphabetical)'
     )
-    print(committer_str)
-    print()
+    print(committer_str, file=file_handle)
+    print("", file=file_handle)
 
     for c in sorted(contributor_set, key=lambda x: users[x].lower()):
         commit_link = f"https://{GH}/{GH_USER}/{GH_REPO}/commits?author={c}"
-        print(f"- [{users[c]}]({commit_link}) - @{c}")
-    print()
+        print(f"- [{users[c]}]({commit_link}) - @{c}", file=file_handle)
+    print("", file=file_handle)
+
+new_contributors =  (authors | docs_authors) - old_contributors
+
+
+if old_contributors and new_contributors: 
+    print("## New Contributors", file=file_handle)
+    print("", file=file_handle)
+    print(f"There are {len(new_contributors)} new contributors for this release:", file=file_handle)
+    print("", file=file_handle)
+    for c in sorted(new_contributors, key=lambda x: users[x].lower()):
+        commit_link = f"https://{GH}/{GH_USER}/{GH_REPO}/commits?author={c}"
+        print(f"- [{users[c]}]({commit_link}) - @{c}", file=file_handle)
