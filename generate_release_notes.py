@@ -233,6 +233,10 @@ contributors['docs reviewers'] = docs_reviewers
 # contributors['committers'] = committers
 
 for section_name, contributor_set in contributors.items():
+    if section_name.startswith("docs"):
+        repo_name = "docs"
+    else:
+        repo_name = "napari"
     print("", file=file_handle)
     if None in contributor_set:
         contributor_set.remove(None)
@@ -244,7 +248,7 @@ for section_name, contributor_set in contributors.items():
     print("", file=file_handle)
 
     for c in sorted(contributor_set, key=lambda x: users[x].lower()):
-        commit_link = f"https://{GH}/{GH_USER}/{GH_REPO}/commits?author={c}"
+        commit_link = f"https://{GH}/{GH_USER}/{repo_name}/commits?author={c}"
         print(f"- [{users[c]}]({commit_link}) - @{c}", file=file_handle)
     print("", file=file_handle)
 
@@ -258,4 +262,11 @@ if old_contributors and new_contributors:
     print("", file=file_handle)
     for c in sorted(new_contributors, key=lambda x: users[x].lower()):
         commit_link = f"https://{GH}/{GH_USER}/{GH_REPO}/commits?author={c}"
-        print(f"- [{users[c]}]({commit_link}) - @{c}", file=file_handle)
+        docs_commit_link = f"https://{GH}/{GH_USER}/docs/commits?author={c}"
+        if c in authors and c in docs_authors:
+            print(f"- {users[c]} [docs]({docs_commit_link}) [napari]({commit_link}) - @{c}", file=file_handle)
+        elif c in authors:
+            print(f"- {users[c]} [napari]({commit_link}) - @{c}", file=file_handle)
+        else:
+            print(f"- {users[c]} [docs]({docs_commit_link}) - @{c}", file=file_handle)
+
