@@ -11,11 +11,13 @@ from git import GitCommandError, Repo
 from tqdm import tqdm
 
 from release_utils import (
+    GH,
+    GH_REPO,
+    GH_USER,
     get_milestone,
     iter_pull_request,
     pr_num_pattern,
     setup_cache,
-    GH, GH_REPO, GH_USER
 )
 
 
@@ -41,14 +43,12 @@ def get_consumed_pr():
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('base_branch', help='The base branch.')
-parser.add_argument('milestone', help='The milestone to list')
+parser.add_argument("base_branch", help="The base branch.")
+parser.add_argument("milestone", help="The milestone to list")
 parser.add_argument(
-    '--first-commits', help='file with list of first commits to cherry pick'
+    "--first-commits", help="file with list of first commits to cherry pick"
 )
-parser.add_argument(
-    '--stop-after', help='Stop after this commit', default=0, type=int
-)
+parser.add_argument("--stop-after", help="Stop after this commit", default=0, type=int)
 parser.add_argument(
     "--git-main-branch",
     help="The git main branch",
@@ -58,21 +58,22 @@ parser.add_argument(
 LOCAL_DIR = Path(__file__).parent
 
 
-
 args = parser.parse_args()
 
 target_branch = f"v{args.milestone}x"
 
 if not (LOCAL_DIR / "napari_repo").exists():
-    repo = Repo.clone_from(f"git@{GH}:{GH_USER}/{GH_REPO}.git", LOCAL_DIR / "napari_repo")
+    repo = Repo.clone_from(
+        f"git@{GH}:{GH_USER}/{GH_REPO}.git", LOCAL_DIR / "napari_repo"
+    )
 else:
     repo = Repo(LOCAL_DIR / "napari_repo")
 
 if target_branch not in repo.branches:
     repo.git.checkout(args.base_branch)
-    repo.git.checkout('HEAD', b=target_branch)
+    repo.git.checkout("HEAD", b=target_branch)
 else:
-    repo.git.reset('--hard', "HEAD")
+    repo.git.reset("--hard", "HEAD")
     repo.git.checkout(args.git_main_branch)
     repo.git.pull()
     repo.git.checkout(target_branch)
@@ -83,11 +84,10 @@ setup_cache()
 milestone = get_milestone(args.milestone)
 
 
-
 if not (LOCAL_DIR / "patch_dir").exists():
     (LOCAL_DIR / "patch_dir").mkdir()
 
-patch_dir_path =  LOCAL_DIR / "patch_dir" / milestone.title
+patch_dir_path = LOCAL_DIR / "patch_dir" / milestone.title
 
 if not patch_dir_path.exists():
     patch_dir_path.mkdir()
@@ -145,6 +145,6 @@ for pull in tqdm(pr_list):
     except GitCommandError:
         print(pull, pr_commits_dict[pull.number])
         repo.git.mergetool()
-        repo.git.cherry_pick('--continue')
+        repo.git.cherry_pick("--continue")
         with open(patch_file, "w") as f:
-            f.write(repo.git.format_patch("HEAD~1", '--stdout'))
+            f.write(repo.git.format_patch("HEAD~1", "--stdout"))

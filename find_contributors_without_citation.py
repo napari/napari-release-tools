@@ -1,23 +1,34 @@
 import argparse
-import sys
 from pathlib import Path
-
-from tqdm import tqdm
 
 from yaml import safe_load
 
 from release_utils import (
-    setup_cache,
     get_milestone,
     iter_pull_request,
+    setup_cache,
 )
 
 LOCAL_DIR = Path(__file__).parent
 
 parser = argparse.ArgumentParser()
-parser.add_argument('milestone', help='The milestone to check')
-parser.add_argument("--correction-file", help="The file with the corrections", default=LOCAL_DIR / "name_corrections.yaml")
-parser.add_argument("--citation-path", help="", default=LOCAL_DIR / "napari_repo" / "CITATION.cff", type=Path)
+parser.add_argument("milestone", help="The milestone to check")
+parser.add_argument(
+    "--correction-file",
+    help="The file with the corrections",
+    default=LOCAL_DIR / "name_corrections.yaml",
+)
+parser.add_argument(
+    "--citation-path",
+    help="",
+    default=LOCAL_DIR / "napari_repo" / "CITATION.cff",
+    type=Path,
+)
+parser.add_argument(
+    "--generate",
+    help="Generate the missing entries based on github data",
+    action="store_true",
+)
 
 args = parser.parse_args()
 
@@ -40,9 +51,6 @@ with open(args.correction_file) as f:
         correction_dict[correction["login"]] = correction["corrected_name"]
 
 
-
-print(citation)
-
 setup_cache()
 
 milestone = get_milestone(args.milestone)
@@ -53,12 +61,29 @@ missing_authors = set()
 for pull in iter_pull_request(f"milestone:{args.milestone} is:merged"):
     issue = pull.as_issue()
     creator = issue.user
-    if creator.login in {"github-actions[bot]", "pre-commit-ci[bot]", "dependabot[bot]", "napari-bot"}:
+    if creator.login in {
+        "github-actions[bot]",
+        "pre-commit-ci[bot]",
+        "dependabot[bot]",
+        "napari-bot",
+    }:
         continue
     if correction_dict.get(creator.login, creator.name) not in author_dict:
         missing_authors.add((creator.login, creator.name))
 
-for login, name in sorted(missing_authors):
-    print(f"@{login} ", end="")# ({name})")
+if args.generate:
+    for login, name in sorted(missing_authors):
+        if name is None:
+            continue
+        name, sure_name = name.rsplit(" ", 1)
+        print(
+            f"""- given-names: {name}
+  family-names: {sure_name}
+""",
+            end="",
+        )
+else:
+    for login, name in sorted(missing_authors):
+        print(f"@{login} ", end="")  # ({name})")
 
 print()

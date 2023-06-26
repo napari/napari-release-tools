@@ -14,8 +14,8 @@ from release_utils import (
 )
 
 parser = argparse.ArgumentParser(usage=__doc__)
-parser.add_argument('from_commit', help='The starting tag.')
-parser.add_argument('to_commit', help='The head branch.')
+parser.add_argument("from_commit", help="The starting tag.")
+parser.add_argument("to_commit", help="The head branch.")
 parser.add_argument(
     "--milestone",
     help="if present then filter issues with a given milestone",
@@ -54,25 +54,23 @@ else:
 common_ancestor = get_common_ancestor(args.from_commit, args.to_commit)
 remote_commit = repository.get_commit(common_ancestor.hexsha)
 previous_tag_date = datetime.strptime(
-    remote_commit.last_modified, '%a, %d %b %Y %H:%M:%S %Z'
+    remote_commit.last_modified, "%a, %d %b %Y %H:%M:%S %Z"
 )
 
 probably_solved = repository.get_label("probably solved")
 need_to_reproduce = repository.get_label("need to reproduce")
 
 if args.skip_triaged:
-    triage_labels = [
-        x for x in repository.get_labels() if x.name.startswith("triaged")
-    ]
+    triage_labels = [x for x in repository.get_labels() if x.name.startswith("triaged")]
 else:
     triage_labels = []
 
 labels = [repository.get_label(label) for label in args.label]
 
 search_string = (
-    f'repo:{GH_USER}/{GH_REPO} is:issue is:open '
-    f'created:>{previous_tag_date.isoformat()} '
-    'sort:updated-desc' + milestone_search_string
+    f"repo:{GH_USER}/{GH_REPO} is:issue is:open "
+    f"created:>{previous_tag_date.isoformat()} "
+    "sort:updated-desc" + milestone_search_string
 )
 for label in labels:
     search_string += f' label:"{label.name}"'
@@ -83,7 +81,7 @@ issue_list = []
 
 for issue in tqdm(
     iterable,
-    desc='issues...',
+    desc="issues...",
     total=iterable.totalCount,
 ):
     if "[test-bot]" in issue.title:

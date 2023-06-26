@@ -7,7 +7,7 @@ from tqdm import tqdm
 from release_utils import GH_REPO, GH_USER, get_github, setup_cache
 
 parser = argparse.ArgumentParser(usage=__doc__)
-parser.add_argument('user_name', help='name to search fr undeleted branches')
+parser.add_argument("user_name", help="name to search fr undeleted branches")
 args = parser.parse_args()
 
 setup_cache()
@@ -15,11 +15,11 @@ setup_cache()
 user = get_github().get_user(args.user_name)
 
 pull_requests = get_github().search_issues(
-    f'repo:{GH_USER}/{GH_REPO} '
-    'is:closed '
+    f"repo:{GH_USER}/{GH_REPO} "
+    "is:closed "
     "is:pr "
     f"author:{user.login} "
-    'sort:created-asc'
+    "sort:created-asc"
 )
 
 to_remove_branches = []

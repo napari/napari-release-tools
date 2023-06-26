@@ -25,30 +25,33 @@ https://github.com/scikit-image/scikit-image/issues/3404
 https://github.com/scikit-image/scikit-image/issues/3405
 """
 import argparse
-import os
 import re
 import sys
-from datetime import datetime
-from itertools import chain
-from os.path import abspath
 from pathlib import Path
-from warnings import warn
 
 from yaml import safe_load
 
-from git import Repo
-from github import Github
-
-from release_utils import setup_cache, short_cache, iter_pull_request, get_repo, BOT_LIST, GH, GH_REPO, GH_USER
-
+from release_utils import (
+    BOT_LIST,
+    GH,
+    GH_REPO,
+    GH_USER,
+    get_repo,
+    iter_pull_request,
+    setup_cache,
+)
 
 LOCAL_DIR = Path(__file__).parent
 
 
 parser = argparse.ArgumentParser(usage=__doc__)
-parser.add_argument('milestone', help='The milestone to list')
-parser.add_argument('--target-directory', type=Path, default=None)
-parser.add_argument("--correction-file", help="The file with the corrections", default=LOCAL_DIR / "name_corrections.yaml")
+parser.add_argument("milestone", help="The milestone to list")
+parser.add_argument("--target-directory", type=Path, default=None)
+parser.add_argument(
+    "--correction-file",
+    help="The file with the corrections",
+    default=LOCAL_DIR / "name_corrections.yaml",
+)
 
 args = parser.parse_args()
 
@@ -85,15 +88,15 @@ users = {}
 
 highlights = {}
 
-highlights['Highlights'] = {}
-highlights['New Features'] = {}
-highlights['Improvements'] = {}
+highlights["Highlights"] = {}
+highlights["New Features"] = {}
+highlights["Improvements"] = {}
 highlights["Performance"] = {}
-highlights['Bug Fixes'] = {}
-highlights['API Changes'] = {}
-highlights['Deprecations'] = {}
-highlights['Build Tools'] = {}
-highlights['Documentation'] = {}
+highlights["Bug Fixes"] = {}
+highlights["API Changes"] = {}
+highlights["Deprecations"] = {}
+highlights["Build Tools"] = {}
+highlights["Documentation"] = {}
 other_pull_requests = {}
 
 label_to_section = {
@@ -112,7 +115,7 @@ label_to_section = {
 
 for pull in iter_pull_request(f"milestone:{args.milestone} is:merged"):
     issue = pull.as_issue()
-    assert pull.merged 
+    assert pull.merged
 
     commit = repo.get_commit(pull.merge_commit_sha)
 
@@ -122,7 +125,6 @@ for pull in iter_pull_request(f"milestone:{args.milestone} is:merged"):
     if commit.author is not None:
         add_to_users(users, commit.author)
         authors.add(commit.author.login)
-
 
     summary = pull.title
 
@@ -134,22 +136,21 @@ for pull in iter_pull_request(f"milestone:{args.milestone} is:merged"):
     pr_lables = {label.name.lower() for label in pull.labels}
     for label_name, section in label_to_section.items():
         if label_name in pr_lables:
-            highlights[section][pull.number] = {'summary': summary, "repo": "napari"}
+            highlights[section][pull.number] = {"summary": summary, "repo": "napari"}
             assigned_to_section = True
 
     if not assigned_to_section:
-        other_pull_requests[pull.number] = {'summary': summary, "repo": "napari"}
+        other_pull_requests[pull.number] = {"summary": summary, "repo": "napari"}
 
 
-for pull in iter_pull_request(f"milestone:{args.milestone} is:merged" ,repo="docs"):
+for pull in iter_pull_request(f"milestone:{args.milestone} is:merged", repo="docs"):
     issue = pull.as_issue()
-    assert pull.merged 
+    assert pull.merged
 
     issue.user.login
 
     add_to_users(users, issue.user)
     docs_authors.add(issue.user.login)
-
 
     summary = pull.title
 
@@ -160,18 +161,18 @@ for pull in iter_pull_request(f"milestone:{args.milestone} is:merged" ,repo="doc
     assigned_to_section = False
     pr_lables = {label.name.lower() for label in pull.labels}
     if "maintenance" in pr_lables:
-        other_pull_requests[pull.number] = {'summary': summary, "repo": "docs"}
+        other_pull_requests[pull.number] = {"summary": summary, "repo": "docs"}
     else:
-        highlights["Documentation"][pull.number] = {'summary': summary, "repo": "docs"}
-    
+        highlights["Documentation"][pull.number] = {"summary": summary, "repo": "docs"}
+
 
 # add Other PRs to the ordered dict to make doc generation easier.
-highlights['Other Pull Requests'] = other_pull_requests
+highlights["Other Pull Requests"] = other_pull_requests
 
 
 # remove these bots.
 committers -= BOT_LIST
-authors  -= BOT_LIST
+authors -= BOT_LIST
 docs_committers -= BOT_LIST
 docs_authors -= BOT_LIST
 
@@ -193,7 +194,7 @@ else:
 
 
 # Now generate the release notes
-title = f'# napari {args.milestone}'
+title = f"# napari {args.milestone}"
 print(title, file=file_handle)
 
 print(
@@ -204,7 +205,7 @@ It's designed for browsing, annotating, and analyzing large multi-dimensional
 images. It's built on top of Qt (for the GUI), vispy (for performant GPU-based
 rendering), and the scientific Python stack (numpy, scipy).
 """,
-file=file_handle,
+    file=file_handle,
 )
 
 print(
@@ -212,23 +213,26 @@ print(
 For more information, examples, and documentation, please visit our website:
 https://github.com/napari/napari
 """,
-file=file_handle,
+    file=file_handle,
 )
 
 for section, pull_request_dicts in highlights.items():
-    print(f'## {section}\n', file=file_handle)
+    print(f"## {section}\n", file=file_handle)
     for number, pull_request_info in pull_request_dicts.items():
         repo_str = pull_request_info["repo"]
-        print(f'- {pull_request_info["summary"]} ([napari/{repo_str}/#{number}](https://{GH}/{GH_USER}/{repo_str}/pull/{number}))', file=file_handle)
+        print(
+            f'- {pull_request_info["summary"]} ([napari/{repo_str}/#{number}](https://{GH}/{GH_USER}/{repo_str}/pull/{number}))',
+            file=file_handle,
+        )
     print("", file=file_handle)
 
 
 contributors = {}
 
-contributors['authors'] = authors
-contributors['reviewers'] = reviewers
-contributors['docs authors'] = docs_authors
-contributors['docs reviewers'] = docs_reviewers
+contributors["authors"] = authors
+contributors["reviewers"] = reviewers
+contributors["docs authors"] = docs_authors
+contributors["docs reviewers"] = docs_reviewers
 # ignore committers
 # contributors['committers'] = committers
 
@@ -241,8 +245,8 @@ for section_name, contributor_set in contributors.items():
     if None in contributor_set:
         contributor_set.remove(None)
     committer_str = (
-        f'## {len(contributor_set)} {section_name} added to this '
-        'release (alphabetical)'
+        f"## {len(contributor_set)} {section_name} added to this "
+        "release (alphabetical)"
     )
     print(committer_str, file=file_handle)
     print("", file=file_handle)
@@ -252,21 +256,27 @@ for section_name, contributor_set in contributors.items():
         print(f"- [{users[c]}]({commit_link}) - @{c}", file=file_handle)
     print("", file=file_handle)
 
-new_contributors =  (authors | docs_authors) - old_contributors
+new_contributors = (authors | docs_authors) - old_contributors
 
 
-if old_contributors and new_contributors: 
+if old_contributors and new_contributors:
     print("## New Contributors", file=file_handle)
     print("", file=file_handle)
-    print(f"There are {len(new_contributors)} new contributors for this release:", file=file_handle)
+    print(
+        f"There are {len(new_contributors)} new contributors for this release:",
+        file=file_handle,
+    )
     print("", file=file_handle)
     for c in sorted(new_contributors, key=lambda x: users[x].lower()):
         commit_link = f"https://{GH}/{GH_USER}/{GH_REPO}/commits?author={c}"
         docs_commit_link = f"https://{GH}/{GH_USER}/docs/commits?author={c}"
         if c in authors and c in docs_authors:
-            print(f"- {users[c]} [docs]({docs_commit_link}) [napari]({commit_link}) - @{c}", file=file_handle)
+            print(
+                f"- {users[c]} [docs]({docs_commit_link}) "
+                f"[napari]({commit_link}) - @{c}",
+                file=file_handle,
+            )
         elif c in authors:
             print(f"- {users[c]} [napari]({commit_link}) - @{c}", file=file_handle)
         else:
             print(f"- {users[c]} [docs]({docs_commit_link}) - @{c}", file=file_handle)
-

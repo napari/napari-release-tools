@@ -1,10 +1,10 @@
 import argparse
 from pathlib import Path
 
-from yaml import safe_load, safe_dump
+from yaml import safe_dump, safe_load
 
 parser = argparse.ArgumentParser()
-parser.add_argument('path', help='The path to the citation file to sort', type=Path)
+parser.add_argument("path", help="The path to the citation file to sort", type=Path)
 
 
 args = parser.parse_args()
@@ -13,6 +13,7 @@ args = parser.parse_args()
 with args.path.open(encoding="utf8") as f:
     data = safe_load(f)
 
+
 def reorder_author_fields(author):
     res = {}
     for key in ["given-names", "family-names", "affiliation", "orcid"]:
@@ -20,7 +21,11 @@ def reorder_author_fields(author):
             res[key] = author[key]
     return res
 
-data["authors"] = [reorder_author_fields(x) for x in sorted(data["authors"], key=lambda x: x["family-names"])]
+
+data["authors"] = [
+    reorder_author_fields(x)
+    for x in sorted(data["authors"], key=lambda x: x["family-names"])
+]
 
 
 with args.path.open("w", encoding="utf8") as f:

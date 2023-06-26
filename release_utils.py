@@ -9,7 +9,7 @@ from typing import Optional
 from github import Github, Milestone
 from tqdm import tqdm
 
-pr_num_pattern = re.compile(r'\(#(\d+)\)(?:$|\n)')
+pr_num_pattern = re.compile(r"\(#(\d+)\)(?:$|\n)")
 
 
 @contextmanager
@@ -49,15 +49,13 @@ def setup_cache(timeout=3600):
         return
 
     """setup cache for requests"""
-    requests_cache.install_cache(
-        'github_cache', backend='sqlite', expire_after=timeout
-    )
+    requests_cache.install_cache("github_cache", backend="sqlite", expire_after=timeout)
 
 
-GH =  os.environ.get("GH", "github.com")
-GH_USER = os.environ.get("GH_USER" ,'napari')
-GH_REPO = os.environ.get("GH_REPO", 'napari')
-GH_TOKEN = os.environ.get('GH_TOKEN')
+GH = os.environ.get("GH", "github.com")
+GH_USER = os.environ.get("GH_USER", "napari")
+GH_REPO = os.environ.get("GH_REPO", "napari")
+GH_TOKEN = os.environ.get("GH_TOKEN")
 if GH_TOKEN is None:
     raise RuntimeError(
         "It is necessary that the environment variable `GH_TOKEN` "
@@ -79,7 +77,7 @@ def get_github():
 
 def get_repo(user=GH_USER, repo=GH_REPO):
     g = get_github()
-    return g.get_repo(f'{GH_USER}/{GH_REPO}')
+    return g.get_repo(f"{GH_USER}/{GH_REPO}")
 
 
 def get_local_repo(path=None):
@@ -105,7 +103,7 @@ def get_common_ancestor(commit1, commit2):
 
 def get_commits_to_ancestor(ancestor, rev="main"):
     local_repo = get_local_repo()
-    yield from local_repo.iter_commits(f'{ancestor.hexsha}..{rev}')
+    yield from local_repo.iter_commits(f"{ancestor.hexsha}..{rev}")
 
 
 def get_commit_counts_from_ancestor(release, rev="main"):
@@ -131,22 +129,18 @@ def get_milestone(
     for milestone in repository.get_milestones():
         if milestone.title == milestone_name:
             return milestone
-    raise RuntimeError(f'Milestone {milestone_name} not found')
+    raise RuntimeError(f"Milestone {milestone_name} not found")
 
 
 def get_split_date(previous_release, rev="main"):
     common_ancestor = get_common_ancestor(previous_release, rev)
     remote_commit = get_repo().get_commit(common_ancestor.hexsha)
-    return datetime.strptime(
-        remote_commit.last_modified, '%a, %d %b %Y %H:%M:%S %Z'
-    )
+    return datetime.strptime(remote_commit.last_modified, "%a, %d %b %Y %H:%M:%S %Z")
 
 
 def iter_pull_request(additional_query, user=GH_USER, repo=GH_REPO):
     iterable = get_github().search_issues(
-        f"repo:{user}/{repo} "
-        "is:pr "
-        "sort:created-asc " + additional_query
+        f"repo:{user}/{repo} " "is:pr " "sort:created-asc " + additional_query
     )
     print(
         f"Found {iterable.totalCount} pull requests on query: {additional_query}",
@@ -154,10 +148,16 @@ def iter_pull_request(additional_query, user=GH_USER, repo=GH_REPO):
     )
     for pull_issue in tqdm(
         iterable,
-        desc='Pull Requests...',
+        desc="Pull Requests...",
         total=iterable.totalCount,
     ):
         yield pull_issue.as_pull_request()
 
 
-BOT_LIST = {"github-actions[bot]", "pre-commit-ci[bot]", "dependabot[bot]", "napari-bot", None}
+BOT_LIST = {
+    "github-actions[bot]",
+    "pre-commit-ci[bot]",
+    "dependabot[bot]",
+    "napari-bot",
+    None,
+}

@@ -12,8 +12,8 @@ from release_utils import (
 )
 
 parser = argparse.ArgumentParser()
-parser.add_argument('from_commit', help='The starting tag.')
-parser.add_argument('to_commit', help='The head branch.')
+parser.add_argument("from_commit", help="The starting tag.")
+parser.add_argument("to_commit", help="The head branch.")
 parser.add_argument(
     "--milestone",
     help="if present then filter PR with a given milestone",
@@ -48,17 +48,13 @@ label = repository.get_label(args.label) if args.label else None
 consumed_pr = set()
 
 if args.target_branch:
-    for commit in get_local_repo("./napari_repo").iter_commits(
-        args.target_branch
-    ):
+    for commit in get_local_repo("./napari_repo").iter_commits(args.target_branch):
         if (match := pr_num_pattern.search(commit.message)) is not None:
             pr_num = int(match[1])
             consumed_pr.add(pr_num)
 
 if args.skip_triaged:
-    triage_labels = [
-        x for x in repository.get_labels() if x.name.startswith("triaged")
-    ]
+    triage_labels = [x for x in repository.get_labels() if x.name.startswith("triaged")]
 else:
     triage_labels = []
 
@@ -86,17 +82,17 @@ for pull in sorted(iterable, key=lambda x: x.closed_at):
 
 if not pr_to_list:
     text = (
-        f'## No PRs found with milestone {milestone.title}'
+        f"## No PRs found with milestone {milestone.title}"
         if milestone
-        else '## No PRs found without milestone'
+        else "## No PRs found without milestone"
     )
 elif milestone:
-    text = f'## {len(pr_to_list)} PRs with milestone {milestone.title}'
+    text = f"## {len(pr_to_list)} PRs with milestone {milestone.title}"
 else:
-    text = f'## {len(pr_to_list)} PRs without milestone'
+    text = f"## {len(pr_to_list)} PRs without milestone"
 
 if label:
-    text += f' and label {label.name}'
+    text += f" and label {label.name}"
 
 text += ":"
 print(text)
