@@ -36,6 +36,7 @@ from release_utils import (
     GH,
     GH_REPO,
     GH_USER,
+    GH_DOCS_REPO,
     get_repo,
     iter_pull_request,
     setup_cache,
@@ -136,14 +137,14 @@ for pull in iter_pull_request(f"milestone:{args.milestone} is:merged"):
     pr_lables = {label.name.lower() for label in pull.labels}
     for label_name, section in label_to_section.items():
         if label_name in pr_lables:
-            highlights[section][pull.number] = {"summary": summary, "repo": "napari"}
+            highlights[section][pull.number] = {"summary": summary, "repo": GH_REPO}
             assigned_to_section = True
 
     if not assigned_to_section:
-        other_pull_requests[pull.number] = {"summary": summary, "repo": "napari"}
+        other_pull_requests[pull.number] = {"summary": summary, "repo": GH_REPO}
 
 
-for pull in iter_pull_request(f"milestone:{args.milestone} is:merged", repo="docs"):
+for pull in iter_pull_request(f"milestone:{args.milestone} is:merged", repo=GH_DOCS_REPO):
     issue = pull.as_issue()
     assert pull.merged
 
@@ -161,9 +162,9 @@ for pull in iter_pull_request(f"milestone:{args.milestone} is:merged", repo="doc
     assigned_to_section = False
     pr_lables = {label.name.lower() for label in pull.labels}
     if "maintenance" in pr_lables:
-        other_pull_requests[pull.number] = {"summary": summary, "repo": "docs"}
+        other_pull_requests[pull.number] = {"summary": summary, "repo": GH_DOCS_REPO}
     else:
-        highlights["Documentation"][pull.number] = {"summary": summary, "repo": "docs"}
+        highlights["Documentation"][pull.number] = {"summary": summary, "repo": GH_DOCS_REPO}
 
 
 # add Other PRs to the ordered dict to make doc generation easier.
@@ -238,9 +239,9 @@ contributors["docs reviewers"] = docs_reviewers
 
 for section_name, contributor_set in contributors.items():
     if section_name.startswith("docs"):
-        repo_name = "docs"
+        repo_name = GH_DOCS_REPO
     else:
-        repo_name = "napari"
+        repo_name = GH_REPO
     print("", file=file_handle)
     if None in contributor_set:
         contributor_set.remove(None)

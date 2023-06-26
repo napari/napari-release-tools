@@ -55,6 +55,7 @@ def setup_cache(timeout=3600):
 GH = os.environ.get("GH", "github.com")
 GH_USER = os.environ.get("GH_USER", "napari")
 GH_REPO = os.environ.get("GH_REPO", "napari")
+GH_DOCS_REPO = os.environ.get("GH_REPO", "docs")
 GH_TOKEN = os.environ.get("GH_TOKEN")
 if GH_TOKEN is None:
     raise RuntimeError(
