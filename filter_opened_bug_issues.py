@@ -1,4 +1,5 @@
 import argparse
+import sys
 from datetime import datetime
 
 from tqdm import tqdm
@@ -70,8 +71,10 @@ labels = [repository.get_label(label) for label in args.label]
 search_string = (
     f"repo:{GH_USER}/{GH_REPO} is:issue is:open "
     f"created:>{previous_tag_date.isoformat()} "
-    "sort:updated-desc" + milestone_search_string
+    "sort:updated-desc " + milestone_search_string
 )
+# print(search_string, file=sys.stderr)
+
 for label in labels:
     search_string += f' label:"{label.name}"'
 
