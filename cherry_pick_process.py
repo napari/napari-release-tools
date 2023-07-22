@@ -1,7 +1,7 @@
 """
-This is script to cherry pick commits base on PR labels
+This is script to cherry-pick commits base on PR labels
 """
-
+from __future__ import annotations
 
 import argparse
 import os
@@ -9,7 +9,6 @@ from pathlib import Path
 
 from git import GitCommandError, Repo
 from tqdm import tqdm
-from github import Repository
 
 from release_utils import (
     GH,
@@ -21,11 +20,29 @@ from release_utils import (
     setup_cache,
 )
 
+LOCAL_DIR = Path(__file__).parent
 
-def get_pr_commits_dict(repo: Repository) -> dict[int, str]:
+
+def get_pr_commits_dict(repo: Repo, base_branch: str = "main") -> dict[int, str]:
+    """
+    Calculate mapping from PR number in commit hash from a provided branch
+
+    Parameters
+    ----------
+    repo: Repo
+        Object representing local repository
+
+    base_branch: str
+        branch name
+
+    Returns
+    -------
+    dict from PR number to commit hash
+
+    """
     res = {}
 
-    for commit in repo.iter_commits("main"):
+    for commit in repo.iter_commits(base_branch):
         if (match := pr_num_pattern.search(commit.message)) is not None:
             pr_num = int(match[1])
             res[pr_num] = commit.hexsha
@@ -33,7 +50,22 @@ def get_pr_commits_dict(repo: Repository) -> dict[int, str]:
     return res
 
 
-def get_consumed_pr(repo: Repository, target_branch: str) -> set[int]:
+def get_consumed_pr(repo: Repo, target_branch: str) -> set[int]:
+    """
+    Get set of commits that are already cherry picked
+
+    Parameters
+    ----------
+    repo: Repo
+        object representing local repository
+
+    target_branch: str
+        branch to check for merged PR
+
+    Returns
+    -------
+
+    """
     res = set()
 
     for commit in repo.iter_commits(target_branch):
@@ -41,6 +73,7 @@ def get_consumed_pr(repo: Repository, target_branch: str) -> set[int]:
             pr_num = int(match[1])
             res.add(pr_num)
     return res
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -56,79 +89,128 @@ def main():
         default=os.environ.get("GIT_RELEASE_MAIN_BRANCH", "main"),
     )
 
-    LOCAL_DIR = Path(__file__).parent
-
+    parser.add_argument("--working-dir", help="path to repository", default=LOCAL_DIR, type=Path)
 
     args = parser.parse_args()
 
     target_branch = f"v{args.milestone}x"
 
-    if not (LOCAL_DIR / "napari_repo").exists():
+    if args.first_commits is not None:
+        with open(args.first_commits) as f:
+            first_commits = {int(el) for el in f.read().splitlines()}
+    else:
+        first_commits = set()
+
+    perform_cherry_pick(
+        working_dir=args.woring_dir,
+        target_branch=target_branch,
+        milestone_str=args.milestone,
+        first_commits=first_commits,
+        stop_after=args.stop_after,
+        base_branch=args.base_branch,
+        main_branch=args.git_main_branch,
+    )
+
+
+def prepare_repo(working_dir: Path, target_branch: str, base_branch: str, main_branch: str = "main") -> Repo:
+    if not working_dir.exists():
         repo = Repo.clone_from(
-            f"git@{GH}:{GH_USER}/{GH_REPO}.git", LOCAL_DIR / "napari_repo"
+            f"git@{GH}:{GH_USER}/{GH_REPO}.git", working_dir
         )
     else:
         repo = Repo(LOCAL_DIR / "napari_repo")
 
     if target_branch not in repo.branches:
-        repo.git.checkout(args.base_branch)
+        repo.git.checkout(base_branch)
         repo.git.checkout("HEAD", b=target_branch)
     else:
         repo.git.reset("--hard", "HEAD")
-        repo.git.checkout(args.git_main_branch)
+        repo.git.checkout(main_branch)
         repo.git.pull()
         repo.git.checkout(target_branch)
         # repo.git.pull()
 
+    return repo
+
+
+def perform_cherry_pick(
+        working_dir: Path,
+        target_branch: str,
+        milestone_str: str,
+        first_commits: set,
+        stop_after: int | None,
+        base_branch: str,
+        main_branch: str = "main"
+):
+    """
+    Perform cherry-pick process
+
+    Parameters
+    ----------
+    working_dir: Path
+        Path to working directory
+    target_branch: str
+        branch that is target for cherry-pick process
+    milestone_str: str
+        name of milestone to which will be released
+    first_commits: set[int]
+        set of commit that need to ben cherry-picked on begin, for example fixes for CI
+    stop_after: int | None
+        PR number after which cherry-pick process should be stopped
+    base_branch: str
+        branch or commit where target branch will be created if missed
+    main_branch: str
+        the main branch of repository, by default is ``main`` but could be for example ``master``
+
+    Returns
+    -------
+    Nothing
+    """
+    repo = prepare_repo(
+        working_dir=working_dir / "project_repo",
+        target_branch=target_branch,
+        base_branch=base_branch,
+        main_branch=main_branch
+    )
+
     setup_cache()
 
-    milestone = get_milestone(args.milestone)
-
-
-    if not (LOCAL_DIR / "patch_dir").exists():
-        (LOCAL_DIR / "patch_dir").mkdir()
-
-    patch_dir_path = LOCAL_DIR / "patch_dir" / milestone.title
-
-    if not patch_dir_path.exists():
-        patch_dir_path.mkdir()
+    milestone = get_milestone(milestone_str)
+    patch_dir_path = working_dir / "patch_dir" / milestone.title
+    patch_dir_path.mkdir(parents=True, exist_ok=True)
 
     # with short_cache(60):
-    iterable = [
+    pr_targeted_for_release = [
         x
-        for x in iter_pull_request(f"milestone:{args.milestone} is:merged")
+        for x in iter_pull_request(f"milestone:{milestone.title} is:merged")
         if x.milestone == milestone
     ]
 
-    if args.first_commits is not None:
-        with open(args.first_commits) as f:
-            first_commits = {int(el) for el in f.read().splitlines()}
-    else:
-        first_commits = {}
+    pr_commits_dict = get_pr_commits_dict(repo)
+    consumed_pr = get_consumed_pr(repo, target_branch)
 
-    pr_commits_dict = get_pr_commits_dict()
-    consumed_pr = get_consumed_pr()
-
-    iterable = list(iterable)
-
-    for el in iterable:
+    # check for errors, may require to reset cache if happens
+    for el in pr_targeted_for_release:
         assert el.closed_at is not None, el
 
+    # order PR by merge date, move "first_commits" on begin
+    # (by default PR are ordered by creation date)
     pr_list_base = sorted(
-        iterable, key=lambda x: (x.number not in first_commits, x.closed_at)
+        pr_targeted_for_release, key=lambda x: (x.number not in first_commits, x.closed_at)
     )
 
+    # list of PR to cherry pic in this run
     pr_list = []
 
     for pr in pr_list_base:
         pr_list.append(pr)
-        if pr.number == args.stop_after:
+        if pr.number == stop_after:
             break
 
+    # print already cherry-picked PR
     for el in pr_list:
         if el.number in consumed_pr:
             print(el, el.number in consumed_pr)
-
 
     for pull in tqdm(pr_list):
         if pull.number in consumed_pr:
