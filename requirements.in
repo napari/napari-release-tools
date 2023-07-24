@@ -2,3 +2,5 @@ tqdm
 PyGithub
 gitpython
 requests-cache
+unidecode
+pyyaml
