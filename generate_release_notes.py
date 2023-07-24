@@ -34,9 +34,9 @@ from yaml import safe_load
 from release_utils import (
     BOT_LIST,
     GH,
+    GH_DOCS_REPO,
     GH_REPO,
     GH_USER,
-    GH_DOCS_REPO,
     get_repo,
     iter_pull_request,
     setup_cache,
@@ -144,7 +144,9 @@ for pull in iter_pull_request(f"milestone:{args.milestone} is:merged"):
         other_pull_requests[pull.number] = {"summary": summary, "repo": GH_REPO}
 
 
-for pull in iter_pull_request(f"milestone:{args.milestone} is:merged", repo=GH_DOCS_REPO):
+for pull in iter_pull_request(
+    f"milestone:{args.milestone} is:merged", repo=GH_DOCS_REPO
+):
     issue = pull.as_issue()
     assert pull.merged
 
@@ -164,7 +166,10 @@ for pull in iter_pull_request(f"milestone:{args.milestone} is:merged", repo=GH_D
     if "maintenance" in pr_lables:
         other_pull_requests[pull.number] = {"summary": summary, "repo": GH_DOCS_REPO}
     else:
-        highlights["Documentation"][pull.number] = {"summary": summary, "repo": GH_DOCS_REPO}
+        highlights["Documentation"][pull.number] = {
+            "summary": summary,
+            "repo": GH_DOCS_REPO,
+        }
 
 
 # add Other PRs to the ordered dict to make doc generation easier.

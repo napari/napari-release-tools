@@ -1,15 +1,15 @@
 import argparse
 from pathlib import Path
 
-from yaml import safe_load
 from tqdm import tqdm
+from yaml import safe_load
 
 from release_utils import (
+    BOT_LIST,
     get_milestone,
+    get_repo,
     iter_pull_request,
     setup_cache,
-    BOT_LIST,
-    get_repo,
 )
 
 LOCAL_DIR = Path(__file__).parent
@@ -56,7 +56,9 @@ def main():
             if name is None:
                 continue
             name, sure_name = name.rsplit(" ", 1)
-            print(f"- given-names: {name}\n  family-names: {sure_name}\n alias: {login}")
+            print(
+                f"- given-names: {name}\n  family-names: {sure_name}\n alias: {login}"
+            )
     else:
         for login, name in sorted(missing_authors):
             print(f"@{login} ", end="")  # ({name})")
@@ -67,7 +69,7 @@ def find_missing_authors(citation) -> set[tuple[str, str]]:
     author_dict = {}
 
     for author in citation["authors"]:
-        author_dict[author['alias']] = author
+        author_dict[author["alias"]] = author
 
     setup_cache()
     missing_authors = set()
@@ -82,11 +84,13 @@ def find_missing_authors(citation) -> set[tuple[str, str]]:
     return missing_authors
 
 
-def find_missing_authors_for_milestone(citation, milestone_str: str) -> set[tuple[str, str]]:
+def find_missing_authors_for_milestone(
+    citation, milestone_str: str
+) -> set[tuple[str, str]]:
     author_dict = {}
 
     for author in citation["authors"]:
-        author_dict[author['alias']] = author
+        author_dict[author["alias"]] = author
 
     setup_cache()
     milestone = get_milestone(milestone_str)
