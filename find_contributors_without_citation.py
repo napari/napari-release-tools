@@ -2,12 +2,14 @@ import argparse
 from pathlib import Path
 
 from yaml import safe_load
+from tqdm import tqdm
 
 from release_utils import (
     get_milestone,
     iter_pull_request,
     setup_cache,
     BOT_LIST,
+    get_repo,
 )
 
 LOCAL_DIR = Path(__file__).parent
@@ -22,7 +24,7 @@ def existing_file(path: str) -> Path:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("milestone", help="The milestone to check")
+    parser.add_argument("--milestone", help="The milestone to check")
     parser.add_argument(
         "--correction-file",
         help="The file with the corrections",
@@ -44,7 +46,10 @@ def main():
     with args.citation_path.open() as f:
         citation = safe_load(f)
 
-    missing_authors = find_missing_authors(citation)
+    if args.milestone is not None:
+        missing_authors = find_missing_authors_for_milestone(citation, args.milestone)
+    else:
+        missing_authors = find_missing_authors(citation)
 
     if args.generate:
         for login, name in sorted(missing_authors):
@@ -58,7 +63,26 @@ def main():
     print()
 
 
-def find_missing_authors(citation, milestone_str: str):
+def find_missing_authors(citation) -> set[tuple[str, str]]:
+    author_dict = {}
+
+    for author in citation["authors"]:
+        author_dict[author['alias']] = author
+
+    setup_cache()
+    missing_authors = set()
+
+    contributtors = get_repo().get_contributors()
+
+    for creator in tqdm(contributtors, total=contributtors.totalCount):
+        if creator.login in BOT_LIST:
+            continue
+        if creator.login not in author_dict:
+            missing_authors.add((creator.login, creator.name))
+    return missing_authors
+
+
+def find_missing_authors_for_milestone(citation, milestone_str: str) -> set[tuple[str, str]]:
     author_dict = {}
 
     for author in citation["authors"]:
