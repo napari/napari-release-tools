@@ -1,5 +1,5 @@
 """
-This is script for adding logins to existing CITATION.cff file. 
+This is script for adding logins to existing CITATION.cff file.
 This simplify future updating of this file. Its create bakup file with .bck suffix/
 """
 from __future__ import annotations
@@ -9,11 +9,11 @@ import shutil
 import sys
 from pathlib import Path
 
-from yaml import safe_dump, safe_load
 from tqdm import tqdm
 from unidecode import unidecode
+from yaml import safe_dump, safe_load
 
-from release_utils import get_repo, setup_cache, BOT_LIST
+from release_utils import BOT_LIST, get_repo, setup_cache
 
 LOCAL_DIR = Path(__file__).parent
 DEFAULT_CORRECTION_FILE = LOCAL_DIR / "name_corrections.yaml"
@@ -25,28 +25,33 @@ def existing_file(value):
         raise argparse.ArgumentTypeError(f"The file {file_path} does not exists.")
     return file_path
 
+
 def get_correction_dict(file_path: Path | None) -> dict[str, str]:
     """
-    Read file with correction of name between 
+    Read file with correction of name between
     """
-    if not file_path or not file_path.exists(): 
+    if not file_path or not file_path.exists():
         return {}
 
     correction_dict = {}
     with open(file_path) as f:
         corrections = safe_load(f)
         for correction in corrections["login_to_name"]:
-            correction_dict[correction["login"]] = unidecode(correction["corrected_name"].lower())
-    
+            correction_dict[correction["login"]] = unidecode(
+                correction["corrected_name"].lower()
+            )
+
     return correction_dict
 
 
-def get_correctrions_from_citation_cff(cff_dict):
+def get_corrections_from_citation_cff(cff_dict):
     res = {}
     for author in cff_dict["authors"]:
         if "alias" in author:
-            res[author["alias"]] = unidecode(f'{author["given-names"]} {author["family-names"]}'.lower())
-    return res 
+            res[author["alias"]] = unidecode(
+                f'{author["given-names"]} {author["family-names"]}'.lower()
+            )
+    return res
 
 
 def get_name(user, correction_dict):
@@ -66,7 +71,8 @@ def main():
         default=DEFAULT_CORRECTION_FILE,
         type=existing_file,
     )
-    args = parser.parse_args()
+    parser.parse_args()
+
 
 def add_logins(cff_path: Path, correction_file: Path | None = None) -> None:
     setup_cache()
@@ -76,18 +82,21 @@ def add_logins(cff_path: Path, correction_file: Path | None = None) -> None:
 
     contributors_iterable = get_repo().get_contributors()
 
-    correction_dict = get_correction_dict(correction_file) | get_correctrions_from_citation_cff(data)
+    correction_dict = get_correction_dict(
+        correction_file
+    ) | get_corrections_from_citation_cff(data)
 
-    contributors = { get_name(user, correction_dict): user for user in
-        tqdm(contributors_iterable, total=contributors_iterable.totalCount) if get_name(user) is not None
+    contributors = {
+        get_name(user, correction_dict): user
+        for user in tqdm(contributors_iterable, total=contributors_iterable.totalCount)
+        if get_name(user, correction_dict) is not None
     }
 
     for user in get_repo().get_contributors():
-        if get_name(user) is None  and user.login not in BOT_LIST:
+        if get_name(user, correction_dict) is None and user.login not in BOT_LIST:
             print(f"Could not find {user.login}", file=sys.stderr)
 
     # assert len(contributors) == contributors_iterable.totalCount
-
 
     for i, author in enumerate(data["authors"]):
         if "alias" in author:

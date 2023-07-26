@@ -4,6 +4,7 @@ import re
 import sys
 from contextlib import contextmanager
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 from github import Github, Milestone
@@ -52,6 +53,8 @@ def setup_cache(timeout=3600):
     requests_cache.install_cache("github_cache", backend="sqlite", expire_after=timeout)
 
 
+LOCAL_DIR = Path(__file__).parent
+REPO_DIR_NAME = "project_repo"
 GH = os.environ.get("GH", "github.com")
 GH_USER = os.environ.get("GH_USER", "napari")
 GH_REPO = os.environ.get("GH_REPO", "napari")
