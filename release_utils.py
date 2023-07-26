@@ -81,20 +81,18 @@ def get_github():
 
 def get_repo(user=GH_USER, repo=GH_REPO):
     g = get_github()
-    return g.get_repo(f"{GH_USER}/{GH_REPO}")
+    return g.get_repo(f"{user}/{repo}")
 
 
 def get_local_repo(path=None):
     """
     get local repository
     """
-    from pathlib import Path
-
     from git import Repo
 
     if path is not None:
         return Repo(path)
-    return Repo(Path(__file__).parent / "napari_repo")
+    return Repo(REPO_DIR_NAME)
 
 
 def get_common_ancestor(commit1, commit2):
