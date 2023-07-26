@@ -1,3 +1,6 @@
+"""
+Sort CITATION.cff files by author family-name.
+"""
 import argparse
 from pathlib import Path
 
