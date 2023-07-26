@@ -1,3 +1,15 @@
+"""
+Find contributors without citation in the CITATION.cff file.
+
+This script could work in two modes:
+
+1. Find missed contributors fo a given milestone
+2. Find missed contributors for the whole project
+
+When pass `--generate` option then script will generate
+the missing entries based on GitHub data.
+"""
+
 import argparse
 from pathlib import Path
 
@@ -6,13 +18,13 @@ from yaml import safe_load
 
 from release_utils import (
     BOT_LIST,
+    LOCAL_DIR,
+    REPO_DIR_NAME,
     get_milestone,
     get_repo,
     iter_pull_request,
     setup_cache,
 )
-
-LOCAL_DIR = Path(__file__).parent
 
 
 def existing_file(path: str) -> Path:
@@ -33,7 +45,7 @@ def main():
     parser.add_argument(
         "--citation-path",
         help="",
-        default=str(LOCAL_DIR / "napari_repo" / "CITATION.cff"),
+        default=str(REPO_DIR_NAME / "CITATION.cff"),
         type=existing_file,
     )
     parser.add_argument(
@@ -74,9 +86,9 @@ def find_missing_authors(citation) -> set[tuple[str, str]]:
     setup_cache()
     missing_authors = set()
 
-    contributtors = get_repo().get_contributors()
+    contributors = get_repo().get_contributors()
 
-    for creator in tqdm(contributtors, total=contributtors.totalCount):
+    for creator in tqdm(contributors, total=contributors.totalCount):
         if creator.login in BOT_LIST:
             continue
         if creator.login not in author_dict:
