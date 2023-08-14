@@ -29,14 +29,15 @@ import re
 import sys
 from pathlib import Path
 
-from yaml import safe_load
-
 from release_utils import (
     BOT_LIST,
     GH,
     GH_DOCS_REPO,
     GH_REPO,
     GH_USER,
+    REPO_DIR_NAME,
+    get_correction_dict,
+    get_corrections_from_citation_cff,
     get_repo,
     iter_pull_request,
     setup_cache,
@@ -59,12 +60,9 @@ args = parser.parse_args()
 
 setup_cache()
 repo = get_repo()
-
-correction_dict = {}
-with open(args.correction_file) as f:
-    corrections = safe_load(f)
-    for correction in corrections["login_to_name"]:
-        correction_dict[correction["login"]] = correction["corrected_name"]
+correction_dict = get_correction_dict(
+    args.correction_file
+) | get_corrections_from_citation_cff(LOCAL_DIR / REPO_DIR_NAME / "CITATION.cff")
 
 
 def add_to_users(users, new_user):
@@ -149,8 +147,6 @@ for pull in iter_pull_request(
 ):
     issue = pull.as_issue()
     assert pull.merged
-
-    issue.user.login
 
     add_to_users(users, issue.user)
     docs_authors.add(issue.user.login)

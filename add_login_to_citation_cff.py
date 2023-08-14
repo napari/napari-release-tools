@@ -13,38 +13,17 @@ from tqdm import tqdm
 from unidecode import unidecode
 from yaml import safe_dump, safe_load
 
-from release_utils import BOT_LIST, existing_file, get_repo, setup_cache
+from release_utils import (
+    BOT_LIST,
+    existing_file,
+    get_correction_dict,
+    get_corrections_from_citation_cff,
+    get_repo,
+    setup_cache,
+)
 
 LOCAL_DIR = Path(__file__).parent
 DEFAULT_CORRECTION_FILE = LOCAL_DIR / "name_corrections.yaml"
-
-
-def get_correction_dict(file_path: Path | None) -> dict[str, str]:
-    """
-    Read file with correction of name between
-    """
-    if not file_path or not file_path.exists():
-        return {}
-
-    correction_dict = {}
-    with open(file_path) as f:
-        corrections = safe_load(f)
-        for correction in corrections["login_to_name"]:
-            correction_dict[correction["login"]] = unidecode(
-                correction["corrected_name"].lower()
-            )
-
-    return correction_dict
-
-
-def get_corrections_from_citation_cff(cff_dict):
-    res = {}
-    for author in cff_dict["authors"]:
-        if "alias" in author:
-            res[author["alias"]] = unidecode(
-                f'{author["given-names"]} {author["family-names"]}'.lower()
-            )
-    return res
 
 
 def get_name(user, correction_dict):
@@ -64,7 +43,9 @@ def main():
         default=DEFAULT_CORRECTION_FILE,
         type=existing_file,
     )
-    parser.parse_args()
+    args = parser.parse_args()
+
+    add_logins(args.path, args.correction_file)
 
 
 def add_logins(cff_path: Path, correction_file: Path | None = None) -> None:

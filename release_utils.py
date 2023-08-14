@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import contextlib
 import os
 import re
@@ -5,11 +7,12 @@ import sys
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from git import Repo
 from github import Github, Milestone
 from tqdm import tqdm
+from unidecode import unidecode
+from yaml import safe_load
 
 pr_num_pattern = re.compile(r"\(#(\d+)\)(?:$|\n)")
 
@@ -87,7 +90,7 @@ def get_repo(user=GH_USER, repo=GH_REPO):
 
 def get_local_repo(path=None):
     """
-    get local repository
+    get the local repository
     """
     from git import Repo
 
@@ -98,7 +101,7 @@ def get_local_repo(path=None):
 
 def get_common_ancestor(commit1, commit2):
     """
-    find common ancestor for two commits
+    find the common ancestor for two commits
     """
     local_repo = get_local_repo()
     return local_repo.merge_base(commit1, commit2)[0]
@@ -121,8 +124,8 @@ def get_commit_counts_from_ancestor(release, rev="main"):
 
 
 def get_milestone(
-    milestone_name: Optional[str],
-) -> Optional[Milestone.Milestone]:
+    milestone_name: str | None,
+) -> Milestone.Milestone | None:
     if milestone_name is None:
         return None
     repository = get_repo()
@@ -180,7 +183,7 @@ def get_pr_commits_dict(repo: Repo, branch: str = "main") -> dict[int, str]:
 
 def get_consumed_pr(repo: Repo, target_branch: str) -> set[int]:
     """
-    Get set of commits that are already cherry picked
+    Get a set of commits that are already cherry-picked
     Parameters
     ----------
     repo: Repo
@@ -213,3 +216,37 @@ BOT_LIST = {
     "napari-bot",
     None,
 }
+
+
+def get_correction_dict(file_path: Path | None) -> dict[str, str]:
+    """
+    Read file with correction of name between
+    """
+    if not file_path or not file_path.exists():
+        return {}
+
+    correction_dict = {}
+    with open(file_path) as f:
+        corrections = safe_load(f)
+        for correction in corrections["login_to_name"]:
+            correction_dict[correction["login"]] = unidecode(
+                correction["corrected_name"].lower()
+            )
+
+    return correction_dict
+
+
+def get_corrections_from_citation_cff(cff_data: str | Path | dict) -> dict[str, str]:
+    if isinstance(cff_data, (str, Path)):
+        cff_data = Path(cff_data)
+        if not cff_data.exists():
+            return {}
+        with cff_data.open(encoding="utf8") as f:
+            cff_data = safe_load(f)
+    res = {}
+    for author in cff_data["authors"]:
+        if "alias" in author:
+            res[author["alias"]] = unidecode(
+                f'{author["given-names"]} {author["family-names"]}'.lower()
+            )
+    return res

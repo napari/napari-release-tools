@@ -1,15 +1,14 @@
 import argparse
-from datetime import datetime
 
 from tqdm import tqdm
 
 from release_utils import (
     GH_REPO,
     GH_USER,
-    get_common_ancestor,
     get_github,
     get_milestone,
     get_repo,
+    get_split_date,
     setup_cache,
 )
 
@@ -51,11 +50,7 @@ else:
     milestone = None
 
 
-common_ancestor = get_common_ancestor(args.from_commit, args.to_commit)
-remote_commit = repository.get_commit(common_ancestor.hexsha)
-previous_tag_date = datetime.strptime(
-    remote_commit.last_modified, "%a, %d %b %Y %H:%M:%S %Z"
-)
+previous_tag_date = get_split_date(args.from_commit, args.to_commit)
 
 probably_solved = repository.get_label("probably solved")
 need_to_reproduce = repository.get_label("need to reproduce")
