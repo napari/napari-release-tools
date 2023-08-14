@@ -8,6 +8,7 @@ import argparse
 
 from release_utils import (
     REPO_DIR_NAME,
+    get_consumed_pr,
     get_local_repo,
     get_milestone,
     get_repo,
@@ -71,13 +72,8 @@ def filter_pr(
 
     label = repository.get_label(label) if label else None
 
-    consumed_pr = set()
-
-    if target_branch:
-        for commit in get_local_repo(REPO_DIR_NAME).iter_commits(target_branch):
-            if (match := pr_num_pattern.search(commit.message)) is not None:
-                pr_num = int(match[1])
-                consumed_pr.add(pr_num)
+    repo = get_local_repo(REPO_DIR_NAME)
+    consumed_pr = get_consumed_pr(repo, target_branch) if target_branch else set()
 
     if skip_triaged:
         triage_labels = [
@@ -86,11 +82,10 @@ def filter_pr(
     else:
         triage_labels = []
 
-    previous_tag_date = get_split_date(from_commit, to_commit)
-
     if milestone is not None:
         query = f"milestone:{milestone.title} is:merged "
     else:
+        previous_tag_date = get_split_date(from_commit, to_commit)
         query = f"merged:>{previous_tag_date.isoformat()} no:milestone "
 
     if label is not None:

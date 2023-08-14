@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Optional
 
 from github import Github, Milestone
+from git import Repo
 from tqdm import tqdm
 
 pr_num_pattern = re.compile(r"\(#(\d+)\)(?:$|\n)")
@@ -155,6 +156,55 @@ def iter_pull_request(additional_query, user=GH_USER, repo=GH_REPO):
     ):
         yield pull_issue.as_pull_request()
 
+
+def get_pr_commits_dict(repo: Repo, branch: str = "main") -> dict[int, str]:
+    """
+    Calculate mapping from PR number in commit hash from a provided branch
+    Parameters
+    ----------
+    repo: Repo
+        Object representing local repository
+    branch: str
+        branch name
+    Returns
+    -------
+    dict from PR number to commit hash
+    """
+    res = {}
+    for commit in repo.iter_commits(branch):
+        if (match := pr_num_pattern.search(commit.message)) is not None:
+            pr_num = int(match[1])
+            res[pr_num] = commit.hexsha
+    return res
+
+
+def get_consumed_pr(repo: Repo, target_branch: str) -> set[int]:
+    """
+    Get set of commits that are already cherry picked
+    Parameters
+    ----------
+    repo: Repo
+        object representing local repository
+    target_branch: str
+        branch to check for merged PR
+    Returns
+    -------
+    """
+    res = set()
+
+    for commit in repo.iter_commits(target_branch):
+        if (match := pr_num_pattern.search(commit.message)) is not None:
+            pr_num = int(match[1])
+            res.add(pr_num)
+    return res
+
+
+def existing_file(path: str) -> Path:
+    path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(f"{path} not found")
+    return path
+    
 
 BOT_LIST = {
     "github-actions[bot]",

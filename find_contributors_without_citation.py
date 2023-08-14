@@ -20,6 +20,7 @@ from release_utils import (
     BOT_LIST,
     LOCAL_DIR,
     REPO_DIR_NAME,
+    existing_file,
     get_milestone,
     get_repo,
     iter_pull_request,
@@ -27,11 +28,6 @@ from release_utils import (
 )
 
 
-def existing_file(path: str) -> Path:
-    path = Path(path)
-    if not path.exists():
-        raise FileNotFoundError(f"{path} not found")
-    return path
 
 
 def main():

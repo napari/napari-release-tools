@@ -18,15 +18,6 @@ from release_utils import (
 )
 
 
-def get_pr_commits_dict():
-    res = {}
-
-    for commit in repo.iter_commits("main"):
-        if (match := pr_num_pattern.search(commit.message)) is not None:
-            pr_num = int(match[1])
-            res[pr_num] = commit.hexsha
-
-    return res
 
 
 parser = argparse.ArgumentParser()

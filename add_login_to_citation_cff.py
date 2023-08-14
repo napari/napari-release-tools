@@ -1,6 +1,6 @@
 """
-This is script for adding logins to existing CITATION.cff file.
-This simplify future updating of this file. Its create bakup file with .bck suffix/
+This is a script for adding logins to the existing CITATION.cff file.
+This simplifies future updating of this file. It creates a backup file with .bck suffix/
 """
 from __future__ import annotations
 
@@ -13,17 +13,12 @@ from tqdm import tqdm
 from unidecode import unidecode
 from yaml import safe_dump, safe_load
 
-from release_utils import BOT_LIST, get_repo, setup_cache
+from release_utils import BOT_LIST, existing_file, get_repo, setup_cache
 
 LOCAL_DIR = Path(__file__).parent
 DEFAULT_CORRECTION_FILE = LOCAL_DIR / "name_corrections.yaml"
 
 
-def existing_file(value):
-    file_path = Path(value)
-    if not file_path.exists():
-        raise argparse.ArgumentTypeError(f"The file {file_path} does not exists.")
-    return file_path
 
 
 def get_correction_dict(file_path: Path | None) -> dict[str, str]:

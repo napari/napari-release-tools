@@ -16,63 +16,17 @@ from release_utils import (
     GH_USER,
     LOCAL_DIR,
     REPO_DIR_NAME,
+    get_consumed_pr,
     get_milestone,
+    get_pr_commits_dict,
     iter_pull_request,
     pr_num_pattern,
     setup_cache,
 )
 
 
-def get_pr_commits_dict(repo: Repo, base_branch: str = "main") -> dict[int, str]:
-    """
-    Calculate mapping from PR number in commit hash from a provided branch
-
-    Parameters
-    ----------
-    repo: Repo
-        Object representing local repository
-
-    base_branch: str
-        branch name
-
-    Returns
-    -------
-    dict from PR number to commit hash
-
-    """
-    res = {}
-
-    for commit in repo.iter_commits(base_branch):
-        if (match := pr_num_pattern.search(commit.message)) is not None:
-            pr_num = int(match[1])
-            res[pr_num] = commit.hexsha
-
-    return res
 
 
-def get_consumed_pr(repo: Repo, target_branch: str) -> set[int]:
-    """
-    Get set of commits that are already cherry picked
-
-    Parameters
-    ----------
-    repo: Repo
-        object representing local repository
-
-    target_branch: str
-        branch to check for merged PR
-
-    Returns
-    -------
-
-    """
-    res = set()
-
-    for commit in repo.iter_commits(target_branch):
-        if (match := pr_num_pattern.search(commit.message)) is not None:
-            pr_num = int(match[1])
-            res.add(pr_num)
-    return res
 
 
 def main():
@@ -191,7 +145,7 @@ def perform_cherry_pick(
         if x.milestone == milestone
     ]
 
-    pr_commits_dict = get_pr_commits_dict(repo)
+    pr_commits_dict = get_pr_commits_dict(repo, base_branch)
     consumed_pr = get_consumed_pr(repo, target_branch)
 
     # check for errors, may require to reset cache if happens
