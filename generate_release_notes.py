@@ -1,4 +1,4 @@
-"""Generate the release notes automatically from Github pull requests.
+"""Generate the release notes automatically from GitHub pull requests.
 Start with:
 ```
 export GH_TOKEN=<your-gh-api-token>
@@ -65,16 +65,16 @@ correction_dict = get_correction_dict(
 ) | get_corrections_from_citation_cff(LOCAL_DIR / REPO_DIR_NAME / "CITATION.cff")
 
 
-def add_to_users(users, new_user):
-    if new_user.login in users:
+def add_to_users(users_dkt, new_user):
+    if new_user.login in users_dkt:
         # reduce obsolete requests to GitHub API
         return
     if new_user.login in correction_dict:
-        users[new_user.login] = correction_dict[new_user.login]
+        users_dkt[new_user.login] = correction_dict[new_user.login]
     elif new_user.name is None:
-        users[new_user.login] = new_user.login
+        users_dkt[new_user.login] = new_user.login
     else:
-        users[new_user.login] = new_user.name
+        users_dkt[new_user.login] = new_user.name
 
 
 authors = set()
@@ -85,17 +85,18 @@ reviewers = set()
 docs_reviewers = set()
 users = {}
 
-highlights = {}
+highlights = {
+    "Highlights": {},
+    "New Features": {},
+    "Improvements": {},
+    "Performance": {},
+    "Bug Fixes": {},
+    "API Changes": {},
+    "Deprecations": {},
+    "Build Tools": {},
+    "Documentation": {},
+}
 
-highlights["Highlights"] = {}
-highlights["New Features"] = {}
-highlights["Improvements"] = {}
-highlights["Performance"] = {}
-highlights["Bug Fixes"] = {}
-highlights["API Changes"] = {}
-highlights["Deprecations"] = {}
-highlights["Build Tools"] = {}
-highlights["Documentation"] = {}
 other_pull_requests = {}
 
 label_to_section = {
@@ -132,9 +133,9 @@ for pull in iter_pull_request(f"milestone:{args.milestone} is:merged"):
             add_to_users(users, review.user)
             reviewers.add(review.user.login)
     assigned_to_section = False
-    pr_lables = {label.name.lower() for label in pull.labels}
+    pr_labels = {label.name.lower() for label in pull.labels}
     for label_name, section in label_to_section.items():
-        if label_name in pr_lables:
+        if label_name in pr_labels:
             highlights[section][pull.number] = {"summary": summary, "repo": GH_REPO}
             assigned_to_section = True
 
@@ -158,8 +159,8 @@ for pull in iter_pull_request(
             add_to_users(users, review.user)
             docs_reviewers.add(review.user.login)
     assigned_to_section = False
-    pr_lables = {label.name.lower() for label in pull.labels}
-    if "maintenance" in pr_lables:
+    pr_labels = {label.name.lower() for label in pull.labels}
+    if "maintenance" in pr_labels:
         other_pull_requests[pull.number] = {"summary": summary, "repo": GH_DOCS_REPO}
     else:
         highlights["Documentation"][pull.number] = {
@@ -179,7 +180,7 @@ docs_committers -= BOT_LIST
 docs_authors -= BOT_LIST
 
 
-user_name_pattern = re.compile(r"@([\w-]+)")  # pattern for GitHub user names
+user_name_pattern = re.compile(r"@([\w-]+)")  # pattern for GitHub usernames
 
 old_contributors = set()
 
@@ -229,12 +230,13 @@ for section, pull_request_dicts in highlights.items():
     print("", file=file_handle)
 
 
-contributors = {}
+contributors = {
+    "authors": authors,
+    "reviewers": reviewers,
+    "docs authors": docs_authors,
+    "docs reviewers": docs_reviewers,
+}
 
-contributors["authors"] = authors
-contributors["reviewers"] = reviewers
-contributors["docs authors"] = docs_authors
-contributors["docs reviewers"] = docs_reviewers
 # ignore committers
 # contributors['committers'] = committers
 
