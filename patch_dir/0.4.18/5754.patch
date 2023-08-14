@@ -54,7 +54,7 @@ index 0977535a..7a5db4b3 100644
 @@ -265,7 +265,7 @@ class ViewerModel(KeymapProvider, MousemapProvider, EventedModel):
              settings.application.grid_width,
          )
- 
+
 -    @validator('theme')
 +    @validator('theme', allow_reuse=True)
      def _valid_theme(cls, v):
@@ -66,8 +66,8 @@ index 0977535a..7a5db4b3 100644
              self.camera.mouse_pan = active_layer.mouse_pan
              self.camera.mouse_zoom = active_layer.mouse_zoom
 +            self._update_status_bar_from_cursor()
- 
+
      @staticmethod
      def rounded_division(min_val, max_val, precision):
--- 
+--
 2.34.1

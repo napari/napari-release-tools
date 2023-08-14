@@ -83,7 +83,7 @@ index 33366674..b618abe9 100644
 +from napari.layers.points import Points
  from napari.settings import get_settings
  from napari.utils.theme import available_themes, get_system_theme
- 
+
 @@ -50,3 +56,20 @@ def test_theme_toggle_from_system_theme():
          assert viewer.theme != 'system'
      # ensure we have looped back to whatever system was
@@ -178,79 +178,79 @@ index ad4c66b2..9efb6c5a 100644
 --- a/napari/layers/image/_image_key_bindings.py
 +++ b/napari/layers/image/_image_key_bindings.py
 @@ -77,7 +77,7 @@ def activate_image_transform_mode(layer):
- 
- 
+
+
  @register_image_action(trans._('Pan/zoom'))
 -def activate_image_pan_zoom_mode(layer):
 +def activate_image_pan_zoom_mode(layer: Image):
      layer.mode = Mode.PAN_ZOOM
- 
- 
+
+
 diff --git a/napari/layers/points/_points_key_bindings.py b/napari/layers/points/_points_key_bindings.py
 index bd843f4a..86718d43 100644
 --- a/napari/layers/points/_points_key_bindings.py
 +++ b/napari/layers/points/_points_key_bindings.py
 @@ -25,7 +25,7 @@ def activate_points_transform_mode(layer):
- 
- 
+
+
  @register_points_mode_action(trans._('Pan/zoom'))
 -def activate_points_pan_zoom_mode(layer):
 +def activate_points_pan_zoom_mode(layer: Points):
      layer.mode = Mode.PAN_ZOOM
- 
- 
+
+
 diff --git a/napari/layers/shapes/_shapes_key_bindings.py b/napari/layers/shapes/_shapes_key_bindings.py
 index 0a54df4c..5355aa8d 100644
 --- a/napari/layers/shapes/_shapes_key_bindings.py
 +++ b/napari/layers/shapes/_shapes_key_bindings.py
 @@ -51,7 +51,7 @@ def activate_shapes_transform_mode(layer):
- 
- 
+
+
  @register_shapes_mode_action(trans._('Pan/zoom'))
 -def activate_shapes_pan_zoom_mode(layer):
 +def activate_shapes_pan_zoom_mode(layer: Shapes):
      layer.mode = Mode.PAN_ZOOM
- 
- 
+
+
 diff --git a/napari/layers/surface/_surface_key_bindings.py b/napari/layers/surface/_surface_key_bindings.py
 index 703df346..6011953e 100644
 --- a/napari/layers/surface/_surface_key_bindings.py
 +++ b/napari/layers/surface/_surface_key_bindings.py
 @@ -21,7 +21,7 @@ def activate_surface_transform_mode(layer):
- 
- 
+
+
  @register_surface_mode_action(trans._('Pan/zoom'))
 -def activate_surface_pan_zoom_mode(layer):
 +def activate_surface_pan_zoom_mode(layer: Surface):
      layer.mode = Mode.PAN_ZOOM
- 
- 
+
+
 diff --git a/napari/layers/tracks/_tracks_key_bindings.py b/napari/layers/tracks/_tracks_key_bindings.py
 index a701e4cd..2ea14a72 100644
 --- a/napari/layers/tracks/_tracks_key_bindings.py
 +++ b/napari/layers/tracks/_tracks_key_bindings.py
 @@ -21,7 +21,7 @@ def activate_tracks_transform_mode(layer):
- 
- 
+
+
  @register_tracks_mode_action(trans._('Pan/zoom'))
 -def activate_tracks_pan_zoom_mode(layer):
 +def activate_tracks_pan_zoom_mode(layer: Tracks):
      layer.mode = Mode.PAN_ZOOM
- 
- 
+
+
 diff --git a/napari/layers/vectors/_vectors_key_bindings.py b/napari/layers/vectors/_vectors_key_bindings.py
 index f8f7bec8..06f48b3a 100644
 --- a/napari/layers/vectors/_vectors_key_bindings.py
 +++ b/napari/layers/vectors/_vectors_key_bindings.py
 @@ -21,7 +21,7 @@ def activate_vectors_transform_mode(layer):
- 
- 
+
+
  @register_vectors_mode_action(trans._('Pan/zoom'))
 -def activate_vectors_pan_zoom_mode(layer):
 +def activate_vectors_pan_zoom_mode(layer: Vectors):
      layer.mode = Mode.PAN_ZOOM
- 
- 
+
+
 diff --git a/napari/utils/shortcuts.py b/napari/utils/shortcuts.py
 index 53ffe707..3ed1ef5c 100644
 --- a/napari/utils/shortcuts.py
@@ -263,6 +263,5 @@ index 53ffe707..3ed1ef5c 100644
      'napari:activate_labels_erase_mode': ['1'],
      'napari:activate_labels_paint_mode': ['2'],
      'napari:activate_labels_fill_mode': ['3'],
--- 
+--
 2.34.1
-

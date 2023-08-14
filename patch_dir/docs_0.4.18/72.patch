@@ -30,14 +30,14 @@ index bd1ff815..d2658f96 100644
 +++ b/docs/developers/contributing.md
 @@ -9,69 +9,108 @@ If you are a new user, we recommend checking out the detailed [Github Docs](http
  ## Setting up a development installation
- 
+
  In order to make changes to `napari`, you will need to [fork](https://docs.github.com/en/get-started/quickstart/contributing-to-projects#forking-a-repository) the
 -[repository](https://github.com/napari/napari).
 +[repository](https://github.com/napari/napari). If you are not familiar with `git`, we recommend reading up on [this guide](https://docs.github.com/en/get-started/using-git/about-git#basic-git-commands).
- 
+
 -If you are not familiar with `git`, we recommend reading up on [this guide](https://docs.github.com/en/get-started/using-git/about-git#basic-git-commands).
 +1. Clone the forked repository to your local machine and change directories:
- 
+
 -Clone the forked repository to your local machine and change directories:
 -```sh
 -git clone https://github.com/your-username/napari.git
@@ -47,13 +47,13 @@ index bd1ff815..d2658f96 100644
 +    git clone https://github.com/your-username/napari.git
 +    cd napari
 +    ```
- 
+
 -Set the `upstream` remote to the base `napari` repository:
 -```sh
 -git remote add upstream https://github.com/napari/napari.git
 -```
 +2. Set the `upstream` remote to the base `napari` repository:
- 
+
 -We recommend starting with a fresh Python virtual environment, using an environment manager like
 -[conda](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html) or [venv](https://docs.python.org/3/library/venv.html). Then, install the napari package
 -in editable mode and all of the developer tools, along with a supported Qt backend. For example, for PyQt5, the default, you would use the following:
@@ -63,25 +63,25 @@ index bd1ff815..d2658f96 100644
 +    ```sh
 +    git remote add upstream https://github.com/napari/napari.git
 +    ```
- 
+
 -If you want to use PySide2 instead, you would use:
 -```sh
 -python -m pip install -e ".[pyside,dev]"  # (quotes only needed for zsh shell)
 -```
 +3. If you haven't already, create a development environment:
- 
+
 -Finally, if you already have a Qt backend installed or want to use an experimental one like Qt6 use:
 -```sh
 -python -m pip install -e ".[dev]"  # (quotes only needed for zsh shell)
 -```
 +    ::::{tab-set}
- 
+
 +    :::{tab-item} Using `conda`
 +    After [installing `conda`](https://www.anaconda.com/products/distribution), create an environment called `napari-env` with Python {{ python_version }} and activate it.
- 
+
 +    {{ conda_create_env }}
 +    :::
- 
+
 -We use [`pre-commit`](https://pre-commit.com) to sort imports with
 -[`isort`](https://github.com/PyCQA/isort), format code with
 -[`black`](https://github.com/psf/black), and lint with
@@ -96,7 +96,7 @@ index bd1ff815..d2658f96 100644
 +    ```
 +    See the [venv](https://docs.python.org/3/library/venv.html) documentation for instructions on Windows.
 +    :::
- 
+
 -```sh
 -pre-commit install
 -```
@@ -121,7 +121,7 @@ index bd1ff815..d2658f96 100644
 +    ```sh
 +    pip install -e ".[pyqt,dev]"  # (quotes only needed for zsh shell)
 +    ```
- 
+
 -Upon committing, your code will be formatted according to our [`black`
 -configuration](https://github.com/napari/napari/blob/main/pyproject.toml), which includes the settings
 -`skip-string-normalization = true` and `max-line-length = 79`. To learn more,
@@ -185,14 +185,14 @@ index bd1ff815..d2658f96 100644
 +
 +## Contributing documentation
 +
-+If you wish to contribute documentation changes to napari, please read the [guide on contributing documentation](documentation/index.md). 
- 
++If you wish to contribute documentation changes to napari, please read the [guide on contributing documentation](documentation/index.md).
+
  ## Adding icons
- 
+
 @@ -223,18 +262,6 @@ git push -u origin your-branch-name
  You can then make a
  [pull-request](https://docs.github.com/en/get-started/quickstart/contributing-to-projects#making-a-pull-request) to `napari`'s `main` branch.
- 
+
 -## Building the docs
 -
 -From the project root:
@@ -206,7 +206,7 @@ index bd1ff815..d2658f96 100644
 -Try entering `file:///absolute/path/to/napari/docs/_build/html/index.html` in your address bar.
 -
  ## Code of Conduct
- 
+
  `napari` has a [Code of Conduct](napari-coc) that should be honored by everyone who participates in the `napari` community.
 diff --git a/docs/tutorials/fundamentals/installation.md b/docs/tutorials/fundamentals/installation.md
 index 3554687c..0112d644 100644
@@ -218,15 +218,15 @@ index 3554687c..0112d644 100644
  ```
 -You can then upgrade napari to a new version using
 +You can then upgrade napari to a new version using:
- 
+
  ```sh
  python -m pip install "napari[all]" --upgrade
 @@ -105,7 +105,7 @@ conda-forge channel. We also recommend this path for users of arm64 macOS machin
  conda install -c conda-forge napari
  ```
- 
+
 -You can then upgrade to a new version of napari using
 +You can then upgrade to a new version of napari using:
- 
+
  ```sh
  conda update napari

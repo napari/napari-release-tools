@@ -74,7 +74,7 @@ index 28177608..de199674 100644
 @@ -6,20 +6,31 @@ on:
      # Runs every Monday at 8:00 UTC (4:00 Eastern)
      - cron: '0 8 * * 1'
- 
+
 +  push:
 +    paths:
 +        - 'resources/constraints/version_denylist.txt'
@@ -104,7 +104,7 @@ index 28177608..de199674 100644
            # https://github.com/peter-evans/create-pull-request/blob/main/docs/concepts-guidelines.md#triggering-further-workflow-runs
            ssh-key: ${{ secrets.DEPLOY_KEY }}
 +          fetch-depth: 0
- 
+
        # START PYTHON DEPENDENCIES
        - uses: actions/setup-python@v4
 @@ -42,9 +53,18 @@ jobs:
@@ -119,13 +119,13 @@ index 28177608..de199674 100644
 +          git branch -a
 +          echo "branch_name=$(python tools/get_auto_upgrade_branch_name.py)" >> $GITHUB_OUTPUT
 +          echo "base_branch_name=$(python tools/get_auto_upgrade_branch_name.py --base_branch)" >> $GITHUB_OUTPUT
- 
+
        - name: Upgrade Python dependencies
          # ADD YOUR CUSTOM DEPENDENCY UPGRADE COMMANDS BELOW
 +        if: steps.branch_name.outputs.branch_name != 'skip'
          run: |
            flags=""
-           # Explanation of below commands 
+           # Explanation of below commands
 @@ -84,6 +104,7 @@ jobs:
        - name: Check updated packages
          id: packages
@@ -137,7 +137,7 @@ index 28177608..de199674 100644
 @@ -91,11 +112,22 @@ jobs:
            echo "$(python tools/check_updated_packages.py)" >> $GITHUB_OUTPUT
            echo "EOF" >> $GITHUB_OUTPUT
- 
+
 -      - name: Create PR updating vendored modules
 +      - name: Create commit
 +        if: (steps.branch_name.outputs.branch_name != 'skip') && (github.event_name == 'push')
@@ -147,7 +147,7 @@ index 28177608..de199674 100644
 +          git reset --soft `git merge-base origin/${{ steps.branch_name.outputs.base_branch_name }} HEAD`
 +          git add -u
 +          git diff-index --quiet HEAD -- || git commit -m "update constraints"
-+          
++
 +
 +      - name: Create PR updating test constraints
          uses: peter-evans/create-pull-request@v5
@@ -185,10 +185,10 @@ index f3406469..eb1a18ce 100644
 +from importlib.metadata import version as package_version
  from os.path import abspath, expanduser, sep
  from pathlib import Path
- 
+
  import pytest
 +from packaging.version import parse as parse_version
- 
+
  from napari.utils.misc import (
      StringEnum,
 @@ -198,6 +200,15 @@ def test_equality_operator():
@@ -558,7 +558,7 @@ index 18d390b3..2e0b30cc 100644
      # via napari (setup.cfg)
  zipp==3.15.0
      # via importlib-metadata
- 
+
  # The following packages are considered to be unsafe in a requirements file:
 -setuptools==67.7.2
 +pip==23.1.2
@@ -884,7 +884,7 @@ index 91f8fbff..d3a85530 100644
      # via napari (setup.cfg)
  zipp==3.15.0
      # via importlib-metadata
- 
+
  # The following packages are considered to be unsafe in a requirements file:
 -setuptools==67.7.2
 +pip==23.1.2
@@ -1244,7 +1244,7 @@ index 1ca27026..32c7ea12 100644
      # via
 @@ -540,7 +551,9 @@ zipp==3.15.0
      #   importlib-resources
- 
+
  # The following packages are considered to be unsafe in a requirements file:
 -setuptools==67.7.2
 +pip==23.1.2
@@ -1612,7 +1612,7 @@ index bff160ee..a2521a3a 100644
      # via
 @@ -533,7 +545,9 @@ zipp==3.15.0
      #   importlib-resources
- 
+
  # The following packages are considered to be unsafe in a requirements file:
 -setuptools==67.7.2
 +pip==23.1.2
@@ -2366,16 +2366,16 @@ index 0095aed1..1e2326f7 100644
  import sys
  from configparser import ConfigParser
  from pathlib import Path
- 
+
 +from get_auto_upgrade_branch_name import get_base_branch_name
 +
  name_re = re.compile(r"[\w-]+")
  changed_name_re = re.compile(r"\+([\w-]+)")
- 
+
 @@ -15,16 +18,55 @@ parser = argparse.ArgumentParser()
  parser.add_argument("--main-packages", action="store_true")
  args = parser.parse_args()
- 
+
 +ref_name = os.environ.get("GITHUB_REF_NAME")
 +event = os.environ.get("GITHUB_EVENT_NAME", "")
 +if ref_name is None:
@@ -2398,7 +2398,7 @@ index 0095aed1..1e2326f7 100644
      capture_output=True,
      check=True,
  )
- 
+
 +branches = out.stdout.decode().split("\n")
 +
 +if base_branch not in branches:
@@ -2499,5 +2499,5 @@ index 00000000..d2facee5
 +
 +if __name__ == "__main__":
 +    main()
--- 
+--
 2.34.1

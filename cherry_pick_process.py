@@ -20,13 +20,8 @@ from release_utils import (
     get_milestone,
     get_pr_commits_dict,
     iter_pull_request,
-    pr_num_pattern,
     setup_cache,
 )
-
-
-
-
 
 
 def main():

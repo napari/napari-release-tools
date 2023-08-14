@@ -71,9 +71,9 @@ index be79089b..8eae8b86 100644
 --- a/napari/_qt/qt_resources/styles/01_buttons.qss
 +++ b/napari/_qt/qt_resources/styles/01_buttons.qss
 @@ -1,15 +1,6 @@
- 
+
  /* ----------------- Buttons -------------------- */
- 
+
 -QtDeleteButton {
 -   image: url("theme_{{ id }}:/delete.svg");
 -   min-width : 28px;
@@ -87,9 +87,9 @@ index be79089b..8eae8b86 100644
     min-width : 28px;
     max-width : 28px;
 @@ -19,6 +10,10 @@ QtViewerPushButton{
-    
+
  }
- 
+
 +QtViewerPushButton[mode="delete_button"] {
 +   image: url("theme_{{ id }}:/delete.svg");
 +}
@@ -108,10 +108,10 @@ index 9aae491f..6659d745 100644
 -from napari.utils.interactions import Shortcut
  from napari.utils.misc import in_ipython, in_jupyter, in_python_repl
  from napari.utils.translations import trans
- 
+
 @@ -52,7 +51,11 @@ class QtLayerButtons(QFrame):
          super().__init__()
- 
+
          self.viewer = viewer
 -        self.deleteButton = QtDeleteButton(self.viewer)
 +
@@ -124,8 +124,8 @@ index 9aae491f..6659d745 100644
              trans._('New points layer'),
 @@ -337,80 +340,6 @@ class QtViewerButtons(QFrame):
          self.viewer.grid.shape = (value, self.viewer.grid.shape[1])
- 
- 
+
+
 -class QtDeleteButton(QPushButton):
 -    """Delete button to remove selected layers.
 -
@@ -209,8 +209,8 @@ index 64a8cf65..4e9c5aa3 100644
 +++ b/napari/components/_viewer_key_bindings.py
 @@ -76,6 +76,11 @@ def reset_view(viewer: Viewer):
      viewer.reset_view()
- 
- 
+
+
 +@register_viewer_action(trans._("Delete selected layers."))
 +def delete_selected_layers(viewer: Viewer):
 +    viewer.layers.remove_selected()
@@ -249,5 +249,5 @@ index 5487158c..09ebfc26 100644
        "perspective",
        "Control-Backspace",
        "console",
--- 
+--
 2.34.1

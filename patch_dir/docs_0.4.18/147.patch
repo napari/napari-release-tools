@@ -42,16 +42,16 @@ index fd0b9f39..caa42733 100644
 @@ -70,24 +70,14 @@ A software installer is usually expected to fulfill these requirements:
  * It will provide a convenient way of opening the application, like a shortcut or a menu entry.
  * It will allow the user to uninstall the application, leaving no artifacts behind.
- 
+
 -Right now, we are using two ways of generating the installers:
 -
 -* With `briefcase`, which takes PyPI packages.
 -* With `constructor`, which takes `conda` packages.
 -
 +We use `constructor` to build the bundled installers, which takes `conda` packages.
- `conda` packages offer several advantages when it comes to bundling dependencies, since it makes very few assumptions about the underlying system installation. 
+ `conda` packages offer several advantages when it comes to bundling dependencies, since it makes very few assumptions about the underlying system installation.
  As a result, `constructor` bundles include libraries that might be missing in the target system and hence should provide a more robust user experience.
- 
+
 -### Briefcase-based installers
 -
 -[`briefcase`][5] based installers are marked for deprecation, so we will not discuss them here.
@@ -59,15 +59,15 @@ index fd0b9f39..caa42733 100644
 -
 -### Constructor-based installers
 -
--We use `constructor` to build the `napari` installers through the `.github/workflows/make_bundle_conda.yml` workflow, 
--which only specifies the triggers used to call the actual workflow implementation under the `napari/packaging` repository. 
+-We use `constructor` to build the `napari` installers through the `.github/workflows/make_bundle_conda.yml` workflow,
+-which only specifies the triggers used to call the actual workflow implementation under the `napari/packaging` repository.
 -This repository stores all the logic and files needed to create the nightly `conda` packages and the `constructor` installers.
 +The automation is implemented in the `.github/workflows/make_bundle_conda.yml` workflow, which only
 +specifies the triggers used to call the actual workflow implementation under the `napari/packaging`
 +repository. This repository stores all the logic and files needed to create the nightly `conda`
 +packages and the `constructor` installers.
- 
- [`constructor`][6] allows you to build cross-platform installers out of `conda` packages. 
+
+ [`constructor`][6] allows you to build cross-platform installers out of `conda` packages.
  It supports the following installer types:
 @@ -110,7 +100,7 @@ company: Napari
  license: EULA.md
@@ -79,13 +79,13 @@ index fd0b9f39..caa42733 100644
  specs: # specs for the 'base'  environment
    - python   # pinned to the version of the running interpreter, configured in the CI
 @@ -156,7 +146,7 @@ The main OS-agnostic keys are:
- 
- * `channels`: where the packages will be downloaded from. 
-   We mainly rely on `conda-forge` for this, where `napari` is published. 
--  However, we also have `napari/label/bundle_tools`, where we store our `constructor` stack forks (more on this later). 
-+  However, we also have `napari/label/bundle_tools_2`, where we store our `constructor` stack forks (more on this later). 
-   In nightly installers, we locally build our own development packages for `conda`, without resorting to `conda-forge`. 
-   To make use of those (which are eventually published to `napari/label/nightly`), 
+
+ * `channels`: where the packages will be downloaded from.
+   We mainly rely on `conda-forge` for this, where `napari` is published.
+-  However, we also have `napari/label/bundle_tools`, where we store our `constructor` stack forks (more on this later).
++  However, we also have `napari/label/bundle_tools_2`, where we store our `constructor` stack forks (more on this later).
+   In nightly installers, we locally build our own development packages for `conda`, without resorting to `conda-forge`.
+   To make use of those (which are eventually published to `napari/label/nightly`),
    we unpack the GitHub Actions artifact in a specific location that `constructor` recognizes as a _local_ channel once indexed.
 @@ -323,7 +313,6 @@ a high-level list of the main changes introduced in the stack.
  [2]: https://github.com/napari/napari/blob/main/.github/workflows/make_release.yml
@@ -12234,7 +12234,7 @@ index 8a798e5c..7861b79e 100644
 @@ -46,12 +46,6 @@ You may also want:
  This is the easiest way to install napari if you only wish to use it as a standalone GUI app.
  This installation method does not have any prerequisites.
- 
+
 -```{important}
 -Note that the bundled app is still
 -in active development, and may not be very stable. We strongly recommend
@@ -12243,10 +12243,10 @@ index 8a798e5c..7861b79e 100644
 -
  [Click here](#install-as-a-bundled-app) to see instructions
  for installing the bundled app.
- 
+
 @@ -218,102 +212,27 @@ you're not using.
  ## Install as a bundled app
- 
+
  napari can also be installed as a bundled app on each of the major platforms,
 -MacOS, Windows, and Linux with a simple one click download and installation
 +MacOS, Windows, and Linux with a simple one-click download and installation
@@ -12255,7 +12255,7 @@ index 8a798e5c..7861b79e 100644
  process described above working. The bundled app version of napari is the same
  version that you can get through the above described processes, and can still be
  extended with napari plugins installed directly via the app.
- 
+
 +```{important}
 +Note that the bundled app is still
 +in active development, and may not be very stable. We strongly recommend
@@ -12347,13 +12347,13 @@ index 8a798e5c..7861b79e 100644
 -The very first time you launch napari the startup time will be fairly slow, but
 -after that you will find that napari launches more quickly.
 +expand the `Assets` section. You can then download the appropriate file for your platform.
- 
+
 -### Installing the Linux bundle
- 
+
 -(Guide coming soon... In the meantime, if you try it and encounter issues, see
 -below for how to contact us.)
  <!-- #endregion -->
- 
+
  ## Next steps
 @@ -325,7 +244,7 @@ contributing to napari please check our [contributing
  guidelines](../../developers/contributing.md)
@@ -12369,9 +12369,9 @@ index 123a1d9b..7be7b673 100644
 --- a/docs/tutorials/fundamentals/quick_start.md
 +++ b/docs/tutorials/fundamentals/quick_start.md
 @@ -48,13 +48,12 @@ You will also see some examples of plugins. The core napari viewer focuses on do
- 
+
  ### Installation
- 
+
 -- Download the napari {{ napari_version }} bundled app for simple installation:
 -
 -    {{ '[Linux installation](https://github.com/napari/napari/releases/download/vNAPARI_VER/napari-NAPARI_VER-Linux-x86_64.zip)'.replace('NAPARI_VER', napari_version) }}<br>
@@ -12385,15 +12385,14 @@ index 123a1d9b..7be7b673 100644
 +  - macOS (Apple Silicon): {{ '[`napari-NAPARI_VER-macOS-arm64.pkg`](https://github.com/napari/napari/releases/download/vNAPARI_VER/napari-NAPARI_VER-macOS-arm64.pkg)'.replace('NAPARI_VER', napari_version) }}.
 +  - Windows: {{ '[`napari-NAPARI_VER-Windows-x86_64.exe`](https://github.com/napari/napari/releases/download/vNAPARI_VER/napari-NAPARI_VER-Windows-x86_64.exe)'.replace('NAPARI_VER', napari_version) }}.
 +  - Other artifacts can be found in the {{ '[the Releases page](https://github.com/napari/napari/releases/vNAPARI_VER)'.replace('NAPARI_VER', napari_version) }}, by the Assets section at the bottom.
- 
+
  - For those familiar with Python:
- 
+
 @@ -91,7 +90,7 @@ napari
  - If you installed the bundled app:
- 
+
      Click on the app icon to open it.<br>
 -    *Note: for mac users, it may require [security setting changes](https://napari.org/tutorials/fundamentals/installation.html).*
 +    *Note: macOS users might need to right click on the app icon and select "Open" to bypass the security check. You can also go to System Settings > Privacy & Security and click on "Open Anyway".*
- 
+
  +++
- 

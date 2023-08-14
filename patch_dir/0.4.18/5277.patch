@@ -31,7 +31,7 @@ index 252c2fb4..6361f153 100644
 +      - "v*x"
      paths-ignore:
        - 'docs/**'
- 
+
 @@ -80,6 +81,10 @@ jobs:
            - python: 3.9
              platform: ubuntu-latest
@@ -40,8 +40,8 @@ index 252c2fb4..6361f153 100644
 +#          - python: '3.10'
 +#            platform: ubuntu-latest
 +#            backend: pyside6
- 
+
      steps:
        - name: Cancel Previous Runs
--- 
+--
 2.34.1

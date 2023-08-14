@@ -9110,7 +9110,7 @@ index a84fdbf3..7c30e7ed 100644
 @@ -10,6 +10,33 @@ When developing plugins in napari, you may encounter mistakes or bugs in your co
  6. Logging and debug messages.
  7. Debugging segfaults/memory violation errors
- 
+
 +## Quick start
 +
 +To quickly get started with debugging your plugin, you can do the following:
@@ -9139,5 +9139,5 @@ index a84fdbf3..7c30e7ed 100644
 +![debugging_in_vscode](../images/vs_code_debug.png)
 +
  ## Debugging plugin start-up issues
- 
+
  It is possible that after installing your plugin, napari will fail to launch - or your plugin won't show up.

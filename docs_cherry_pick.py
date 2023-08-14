@@ -17,9 +17,6 @@ from release_utils import (
     setup_cache,
 )
 
-
-
-
 parser = argparse.ArgumentParser()
 parser.add_argument("milestone", help="The milestone to list")
 parser.add_argument(

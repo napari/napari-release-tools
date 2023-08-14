@@ -91,7 +91,7 @@ index 216a1feb..d3d2a1f9 100644
 +            schema["title"] = field.field_info.title
 +        if field.field_info.description:
 +            schema["description"] = field.field_info.description
- 
+
          # find enums:
          for name, subfield in ftype.__fields__.items():
 diff --git a/napari/_vendor/qt_json_builder/qt_jsonschema_form/form.py b/napari/_vendor/qt_json_builder/qt_jsonschema_form/form.py
@@ -101,7 +101,7 @@ index b7af425e..41505d0a 100644
 @@ -120,6 +120,9 @@ class WidgetBuilder:
          if "enum" in schema:
              default_variant = "enum"
- 
+
 +        if schema.get("description"):
 +            description = schema["description"]
 +
@@ -115,7 +115,7 @@ index 4e245901..175270c5 100644
 @@ -685,6 +685,20 @@ class ObjectSchemaWidgetMinix(SchemaWidgetMixin):
      ) -> Dict[str, QtWidgets.QWidget]:
          raise NotImplementedError
- 
+
 +    def _prepare_widget(self, name: str, sub_schema: dict, widget_builder: 'WidgetBuilder', ui_schema: dict):
 +        description = sub_schema.get('description', "")
 +
@@ -134,7 +134,7 @@ index 4e245901..175270c5 100644
      def populate_from_schema(
          self,
 @@ -697,20 +711,9 @@ class HorizontalObjectSchemaWidget(ObjectSchemaWidgetMinix, QtWidgets.QWidget):
- 
+
          widgets = {}
          for name, sub_schema in schema['properties'].items():
 -            description = sub_schema.get('description', "")
@@ -153,7 +153,7 @@ index 4e245901..175270c5 100644
 -
 -
              widgets[name] = widget
- 
+
          return widgets
 @@ -737,17 +740,11 @@ class ObjectSchemaWidget(ObjectSchemaWidgetMinix, QtWidgets.QGroupBox):
          widgets = {}
@@ -176,15 +176,15 @@ index 4e245901..175270c5 100644
 +            else:
 +                layout.addRow(label, widget)
              widgets[name] = widget
- 
+
          return widgets
 diff --git a/napari/settings/_shortcuts.py b/napari/settings/_shortcuts.py
 index de3b36db..fb86de4c 100644
 --- a/napari/settings/_shortcuts.py
 +++ b/napari/settings/_shortcuts.py
 @@ -8,7 +8,6 @@ from napari.utils.translations import trans
- 
- 
+
+
  class ShortcutsSettings(EventedModel):
 -    # FIXME user with modified shortcut will not see new shortcut
      shortcuts: Dict[str, List[str]] = Field(
@@ -193,12 +193,11 @@ index de3b36db..fb86de4c 100644
 @@ -21,7 +20,7 @@ class ShortcutsSettings(EventedModel):
          # Napari specific configuration
          preferences_exclude = ['schema_version']
- 
+
 -    @validator('shortcuts')
 +    @validator('shortcuts', allow_reuse=True)
      def shortcut_validate(cls, v):
          for name, value in default_shortcuts.items():
              if name not in v:
--- 
+--
 2.34.1
-

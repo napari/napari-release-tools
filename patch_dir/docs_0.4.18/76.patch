@@ -36,6 +36,5 @@ index 4702e4a2..b994639d 100644
      sphinx-gallery
      sphinx_autodoc_typehints==1.12.0
      myst-nb
--- 
+--
 2.34.1
-

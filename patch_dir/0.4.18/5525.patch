@@ -19,13 +19,13 @@ index 70781457..f9f3df49 100644
 @@ -12,6 +12,9 @@ on:
    # Allows you to run this workflow manually from the Actions tab
    workflow_dispatch:
- 
+
 +env:
 +  COLUMNS: 120
 +
  concurrency:
    group: comprehensive-test
- 
+
 diff --git a/.github/workflows/test_prereleases.yml b/.github/workflows/test_prereleases.yml
 index c2331ada..96a6d7e2 100644
 --- a/.github/workflows/test_prereleases.yml
@@ -33,7 +33,7 @@ index c2331ada..96a6d7e2 100644
 @@ -9,6 +9,9 @@ on:
    # Allows you to run this workflow manually from the Actions tab
    workflow_dispatch:
- 
+
 +env:
 +  COLUMNS: 120
 +
@@ -47,7 +47,7 @@ index e66f0f5c..d8e087af 100644
 @@ -9,6 +9,9 @@ on:
      paths-ignore:
        - 'docs/**'
- 
+
 +env:
 +  COLUMNS: 120
 +
@@ -67,13 +67,13 @@ index 89cc1bb0..f7483705 100644
 --- a/napari/_tests/test_pytest_plugin.py
 +++ b/napari/_tests/test_pytest_plugin.py
 @@ -11,11 +11,11 @@ pytest_plugins = "pytester"
- 
+
  @pytest.mark.filterwarnings("ignore:`type` argument to addoption()::")
  @pytest.mark.filterwarnings("ignore:The TerminalReporter.writer::")
 -def test_make_napari_viewer(testdir):
 +def test_make_napari_viewer(pytester_pretty):
      """Make sure that our make_napari_viewer plugin works."""
- 
+
      # create a temporary pytest test file
 -    testdir.makepyfile(
 +    pytester_pretty.makepyfile(
@@ -86,7 +86,7 @@ index 89cc1bb0..f7483705 100644
      # run all tests with pytest
 -    result = testdir.runpytest()
 +    result = pytester_pretty.runpytest()
- 
+
      # check that all 1 test passed
      result.assert_outcomes(passed=1)
 diff --git a/setup.cfg b/setup.cfg
@@ -110,7 +110,7 @@ index a7b6ee89..1b6d4a91 100644
      3.9.0: py390
      3.10: py310
 +fail_on_no_env = True
- 
+
  # This section turns environment variables from github actions
  # into tox environment factors. This, combined with the [gh-actions]
 @@ -64,6 +65,9 @@ passenv =
@@ -133,5 +133,5 @@ index a7b6ee89..1b6d4a91 100644
  deps =
      pytest-cov
      pyqt6: PyQt6
--- 
+--
 2.34.1

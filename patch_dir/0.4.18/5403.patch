@@ -71,6 +71,5 @@ index 99c3faca..fd4fa5d7 100644
 +
 +
 +__all__ = ["QSlider", "QDoubleSlider"]
--- 
+--
 2.34.1
-

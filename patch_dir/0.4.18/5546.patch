@@ -17,7 +17,7 @@ index 39ed62cb..95886bb1 100644
 +++ b/napari/_qt/layer_controls/_tests/test_qt_layer_controls.py
 @@ -5,10 +5,12 @@ import pytest
  from qtpy.QtWidgets import QAbstractButton
- 
+
  from napari._qt.layer_controls.qt_layer_controls_container import (
 +    QtLayerControlsContainer,
      create_qt_layer_controls,
@@ -26,12 +26,12 @@ index 39ed62cb..95886bb1 100644
  from napari._qt.layer_controls.qt_shapes_controls import QtShapesControls
 +from napari.components import ViewerModel
  from napari.layers import Labels, Points, Shapes
- 
+
  LayerTypeWithData = namedtuple('LayerTypeWithData', ['type', 'data'])
 @@ -82,6 +84,45 @@ def test_set_text_then_set_visible_updates_checkbox(
      assert ctrl.textDispCheckBox.isChecked()
- 
- 
+
+
 +@pytest.mark.parametrize(('ndim', 'editable_after'), ((2, False), (3, True)))
 +def test_set_3d_display_with_points(qtbot, ndim, editable_after):
 +    """Interactivity only works for 2D points layers rendered in 2D and not
@@ -86,7 +86,7 @@ index 57b49ac4..8c236d27 100644
 +        controls.ndisplay = self.viewer.dims.ndisplay
          self.addWidget(controls)
          self.widgets[layer] = controls
- 
+
 diff --git a/napari/_qt/layer_controls/qt_points_controls.py b/napari/_qt/layer_controls/qt_points_controls.py
 index d2a8d2f8..e36e436d 100644
 --- a/napari/_qt/layer_controls/qt_points_controls.py
@@ -94,7 +94,7 @@ index d2a8d2f8..e36e436d 100644
 @@ -339,6 +339,9 @@ class QtPointsControls(QtLayerControls):
          with qt_signals_blocked(self.edgeColorEdit):
              self.edgeColorEdit.setColor(self.layer.current_edge_color)
- 
+
 +    def _on_ndisplay_changed(self):
 +        self.layer.editable = not (self.layer.ndim == 2 and self.ndisplay == 3)
 +
@@ -108,7 +108,7 @@ index c19bdd15..e79907f7 100644
 @@ -431,6 +431,9 @@ class QtShapesControls(QtLayerControls):
          with qt_signals_blocked(self.faceColorEdit):
              self.faceColorEdit.setColor(self.layer.current_face_color)
- 
+
 +    def _on_ndisplay_changed(self):
 +        self.layer.editable = self.ndisplay == 2
 +
@@ -121,8 +121,8 @@ index db5de951..e3e93c80 100644
 +++ b/napari/layers/points/_tests/test_points.py
 @@ -2298,40 +2298,6 @@ def test_text_param_and_setter_are_consistent():
      )
- 
- 
+
+
 -def test_editable_2d_layer_ndisplay_3():
 -    """Interactivity doesn't work for 2D points layers
 -    being rendered in 3D. Verify that layer.editable is set
@@ -160,5 +160,5 @@ index db5de951..e3e93c80 100644
  def test_shown():
      """Test setting shown property"""
      shape = (10, 2)
--- 
+--
 2.34.1

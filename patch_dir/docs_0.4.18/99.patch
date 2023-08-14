@@ -41,6 +41,6 @@ index 0ac9e65a..4a1fd790 100644
            repository: napari/napari
 +          # ensure version metadata is proper
 +          fetch-depth: 0
- 
+
        - name: Copy examples to docs folder
          run: |

@@ -97,10 +97,10 @@ index 5a368a04..a8ac5c46 100644
 @@ -408,6 +408,8 @@ class Dims(EventedModel):
          order[nsteps > 1] = np.roll(order[nsteps > 1], 1)
          self.order = order.tolist()
- 
+
 +    def _go_to_center_step(self):
 +        self.current_step = [int((ns - 1) / 2) for ns in self.nsteps]
- 
+
  def assert_axis_in_bounds(axis: int, ndim: int) -> int:
      """Assert a given value is inside the existing axes of the image.
 diff --git a/napari/components/viewer_model.py b/napari/components/viewer_model.py
@@ -108,7 +108,7 @@ index c059acf4..3e560bbb 100644
 --- a/napari/components/viewer_model.py
 +++ b/napari/components/viewer_model.py
 @@ -414,6 +414,13 @@ class ViewerModel(KeymapProvider, MousemapProvider, EventedModel):
- 
+
      @staticmethod
      def rounded_division(min_val, max_val, precision):
 +        warnings.warn(
@@ -119,11 +119,11 @@ index c059acf4..3e560bbb 100644
 +            stacklevel=2,
 +        )
          return int(((min_val + max_val) / 2) / precision) * precision
- 
+
      def _on_layers_change(self):
 @@ -555,10 +562,9 @@ class ViewerModel(KeymapProvider, MousemapProvider, EventedModel):
          self._update_layers(layers=[layer])
- 
+
          if len(self.layers) == 1:
 +            # set dims slider to the middle of all dimensions
              self.reset_view()
@@ -131,8 +131,8 @@ index c059acf4..3e560bbb 100644
 -            midpoint = [self.rounded_division(*_range) for _range in ranges]
 -            self.dims.set_point(range(len(ranges)), midpoint)
 +            self.dims._go_to_center_step()
- 
+
      @staticmethod
      def _layer_help_from_mode(layer: Layer):
--- 
+--
 2.34.1

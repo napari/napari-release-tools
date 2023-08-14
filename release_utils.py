@@ -7,8 +7,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from github import Github, Milestone
 from git import Repo
+from github import Github, Milestone
 from tqdm import tqdm
 
 pr_num_pattern = re.compile(r"\(#(\d+)\)(?:$|\n)")
@@ -204,7 +204,7 @@ def existing_file(path: str) -> Path:
     if not path.exists():
         raise FileNotFoundError(f"{path} not found")
     return path
-    
+
 
 BOT_LIST = {
     "github-actions[bot]",

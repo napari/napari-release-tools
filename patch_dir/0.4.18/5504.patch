@@ -23,14 +23,14 @@ index 240d6da9..2503ab77 100644
 @@ -67,7 +67,11 @@ class QtListModel(_BaseEventedItemModel[ItemType]):
          if isinstance(data, ItemMimeData):
              moving_indices = data.indices
- 
+
 -            logger.debug(f"dropMimeData: indices {moving_indices} ➡ {destRow}")
 +            logger.debug(
 +                "dropMimeData: indices %s ➡ %s",
 +                moving_indices,
 +                destRow,
 +            )
- 
+
              if len(moving_indices) == 1:
                  return self._root.move(moving_indices[0], destRow)
 diff --git a/napari/_qt/qt_viewer.py b/napari/_qt/qt_viewer.py
@@ -44,14 +44,14 @@ index a24f72db..134366ed 100644
 -                logging.debug(f'Saved {saved}')
 +                logging.debug('Saved %s', saved)
                  error_messages = "\n".join(str(x.message.args[0]) for x in wa)
- 
+
              if not saved:
 diff --git a/napari/plugins/io.py b/napari/plugins/io.py
 index 9adcc82c..142164bb 100644
 --- a/napari/plugins/io.py
 +++ b/napari/plugins/io.py
 @@ -344,7 +344,7 @@ def _write_multiple_layers_with_plugins(
- 
+
      hook_caller = plugin_manager.hook.napari_get_writer
      path = abspath_or_url(path)
 -    logger.debug(f"Writing to {path}.  Hook caller: {hook_caller}")
@@ -62,7 +62,7 @@ index 9adcc82c..142164bb 100644
 @@ -454,7 +454,7 @@ def _write_single_layer_with_plugins(
          extension = os.path.splitext(path)[-1]
          plugin_name = plugin_manager.get_writer_for_extension(extension)
- 
+
 -    logger.debug(f"Writing to {path}.  Hook caller: {hook_caller}")
 +    logger.debug("Writing to %s.  Hook caller: %s", path, hook_caller)
      if plugin_name and (plugin_name not in plugin_manager.plugins):
@@ -85,6 +85,5 @@ index 86b820b7..89436a3a 100644
          src_par_i, src_i = split_nested_index(src_index)
          dest_par_i, dest_i = split_nested_index(dest_index)
          dest_i = self._non_negative_index(dest_par_i, dest_i)
--- 
+--
 2.34.1
-

@@ -25,12 +25,12 @@ index b2682a55..58412fd7 100644
      'plugins/_*.md',
 +    'gallery/index.rst',
  ]
- 
+
  napoleon_custom_sections = [('Events', 'params_style')]
 @@ -199,7 +200,9 @@ def reset_napari_theme(gallery_conf, fname):
      settings.appearance.theme = 'dark'
      qtgallery.reset_qapp(gallery_conf, fname)
- 
+
 
 +from sphinx_gallery.sorting import ExampleTitleSortKey
 +
@@ -43,8 +43,8 @@ index b2682a55..58412fd7 100644
      'reference_url': {'napari': None},
 +    'within_subsection_order': ExampleTitleSortKey,
  }
- 
- 
+
+
 diff --git a/docs/gallery.md b/docs/gallery.md
 index bfa4344d..fa0b1fef 100644
 --- a/docs/gallery.md
@@ -52,7 +52,7 @@ index bfa4344d..fa0b1fef 100644
 @@ -1,6 +1,16 @@
 +(gallery)=
  # Gallery
- 
+
 +Examples of napari usage.
 +
 +```{toctree}

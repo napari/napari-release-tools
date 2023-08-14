@@ -21,21 +21,20 @@ index 73122996..cddedb92 100644
 --- a/docs/plugins/testing_workshop_docs/1-pythons-assert-keyword.md
 +++ b/docs/plugins/testing_workshop_docs/1-pythons-assert-keyword.md
 @@ -91,4 +91,4 @@ Note that when the assertion fails, a traceback occurs.
- 
- This example is a simple way to demonstrate the use of the assert keyword, but it’s not particularly useful for testing a larger codebase. This test function has to be called explicitly to test different marks. There’s not much detail when the code is running. We just get `“All passing.”` and there’s no information about other tests when one of the tests fails.  
-   
--Making testing more convenient is where [testing frameworks](./rticle-2-pytest-testing-frameworks), like [pytest](https://docs.pytest.org/) come in.  
-+Making testing more convenient is where [testing frameworks](./2-pytest-testing-frameworks), like [pytest](https://docs.pytest.org/) come in.  
+
+ This example is a simple way to demonstrate the use of the assert keyword, but it’s not particularly useful for testing a larger codebase. This test function has to be called explicitly to test different marks. There’s not much detail when the code is running. We just get `“All passing.”` and there’s no information about other tests when one of the tests fails.
+
+-Making testing more convenient is where [testing frameworks](./rticle-2-pytest-testing-frameworks), like [pytest](https://docs.pytest.org/) come in.
++Making testing more convenient is where [testing frameworks](./2-pytest-testing-frameworks), like [pytest](https://docs.pytest.org/) come in.
 diff --git a/docs/tutorials/fundamentals/viewer.md b/docs/tutorials/fundamentals/viewer.md
 index 514bf83f..8897e3d5 100644
 --- a/docs/tutorials/fundamentals/viewer.md
 +++ b/docs/tutorials/fundamentals/viewer.md
 @@ -459,7 +459,7 @@ viewer.theme = 'dark'
- 
- You can also change the theme using the "Toggle theme" keyboard shortcut, by default `Command/Control+Shift+T`. Note that changing the theme using this shortcut will only change the *current* viewer theme. If you wish to make the change permanent for all viewers, make sure to also change your settings in the **Appearance** tab of the **Preferences** menu. 
- 
--Adding your own custom theme isn't too hard but it requires creating your own color `palette` and rebuilding the icons. It's also possible for [plugins to contribute a theme](../../plugins/contributions.html#contributions-themes). If people want more themes, we're happy to add them or you can look at our [contributing guidelines](../../developers/contributing) for more information about building the icons and add one yourself!  
-+Adding your own custom theme isn't too hard but it requires creating your own color `palette` and rebuilding the icons. It's also possible for [plugins to contribute a theme](contributions-themes). If people want more themes, we're happy to add them or you can look at our [contributing guidelines](../../developers/contributing) for more information about building the icons and add one yourself!  
- 
- +++  
- 
+
+ You can also change the theme using the "Toggle theme" keyboard shortcut, by default `Command/Control+Shift+T`. Note that changing the theme using this shortcut will only change the *current* viewer theme. If you wish to make the change permanent for all viewers, make sure to also change your settings in the **Appearance** tab of the **Preferences** menu.
+
+-Adding your own custom theme isn't too hard but it requires creating your own color `palette` and rebuilding the icons. It's also possible for [plugins to contribute a theme](../../plugins/contributions.html#contributions-themes). If people want more themes, we're happy to add them or you can look at our [contributing guidelines](../../developers/contributing) for more information about building the icons and add one yourself!
++Adding your own custom theme isn't too hard but it requires creating your own color `palette` and rebuilding the icons. It's also possible for [plugins to contribute a theme](contributions-themes). If people want more themes, we're happy to add them or you can look at our [contributing guidelines](../../developers/contributing) for more information about building the icons and add one yourself!
+
+ +++

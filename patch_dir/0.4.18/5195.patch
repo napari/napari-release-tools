@@ -53,8 +53,8 @@ index d21ad293..1c09d79c 100644
      str_to_qbytearray,
  )
 +from napari.utils._proxies import PublicOnlyProxy
- 
- 
+
+
  class Emitter(QObject):
 @@ -101,3 +102,22 @@ def test_qt_might_be_rich_text(qtbot):
      qtbot.addWidget(widget)
@@ -118,7 +118,7 @@ index 10887e21..e423baf2 100644
 --- a/napari/plugins/_tests/test_npe2.py
 +++ b/napari/plugins/_tests/test_npe2.py
 @@ -20,6 +20,9 @@ MANIFEST_PATH = Path(__file__).parent / '_sample_manifest.yaml'
- 
+
  @pytest.fixture
  def mock_pm(npe2pm: 'TestPluginManager'):
 +    from napari.plugins import _initialize_plugins
@@ -133,8 +133,8 @@ index 72566e3b..9d8a1ebb 100644
 +++ b/napari/utils/_tests/test_proxies.py
 @@ -77,6 +77,26 @@ def test_PublicOnlyProxy(patched_root_dir):
      assert '_private' in dir(t)
- 
- 
+
+
 +@pytest.mark.filterwarnings("ignore:Qt libs are available but")
 +def test_thread_proxy_guard(monkeypatch, single_threaded_executor):
 +    class X:
@@ -164,8 +164,8 @@ index 96dd0254..e2ff7639 100644
 +++ b/napari/utils/_testsupport.py
 @@ -305,6 +305,38 @@ def make_napari_viewer(
                  warnings.warn(msg)
- 
- 
+
+
 +@pytest.fixture
 +def make_napari_viewer_proxy(make_napari_viewer, monkeypatch):
 +    """Fixture that returns a function for creating a napari viewer wrapped in proxy.
@@ -201,5 +201,5 @@ index 96dd0254..e2ff7639 100644
  @pytest.fixture
  def MouseEvent():
      """Create a subclass for simulating vispy mouse events.
--- 
+--
 2.34.1

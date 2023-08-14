@@ -67,7 +67,7 @@ index 6ae3d66e..d5109e7e 100644
 --- a/examples/3d_kymograph_.py
 +++ b/examples/3d_kymograph_.py
 @@ -15,7 +15,7 @@ from itertools import product
- 
+
  try:
      from omero.gateway import BlitzGateway
 -except:
@@ -84,8 +84,8 @@ index 41f01738..59e6e6bb 100644
      y = 'a string'
      import something_that_does_not_exist
 +    return something_that_does_not_exist.fun(x, y)
- 
- 
+
+
  def warn_():
 diff --git a/examples/dynamic-projections-dask.py b/examples/dynamic-projections-dask.py
 index 03a07432..e9bd3e66 100644
@@ -94,10 +94,10 @@ index 03a07432..e9bd3e66 100644
 @@ -37,7 +37,7 @@ if __name__ == '__main__':
  ##############################################################################
  # Part 2: using magicgui to vary the slice thickness.
- 
+
 -from magicgui import magicgui
 +from magicgui import magicgui  # noqa: E402
- 
+
  def sliding_window_mean(
      arr: napari.types.ImageData, size: int = 1
 diff --git a/examples/inherit_viewer_style.py b/examples/inherit_viewer_style.py
@@ -107,14 +107,14 @@ index c4aca965..88c85d7e 100644
 @@ -6,8 +6,11 @@ Example how to embed magicgui widget in dialog to inherit style
  from main napari window.
  """
- 
+
 +<<<<<<< HEAD
  from typing import Callable
- 
+
 +=======
 +>>>>>>> 5ca30ea2 (Add ruff linter to pre-commit (#5275))
  from qtpy.QtWidgets import QDialog, QWidget, QVBoxLayout, QPushButton, QGridLayout, QLabel, QSpinBox
- 
+
  from magicgui import magicgui
 diff --git a/examples/interaction_box_image.py b/examples/interaction_box_image.py
 index 620bdfdf..b5cd0ee6 100644
@@ -122,12 +122,12 @@ index 620bdfdf..b5cd0ee6 100644
 +++ b/examples/interaction_box_image.py
 @@ -10,9 +10,7 @@ This allows the user to manipulate the image via the interaction box
  """
- 
+
  from skimage import data
 -import numpy as np
  import napari
 -from napari.utils.transforms import Affine
- 
+
  viewer = napari.view_image(data.astronaut(), rgb=True)
  viewer.layers.selection.active.mode = 'transform'
 diff --git a/examples/interaction_box_points.py b/examples/interaction_box_points.py
@@ -137,7 +137,7 @@ index d22ee86a..da98545c 100644
 @@ -7,7 +7,6 @@ Demonstrate interaction box on points layer
  .. tags:: experimental
  """
- 
+
 -from skimage import data
  import napari
  import numpy as np
@@ -151,8 +151,8 @@ index b3b0e81f..cd016037 100644
  import numpy as np
  import dask.array as da
 -from skimage import data
- 
- 
+
+
  image4d = da.random.random(
 diff --git a/examples/progress_bar_segmentation_.py b/examples/progress_bar_segmentation_.py
 index d9308756..34d930b6 100644
@@ -160,32 +160,32 @@ index d9308756..34d930b6 100644
 +++ b/examples/progress_bar_segmentation_.py
 @@ -54,6 +54,7 @@ def try_thresholds():
          thresholded_nuclei.append(binarised_im)
- 
+
          # uncomment if processing is too fast
 +        # from time import sleep
          # sleep(0.5)
- 
+
      # working with a wrapped iterable, the progress bar will be closed
 @@ -99,6 +100,7 @@ def segment_binarised_ims():
              segmented_nuclei.append(labelled_im)
- 
+
              # uncomment if processing is too fast
 +            # from time import sleep
              # sleep(0.5)
- 
+
      # progress bar is still automatically closed
 diff --git a/examples/scale_bar.py b/examples/scale_bar.py
 index 60f55c28..b63a5b76 100644
 --- a/examples/scale_bar.py
 +++ b/examples/scale_bar.py
 @@ -6,7 +6,6 @@ Display a 3D volume and the scale bar
- 
+
  .. tags:: experimental
  """
 -import numpy as np
  import napari
  from skimage import data
- 
+
 diff --git a/examples/surface_timeseries_.py b/examples/surface_timeseries_.py
 index db7cffd0..9baa9107 100644
 --- a/examples/surface_timeseries_.py
@@ -193,11 +193,11 @@ index db7cffd0..9baa9107 100644
 @@ -15,7 +15,6 @@ except ModuleNotFoundError:
          "You must have nilearn installed to run this example."
      )
- 
+
 -import numpy as np
  import napari
- 
- 
+
+
 diff --git a/examples/tiled-rendering-2d_.py b/examples/tiled-rendering-2d_.py
 index b7b5673d..7627f8f9 100644
 --- a/examples/tiled-rendering-2d_.py
@@ -205,13 +205,13 @@ index b7b5673d..7627f8f9 100644
 @@ -24,8 +24,8 @@ import os
  # important: if this is not set, the entire ~4GB array will be created!
  os.environ.setdefault('NAPARI_OCTREE', '1')
- 
+
 -import dask.array as da
 -import napari
 +import dask.array as da # noqa: E402
 +import napari   # noqa: E402
- 
- 
+
+
  ndim = 2
 diff --git a/napari/__init__.py b/napari/__init__.py
 index 4d43725c..c31f5b25 100644
@@ -219,7 +219,7 @@ index 4d43725c..c31f5b25 100644
 +++ b/napari/__init__.py
 @@ -1,5 +1,7 @@
  import os
- 
+
 +from napari._lazy import install_lazy
 +
  try:
@@ -228,9 +228,9 @@ index 4d43725c..c31f5b25 100644
 @@ -49,7 +51,6 @@ _submod_attrs = {
  # potential to take a second or more, so we definitely don't want to import it
  # just to access the CLI (which may not actually need any of the imports)
- 
+
 -from napari._lazy import install_lazy
- 
+
  __getattr__, __dir__, __all__ = install_lazy(
      __name__, _proto_all_, _submod_attrs
 diff --git a/napari/_qt/__init__.py b/napari/_qt/__init__.py
@@ -238,7 +238,7 @@ index 12519373..fbe8db9a 100644
 --- a/napari/_qt/__init__.py
 +++ b/napari/_qt/__init__.py
 @@ -52,3 +52,5 @@ if tuple(int(x) for x in QtCore.__version__.split('.')[:3]) < (5, 12, 3):
- 
+
  from napari._qt.qt_event_loop import get_app, gui_qt, quit_app, run
  from napari._qt.qt_main_window import Window
 +
@@ -258,9 +258,9 @@ index d04ba16f..67fc0ab8 100644
 --- a/napari/_tests/test_examples.py
 +++ b/napari/_tests/test_examples.py
 @@ -3,13 +3,6 @@ import os
- 
+
  import pytest
- 
+
 -# check if this module has been explicitly requested or `--test-examples` is included
 -fpath = os.path.join(*__file__.split(os.path.sep)[-3:])
 -if '--test-examples' not in sys.argv and fpath not in sys.argv:
@@ -270,11 +270,11 @@ index d04ba16f..67fc0ab8 100644
 -
  import runpy
  from pathlib import Path
- 
+
 @@ -21,6 +14,13 @@ import napari
  from napari._qt.qt_main_window import Window
  from napari.utils.notifications import notification_manager
- 
+
 +# check if this module has been explicitly requested or `--test-examples` is included
 +fpath = os.path.join(*__file__.split(os.path.sep)[-3:])
 +if '--test-examples' not in sys.argv and fpath not in sys.argv:
@@ -528,7 +528,7 @@ index 453abfe3..6f664159 100644
 +++ b/napari/utils/perf/__init__.py
 @@ -61,3 +61,15 @@ from napari.utils.perf._timers import (
  )
- 
+
  USE_PERFMON = os.getenv("NAPARI_PERFMON", "0") != "0"
 +
 +
@@ -548,11 +548,11 @@ index 918aa452..494337d1 100644
 +++ b/napari/utils/settings/__init__.py
 @@ -1,6 +1,6 @@
  import warnings
- 
+
 -from napari.settings import *
 +from napari.settings import *  # noqa: F403
  from napari.utils.translations import trans
- 
+
  warnings.warn(
 diff --git a/napari/utils/transforms/__init__.py b/napari/utils/transforms/__init__.py
 index 1ba64005..e77bd23c 100644
@@ -578,7 +578,7 @@ index 7f67af6f..d1e6aac4 100644
 @@ -76,6 +76,12 @@ profile = "black"
  line_length = 79
  skip_glob = ["*examples/*", "*vendored*", "*_vendor*"]
- 
+
 +[tool.ruff]
 +line-length = 120
 +ignore = ["E501"]
@@ -588,6 +588,5 @@ index 7f67af6f..d1e6aac4 100644
  [tool.pytest.ini_options]
  # These follow standard library warnings filters syntax.  See more here:
  # https://docs.python.org/3/library/warnings.html#describing-warning-filters
--- 
+--
 2.34.1
-

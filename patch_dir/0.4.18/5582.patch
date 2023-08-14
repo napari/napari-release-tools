@@ -81,7 +81,7 @@ index 3a5fbf80..edbed799 100644
 -    points, size=[0, 6, 10, 10], face_color='blue', out_of_slice_display=True
 +    points, size=10, face_color='blue', out_of_slice_display=True
  )
- 
+
  if __name__ == '__main__':
 diff --git a/examples/swap_dims.py b/examples/swap_dims.py
 index e46054f2..34b56428 100644
@@ -94,7 +94,7 @@ index e46054f2..34b56428 100644
 -    points, size=[0, 6, 10, 10], face_color='blue', out_of_slice_display=True
 +    points, size=10, face_color='blue', out_of_slice_display=True
  )
- 
+
  viewer.dims.order = (0, 2, 1, 3)
 diff --git a/napari/_qt/layer_controls/_tests/test_qt_points_layer.py b/napari/_qt/layer_controls/_tests/test_qt_points_layer.py
 index 168df943..9f926ff4 100644
@@ -102,7 +102,7 @@ index 168df943..9f926ff4 100644
 +++ b/napari/_qt/layer_controls/_tests/test_qt_points_layer.py
 @@ -56,7 +56,7 @@ def test_current_size_display_in_range(qtbot):
      assert layer.current_size == 200
- 
+
      # Size event needs to be triggered manually, because no points are selected.
 -    with pytest.warns(RuntimeWarning):
 +    with pytest.raises(ValueError):
@@ -112,7 +112,7 @@ index 168df943..9f926ff4 100644
 @@ -64,20 +64,20 @@ def test_current_size_display_in_range(qtbot):
      assert slider.value() == 200
      assert layer.current_size == 200
- 
+
 -    layer.current_size = [20, 20]
 +    layer.current_size = 20
      layer.events.size()
@@ -122,7 +122,7 @@ index 168df943..9f926ff4 100644
 -    assert layer.current_size == [20, 20]
 +    assert slider.value() == 20
 +    assert layer.current_size == 20
- 
+
 -    with pytest.warns(RuntimeWarning):
 -        layer.current_size = [20, -20]
 +    with pytest.warns(DeprecationWarning):
@@ -134,25 +134,25 @@ index 168df943..9f926ff4 100644
 -    assert layer.current_size == [20, 20]
 +    assert slider.value() == 10
 +    assert layer.current_size == 10
- 
- 
+
+
  def test_current_size_slider_properly_initialized(qtbot):
 diff --git a/napari/_vispy/layers/points.py b/napari/_vispy/layers/points.py
 index 1f2a7033..dd9592bd 100644
 --- a/napari/_vispy/layers/points.py
 +++ b/napari/_vispy/layers/points.py
 @@ -11,11 +11,8 @@ from napari.utils.events import disconnect_events
- 
+
  class VispyPointsLayer(VispyBaseLayer):
      _highlight_color = (0, 0.6, 1)
 -    _highlight_width = None
- 
+
      def __init__(self, layer) -> None:
 -        self._highlight_width = get_settings().appearance.highlight_thickness
 -
          node = PointsVisual()
          super().__init__(layer, node)
- 
+
 @@ -45,10 +42,10 @@ class VispyPointsLayer(VispyBaseLayer):
          if len(self.layer._indices_view) == 0:
              # always pass one invisible point to avoid issues
@@ -167,9 +167,9 @@ index 1f2a7033..dd9592bd 100644
          else:
              data = self.layer._view_data
 @@ -60,6 +57,9 @@ class VispyPointsLayer(VispyBaseLayer):
- 
+
          set_data = self.node._subvisuals[0].set_data
- 
+
 +        # use only last dimension to scale point sizes, see #5582
 +        scale = self.layer.scale[-1]
 +
@@ -184,7 +184,7 @@ index 1f2a7033..dd9592bd 100644
 +                'edge_width': edge_width * scale,
                  'edge_width_rel': None,
              }
- 
+
          set_data(
              data[:, ::-1],
 -            size=size,
@@ -215,7 +215,7 @@ index 1f2a7033..dd9592bd 100644
 +        scaled_highlight = (
 +            settings.appearance.highlight_thickness * self.layer.scale_factor
 +        )
- 
+
          self.node._subvisuals[1].set_data(
              data[:, ::-1],
 -            size=size,
@@ -232,7 +232,7 @@ index 1f2a7033..dd9592bd 100644
              pos = self.layer._highlight_box
 -            width = settings.appearance.highlight_thickness
 +            width = scaled_highlight
- 
+
          self.node._subvisuals[2].set_data(
              pos=pos[:, ::-1],
 diff --git a/napari/layers/points/_tests/test_points.py b/napari/layers/points/_tests/test_points.py
@@ -255,21 +255,21 @@ index bf409fbf..2d0f4447 100644
 -    assert layer.size.shape == shape
 +    assert layer.size.shape == (10,)
      assert np.unique(layer.size)[0] == 10
- 
+
      # Add a new point, it should get current size
      coord = [17, 17]
      layer.add(coord)
 -    assert layer.size.shape == (11, 2)
 +    assert layer.size.shape == (11,)
      assert np.unique(layer.size)[0] == 10
- 
+
      # Setting size affects newly added points not current points
      layer.current_size = 20
      assert layer.current_size == 20
 -    assert layer.size.shape == (11, 2)
 +    assert layer.size.shape == (11,)
      assert np.unique(layer.size)[0] == 10
- 
+
      # Add new point, should have new size
      coord = [18, 18]
      layer.add(coord)
@@ -278,7 +278,7 @@ index bf409fbf..2d0f4447 100644
      assert np.unique(layer.size[:11])[0] == 10
 -    assert np.all(layer.size[11] == [20, 20])
 +    assert np.all(layer.size[11] == 20)
- 
+
      # Select data and change size
      layer.selected_data = {0, 1}
      assert layer.current_size == 10
@@ -287,11 +287,11 @@ index bf409fbf..2d0f4447 100644
 +    assert layer.size.shape == (12,)
      assert np.unique(layer.size[2:11])[0] == 10
      assert np.unique(layer.size[:2])[0] == 16
- 
+
 @@ -1480,141 +1480,59 @@ def test_size():
      assert layer.current_size == 20
- 
- 
+
+
 -def test_size_with_arrays():
 +@pytest.mark.parametrize('ndim', [2, 3])
 +def test_size_with_arrays(ndim):
@@ -305,7 +305,7 @@ index bf409fbf..2d0f4447 100644
 +    sizes = 5 * np.random.random(10)
      layer.size = sizes
      assert np.all(layer.size == sizes)
- 
+
 -    # Test broadcasting of sizes
 -    sizes = [5, 5]
 -    layer.size = sizes
@@ -329,7 +329,7 @@ index bf409fbf..2d0f4447 100644
 -    assert layer.size.shape == shape
 -    assert np.all(layer.size == sizes)
 +        layer.size = sizes
- 
+
      # Create new layer with new size array data
 -    sizes = [5, 5]
 +    sizes = 5 * np.random.random(10)
@@ -339,7 +339,7 @@ index bf409fbf..2d0f4447 100644
 -    assert np.all(layer.size[0] == sizes)
 +    assert layer.size.shape == (10,)
 +    np.testing.assert_array_equal(layer.size, sizes)
- 
+
      # Add new point, should have new size
 -    coord = [18, 18]
 +    coord = [18] * ndim
@@ -351,7 +351,7 @@ index bf409fbf..2d0f4447 100644
 +    assert layer.size.shape == (11,)
 +    np.testing.assert_array_equal(layer.size[:10], sizes[:10])
 +    assert layer.size[10] == 13
- 
+
      # Select data and change size
      layer.selected_data = {0, 1}
 -    assert layer.current_size == 5
@@ -364,7 +364,7 @@ index bf409fbf..2d0f4447 100644
 +    assert layer.size.shape == (11,)
 +    np.testing.assert_array_equal(layer.size[2:10], sizes[2:10])
 +    np.testing.assert_array_equal(layer.size[:2], 16)
- 
+
 -    # Check removing data adjusts colors correctly
 +    # check that current size is correctly set if all points are the same size
 +    layer.selected_data = {10}
@@ -454,8 +454,8 @@ index bf409fbf..2d0f4447 100644
 -    assert np.all(layer.size[0] == [0, 16, 16])
 +    assert layer.size[0] == 16
 +    assert layer.size[1] == sizes[3]
- 
- 
+
+
  def test_copy_and_paste():
 @@ -1806,14 +1724,14 @@ def test_view_data():
  def test_view_size():
@@ -464,30 +464,30 @@ index bf409fbf..2d0f4447 100644
 -    sizes = np.array([[3, 5, 5], [3, 5, 5], [3, 3, 3], [2, 2, 3]])
 +    sizes = np.array([5, 5, 3, 3])
      layer = Points(coords, size=sizes, out_of_slice_display=False)
- 
+
      layer._slice_dims([0, slice(None), slice(None)])
 -    assert np.all(layer._view_size == sizes[np.ix_([0, 1], [1, 2])])
 +    assert np.all(layer._view_size == sizes[[0, 1]])
- 
+
      layer._slice_dims([1, slice(None), slice(None)])
 -    assert np.all(layer._view_size == sizes[np.ix_([2], [1, 2])])
 +    assert np.all(layer._view_size == sizes[[2]])
- 
+
      layer.out_of_slice_display = True
      assert len(layer._view_size) == 3
 @@ -2019,7 +1937,7 @@ def test_to_mask_2d_with_size_4_bottom_right():
- 
- 
+
+
  def test_to_mask_2d_with_diff_sizes():
 -    points = Points([[2, 2], [1, 4]], size=[[1, 1], [2, 2]])
 +    points = Points([[2, 2], [1, 4]], size=[1, 2])
- 
+
      mask = points.to_mask(shape=(5, 7))
- 
+
 @@ -2374,24 +2292,6 @@ def test_shown():
      assert layer.shown[-1] == True  # noqa
- 
- 
+
+
 -def test_selected_data_with_non_uniform_sizes():
 -    data = np.zeros((3, 2))
 -    size = [[1, 3], [1, 4], [1, 3]]
@@ -549,17 +549,17 @@ index 1473aaeb..ffe3d88e 100644
 -                    )
 -                size = np.repeat([new_size], adding, axis=0)
 +                size = np.repeat(self.current_size, adding, axis=0)
- 
+
                  if len(self._edge_width) > 0:
                      new_edge_width = copy(self._edge_width[-1])
 @@ -807,14 +797,15 @@ class Points(Layer):
- 
+
      @property
      def size(self) -> np.ndarray:
 -        """(N, D) array: size of all N points in D dimensions."""
 +        """(N,) array: size of all N points."""
          return self._size
- 
+
      @size.setter
      def size(self, size: Union[int, float, np.ndarray, list]) -> None:
          try:
@@ -586,10 +586,10 @@ index 1473aaeb..ffe3d88e 100644
 +                    stacklevel=2,
 +                )
          self.refresh()
- 
+
      @property
 @@ -835,22 +837,36 @@ class Points(Layer):
- 
+
      @current_size.setter
      def current_size(self, size: Union[None, float]) -> None:
 -        if (isinstance(size, numbers.Number) and size < 0) or (
@@ -659,7 +659,7 @@ index 1473aaeb..ffe3d88e 100644
 +                unique_edge_color := _unique_element(self.edge_color[index])
 +            ) is not None:
                  self.current_edge_color = unique_edge_color
- 
+
 -        if (
 -            unique_face_color := _unique_element(self.face_color[index])
 -        ) is not None:
@@ -668,7 +668,7 @@ index 1473aaeb..ffe3d88e 100644
 +                unique_face_color := _unique_element(self.face_color[index])
 +            ) is not None:
                  self.current_face_color = unique_face_color
- 
+
 -        # Calculate the mean size across the displayed dimensions for
 -        # each point to be consistent with `_view_size`.
 -        mean_size = np.mean(
@@ -678,7 +678,7 @@ index 1473aaeb..ffe3d88e 100644
 -            with self.block_update_properties():
 +            if (unique_size := _unique_element(self.size[index])) is not None:
                  self.current_size = unique_size
- 
+
 -        if (
 -            unique_edge_width := _unique_element(self.edge_width[index])
 -        ) is not None:
@@ -693,22 +693,22 @@ index 1473aaeb..ffe3d88e 100644
 +                unique_symbol := _unique_element(self.symbol[index])
 +            ) is not None:
                  self.current_symbol = unique_symbol
- 
+
 -        unique_properties = {}
 -        for k, v in self.properties.items():
 -            unique_properties[k] = _unique_element(v[index])
 +            unique_properties = {}
 +            for k, v in self.properties.items():
 +                unique_properties[k] = _unique_element(v[index])
- 
+
 -        if all(p is not None for p in unique_properties.values()):
 -            with self.block_update_properties():
 +            if all(p is not None for p in unique_properties.values()):
                  self.current_properties = unique_properties
          self._set_highlight()
- 
+
 @@ -1460,18 +1468,11 @@ class Points(Layer):
- 
+
          Returns
          -------
 -        view_size : (N x D) np.ndarray
@@ -760,7 +760,7 @@ index 1473aaeb..ffe3d88e 100644
 +            return slice_indices, 1
 +
 +        return [], np.empty(0)
- 
+
      def _get_value(self, position) -> Optional[int]:
          """Index of the point at a given 2D position in data coordinates.
 @@ -1602,6 +1606,11 @@ class Points(Layer):
@@ -788,7 +788,7 @@ index 1473aaeb..ffe3d88e 100644
 @@ -1662,10 +1672,14 @@ class Points(Layer):
          )
          rotated_click_point = np.dot(rotation_matrix, plane_point)
- 
+
 +        # positions are scaled anisotropically by scale, but sizes are not,
 +        # so we need to calculate the ratio to correctly map to screen coordinates
 +        scale_ratio = self.scale[self._slice_input.displayed] / self.scale[-1]
@@ -804,7 +804,7 @@ index 1473aaeb..ffe3d88e 100644
          indices = np.where(in_slice_matches)[0]
 @@ -2120,11 +2134,7 @@ class Points(Layer):
          )
- 
+
          # Calculating the radii of the output points in the mask is complex.
 -
 -        # Points.size tells the size of the points in pixels in each dimension,
@@ -812,16 +812,16 @@ index 1473aaeb..ffe3d88e 100644
 -        # per point, which is consistent with visualization.
 -        mean_radii = np.mean(self.size, axis=1, keepdims=True) / 2
 +        radii = self.size / 2
- 
+
          # Scale each radius by the geometric mean scale of the Points layer to
          # keep the balls isotropic when visualized in world coordinates.
 @@ -2140,7 +2150,7 @@ class Points(Layer):
          )
          radii_scale = point_data_to_world_scale * mask_world_to_data_scale
- 
+
 -        output_data_radii = mean_radii * np.atleast_2d(radii_scale)
 +        output_data_radii = radii[:, np.newaxis] * np.atleast_2d(radii_scale)
- 
+
          for coords, radii in zip(
              points_in_mask_data_coords, output_data_radii
 diff --git a/setup.cfg b/setup.cfg
@@ -837,6 +837,5 @@ index d1b6e5fa..69c42ec9 100644
      npe2>=0.5.2
      numpy>=1.21
      numpydoc>=0.9.2
--- 
+--
 2.34.1
-

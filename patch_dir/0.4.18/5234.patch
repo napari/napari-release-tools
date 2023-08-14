@@ -26,9 +26,9 @@ index a2ea56c7..6a2daa96 100644
          with:
            python-version: "3.9"
 +          cache-dependency-path: setup.cfg
- 
+
        - uses: tlambert03/setup-qt-libs@v1
- 
+
 diff --git a/.github/workflows/build_docs.yml b/.github/workflows/build_docs.yml
 index b535f060..619c4363 100644
 --- a/.github/workflows/build_docs.yml
@@ -40,7 +40,7 @@ index b535f060..619c4363 100644
 +    tags:
 +      - 'v*'
    workflow_dispatch:
- 
+
  jobs:
 diff --git a/.github/workflows/make_bundle.yml b/.github/workflows/make_bundle.yml
 index d740c0b6..9432a84c 100644
@@ -75,17 +75,17 @@ index 191b00b2..114ff94e 100644
            python-version: ${{ matrix.python }}
            cache: "pip"
 +          cache-dependency-path: setup.cfg
- 
+
        - uses: tlambert03/setup-qt-libs@v1
- 
+
 @@ -139,6 +140,7 @@ jobs:
          with:
            python-version: 3.9
            cache: "pip"
 +          cache-dependency-path: setup.cfg
- 
+
        - uses: tlambert03/setup-qt-libs@v1
- 
+
 diff --git a/.github/workflows/test_prereleases.yml b/.github/workflows/test_prereleases.yml
 index 3dd420af..e2d44567 100644
 --- a/.github/workflows/test_prereleases.yml
@@ -95,9 +95,9 @@ index 3dd420af..e2d44567 100644
          with:
            python-version: ${{ matrix.python }}
 +          cache-dependency-path: setup.cfg
- 
+
        - uses: tlambert03/setup-qt-libs@v1
- 
+
 diff --git a/.github/workflows/test_pull_requests.yml b/.github/workflows/test_pull_requests.yml
 index 252c2fb4..79a1e344 100644
 --- a/.github/workflows/test_pull_requests.yml
@@ -115,17 +115,17 @@ index 252c2fb4..79a1e344 100644
            python-version: ${{ matrix.python }}
            cache: "pip"
 +          cache-dependency-path: setup.cfg
- 
+
        - uses: tlambert03/setup-qt-libs@v1
- 
+
 @@ -157,6 +159,7 @@ jobs:
          with:
            python-version: 3.9
            cache: "pip"
 +          cache-dependency-path: napari-from-github/setup.cfg
- 
+
        - uses: tlambert03/setup-qt-libs@v1
- 
+
 @@ -180,6 +183,7 @@ jobs:
        - uses: actions/setup-python@v4
          with:
@@ -158,5 +158,5 @@ index 2eeb96e5..50534610 100644
        - name: Install napari
          run: |
            pip install -r resources/requirements_mypy.txt
--- 
+--
 2.34.1

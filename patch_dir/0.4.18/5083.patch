@@ -50,17 +50,17 @@ index 6a2daa96..19340da5 100644
 +++ b/.github/workflows/benchmarks.yml
 @@ -117,7 +117,7 @@ jobs:
            echo "CONTENDER_REF=$CONTENDER_REF" >> $GITHUB_ENV
- 
+
            # Run benchmarks for current commit against base
 -          asv continuous $ASV_OPTIONS -b '${{ matrix.selection-regex }}' ${BASE_REF} ${CONTENDER_REF} \
 +          asv continuous $ASV_OPTIONS -b '${{ matrix.selection-regex }}' ${BASE_REF} ${CONTENDER_REF} -v \
            | sed -E "/Traceback | failed$|PERFORMANCE DECREASED/ s/^/::error:: /" \
            | tee asv_continuous.log
- 
+
 @@ -126,7 +126,7 @@ jobs:
                exit 1
            fi
- 
+
 -      - name: Report Failures
 +      - name: Report Failures as Issue
          if: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && failure() }}
@@ -73,10 +73,10 @@ index 3c55d7f6..81c96354 100644
 @@ -1,7 +1,7 @@
  # We need a dual workflow to make sure the token has the needed permissions to post comments
  # See https://stackoverflow.com/a/71683208 for more details
- 
+
 -name: Report benchmarks
 +name: "Benchmarks - Report"
- 
+
  on:
    workflow_run:
 @@ -22,7 +22,7 @@ jobs:
@@ -103,12 +103,12 @@ index b95e78a6..99146669 100644
 +++ b/docs/developers/benchmarks.md
 @@ -166,3 +166,26 @@ pip install snakeviz
  ```
- 
+
  and we use `--python=same` to profile against our current python environment.
 +
 +## Running benchmarks on CI
 +
-+Benchmarking on CI has two main parts - the Benchmark Action and the Benchmark Reporting Action. 
++Benchmarking on CI has two main parts - the Benchmark Action and the Benchmark Reporting Action.
 +
 +### The Benchmark Action
 +
@@ -117,11 +117,11 @@ index b95e78a6..99146669 100644
 +* On PRs with the `run-benchmark` label
 +* On workflow dispatch (manual trigger)
 +
-+If the benchmarks fail during the scheduled run, an issue is opened in the repo to flag the occurrence. 
-+If an issue has already been opened, it will add to the existing issue. 
++If the benchmarks fail during the scheduled run, an issue is opened in the repo to flag the occurrence.
++If an issue has already been opened, it will add to the existing issue.
 +
 +The contender SHA is a Github PR merge commit - a fake commit not available to users.
-+Every time you want the benchmark CI to run in a PR, you'll need to remove and re-add the `run-benchmark` label. 
++Every time you want the benchmark CI to run in a PR, you'll need to remove and re-add the `run-benchmark` label.
 +
 +
 +### Benchmark Reporting Action
@@ -137,7 +137,7 @@ index a20079b0..2e5d68b3 100644
 -[asv](https://asv.readthedocs.io/en/stable/). They are not distributed with
 +# Napari benchmarking with airspeed velocity (asv)
 +
-+These are benchmarks to be run with airspeed velocity 
++These are benchmarks to be run with airspeed velocity
 +([asv](https://asv.readthedocs.io/en/stable/)). They are not distributed with
  installs.
 +
@@ -158,5 +158,5 @@ index a20079b0..2e5d68b3 100644
 +To compare benchmarks across branches, run using conda environments (instead of virtualenv), and limit to the `Labels2DSuite` benchmarks:
 +
 +`asv continuous main fix_benchmark_ci -q --environment conda --bench Labels2DSuite`
--- 
+--
 2.34.1

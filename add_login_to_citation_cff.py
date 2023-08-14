@@ -19,8 +19,6 @@ LOCAL_DIR = Path(__file__).parent
 DEFAULT_CORRECTION_FILE = LOCAL_DIR / "name_corrections.yaml"
 
 
-
-
 def get_correction_dict(file_path: Path | None) -> dict[str, str]:
     """
     Read file with correction of name between

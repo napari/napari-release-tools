@@ -15,8 +15,8 @@ index f28309de..9629cf2e 100644
 --- a/napari/_qt/_tests/test_qt_viewer.py
 +++ b/napari/_qt/_tests/test_qt_viewer.py
 @@ -67,6 +67,7 @@ def test_qt_viewer_toggle_console(make_napari_viewer):
- 
- 
+
+
  @skip_local_popups
 +@pytest.mark.skipif(os.environ.get("MIN_REQ", "0") == "1", reason="min req")
  def test_qt_viewer_console_focus(qtbot, make_napari_viewer):
@@ -45,7 +45,7 @@ index a2f4448b..2dfeaade 100644
      PyYAML>=5.1
      qtpy>=1.10.0
 -    scikit-image>=0.19.1
--    scikit-image[data]  # just `pooch`, but needed by `builtins` to provide all scikit-image.data samples 
+-    scikit-image[data]  # just `pooch`, but needed by `builtins` to provide all scikit-image.data samples
 +    scikit-image[data]>=0.19.1 # just `pooch`, but needed by `builtins` to provide all scikit-image.data samples
      scipy>=1.4.1 ; python_version < '3.9'
      scipy>=1.5.4 ; python_version >= '3.9'
@@ -74,7 +74,7 @@ index a2f4448b..2dfeaade 100644
 +    IPython>=7.25.0
 +    qtconsole>=4.5.1
 +    rich>=12.0.0
- release = 
+ release =
      PyGithub>=1.44.1
      twine>=3.1.1
 @@ -133,7 +136,6 @@ dev =
@@ -96,8 +96,8 @@ index ed4c4fb6..a1485146 100644
 +    config['options.extras_require']['testing'] = config[
 +        'options.extras_require'
 +    ]['testing'].replace('>=', '==')
- 
+
      # rewrite setup.cfg with new config
      with open(config_filename, 'w') as fout:
--- 
+--
 2.34.1

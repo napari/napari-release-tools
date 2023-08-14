@@ -172,14 +172,14 @@ index e900b23d..fb9dcd73 100644
 @@ -141,11 +141,6 @@ res.qrc
  # ignore all generated themed svgs
  napari/resources/themes
- 
+
 -# briefcase
 -macOS/
 -linux/
 -windows/
 -
  napari/_version.py
- 
+
  docs/api/napari*
 diff --git a/MANIFEST.in b/MANIFEST.in
 index 3f61d52a..a64af5ff 100644
@@ -190,7 +190,7 @@ index 3f61d52a..a64af5ff 100644
  recursive-include napari *.png *.svg *.qss *.gif *.ico *.icns
  recursive-include napari *.yaml
 -exclude napari/resources/_qt_resources*.py
- 
+
  # explicit excludes to keep check-manifest happy and remind us that
  # these things are not being included unless we ask
  recursive-exclude tools *
@@ -210,14 +210,14 @@ index dfb7d662..3cc8547e 100644
 --- a/README.md
 +++ b/README.md
 @@ -33,7 +33,7 @@ python -m pip install "napari[all]"
- 
+
  If you prefer conda over pip, you can replace the last line with: `conda install -c conda-forge napari`
- 
+
 -See here for the full [installation guide](https://napari.org/tutorials/fundamentals/installation.html), including how to [install napari as a bundled app](https://napari.org/tutorials/fundamentals/installation.html#install-as-a-bundled-app).
 +See here for the full [installation guide](https://napari.org/tutorials/fundamentals/installation.html).
- 
+
  ## simple example
- 
+
 diff --git a/bundle.py b/bundle.py
 deleted file mode 100644
 index a4222baf..00000000
@@ -542,12 +542,12 @@ index 6e307f09..b3b4a15b 100644
 -            running_as_bundled_app,
 +            running_as_constructor_app,
          )
- 
+
 -        if running_as_bundled_app():
 +        if running_as_constructor_app():
              install_certifi_opener()
          run(gui_exceptions=True)
- 
+
 diff --git a/napari/_qt/menus/file_menu.py b/napari/_qt/menus/file_menu.py
 index 138f2ea7..af7e9eb0 100644
 --- a/napari/_qt/menus/file_menu.py
@@ -559,7 +559,7 @@ index 138f2ea7..af7e9eb0 100644
 -from napari.utils.misc import running_as_bundled_app
 +from napari.utils.misc import running_as_constructor_app
  from napari.utils.translations import trans
- 
+
  if TYPE_CHECKING:
 @@ -123,7 +123,7 @@ class FileMenu(NapariMenu):
                  'shortcut': 'Ctrl+W',
@@ -586,11 +586,11 @@ index dc5b09d2..e6317cdd 100644
 @@ -451,7 +451,7 @@ class _QtMainWindow(QMainWindow):
          process = QProcess()
          process.setProgram(sys.executable)
- 
+
 -        if not running_as_bundled_app():
 +        if not running_as_constructor_app():
              process.setArguments(sys.argv)
- 
+
          process.startDetached()
 diff --git a/napari/plugins/__init__.py b/napari/plugins/__init__.py
 index 898af969..a85f7478 100644
@@ -598,18 +598,18 @@ index 898af969..a85f7478 100644
 +++ b/napari/plugins/__init__.py
 @@ -1,9 +1,7 @@
  from functools import lru_cache
- 
+
  from npe2 import (
 -    PackageMetadata,
      PluginManager as _PluginManager,
 -    PluginManifest,
  )
- 
+
  from napari.plugins import _npe2
 @@ -42,15 +40,6 @@ def _initialize_plugins():
      _npe2pm.events.plugins_registered.connect(_npe2.on_plugins_registered)
      _npe2pm.discover(include_npe1=settings.plugins.use_npe2_adaptor)
- 
+
 -    # this is a workaround for the fact that briefcase does not seem to include
 -    # napari's entry_points.txt in the bundled app, so the builtin plugins
 -    # don't get detected.  So we just register it manually.  This could
@@ -642,11 +642,11 @@ index 60052e3f..ec8a334e 100644
 +from napari.utils.misc import camel_to_spaces
  from napari.utils.theme import Theme, register_theme, unregister_theme
  from napari.utils.translations import trans
- 
+
 @@ -97,9 +95,6 @@ class NapariPluginManager(PluginManager):
          self._function_widgets: Dict[str, Dict[str, Callable[..., Any]]] = {}
          self._theme_data: Dict[str, Dict[str, Theme]] = {}
- 
+
 -        if sys.platform.startswith('linux') and running_as_bundled_app():
 -            sys.path.append(user_site_packages())
 -
@@ -660,7 +660,7 @@ index 2ea5ed48..5a4d3dac 100644
 @@ -23,9 +23,7 @@ def _user_agent() -> str:
      from napari import __version__
      from napari.utils import misc
- 
+
 -    if misc.running_as_bundled_app():
 -        env = 'briefcase'
 -    elif misc.running_as_constructor_app():
@@ -674,8 +674,8 @@ index 07187419..5ea11497 100644
 +++ b/napari/utils/misc.py
 @@ -50,15 +50,27 @@ def parse_version(v) -> 'packaging.version._BaseVersion':
          return packaging.version.LegacyVersion(v)
- 
- 
+
+
 -def running_as_bundled_app() -> bool:
 -    """Infer whether we are running as a briefcase bundle."""
 +def running_as_bundled_app(*, check_conda=True) -> bool:
@@ -698,7 +698,7 @@ index 07187419..5ea11497 100644
 +        and (Path(sys.executable).parent / ".napari_is_bundled").exists()
 +    ):
          return True
- 
+
 +    # TODO: Remove from here on?
      try:
          app_module = sys.modules['__main__'].__package__
@@ -710,7 +710,7 @@ index 09d4ab6b..0f052fd3 100644
 @@ -9,23 +9,6 @@ build-backend = "setuptools.build_meta"
  [tool.setuptools_scm]
  write_to = "napari/_version.py"
- 
+
 -[tool.briefcase]
 -project_name = "napari"
 -bundle = "com.napari"
@@ -732,7 +732,7 @@ index 09d4ab6b..0f052fd3 100644
  target-version = ['py38', 'py39', 'py310']
  skip-string-normalization = true
 @@ -54,7 +37,6 @@ exclude = '''
- 
+
  [tool.check-manifest]
  ignore = [
 -  "bundle.py",
@@ -745,21 +745,21 @@ index 09d4ab6b..0f052fd3 100644
  "examples/**" = ["INP001", "T20"]
 -"bundle.py" = ["T20"]
  "**/vendored/**" = ["TID"]
- 
+
  [tool.ruff.flake8-quotes]
 diff --git a/resources/bundle_readme.md b/resources/bundle_readme.md
 index b87a8c8b..5f454da9 100644
 --- a/resources/bundle_readme.md
 +++ b/resources/bundle_readme.md
 @@ -24,7 +24,7 @@ need to activate the `conda` environment to ensure all dependencies are importab
- 
+
  ## What does `conda` have to do with `napari`?
- 
+
 -The `napari` installer uses `conda` packages to bundle all its dependencies (Python, qt, etc).
 +The `napari` installer uses `conda` packages to bundle all its dependencies (Python, Qt, etc).
  This directory is actually a full `conda` installation! If you have used `conda` before, this
  is equivalent to what you usually call the `base` environment.
- 
+
 diff --git a/setup.cfg b/setup.cfg
 index 882ebb1e..7ca23193 100644
 --- a/setup.cfg
@@ -785,9 +785,8 @@ index 882ebb1e..7ca23193 100644
 -    wheel
 -    pims
 -    numpy==1.19.3
- 
+
  [options.entry_points]
  console_scripts =
--- 
+--
 2.34.1
-

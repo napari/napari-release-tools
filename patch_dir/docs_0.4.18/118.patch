@@ -73,14 +73,14 @@ index a5f15eca..378366f7 100644
 @@ -786,10 +786,10 @@ IF YOU COMPLY WITH THESE LICENSE TERMS, YOU HAVE THE RIGHTS BELOW.
          the associated installation directory, those license terms
          control.
- 
+
 -    -   THIRD PARTY COMPONENTS.  The software may include third party
 +    -   THIRD PARTY COMPONENTS.  The software may include third party
          components with separate legal notices or governed by other
          agreements, as may be described in the ThirdPartyNotices file(s)
 -        accompanying the software. 
 +        accompanying the software.
- 
+
  -   SCOPE OF LICENSE. The software is licensed, not sold. This agreement
      only gives you some rights to use the software. Microsoft reserves
 diff --git a/docs/howtos/docker.md b/docs/howtos/docker.md
@@ -90,10 +90,10 @@ index 3cee7f79..6fea186f 100644
 @@ -57,7 +57,7 @@ This image features a series of environment variables you can use to customize i
  * `XPRA_EXIT_WITH_CLIENT="yes"`: By default, Xpra will exit if you close the browser tab
  * `XPRA_XVFB_SCREEN="1920x1080x24+32"`: The resolution and bit depth of the virtual display created by Xvfb
- 
+
 -## For development
 +## For development
- 
+
  The Docker images are also useful for developers who need to debug issues on Linux.
  The images include the latest napari version published on PyPI by default, but you can also install your own local version of napari if needed.
 diff --git a/docs/naps/2-conda-based-packaging.md b/docs/naps/2-conda-based-packaging.md
@@ -102,13 +102,13 @@ index be47a8de..01c8fd09 100644
 +++ b/docs/naps/2-conda-based-packaging.md
 @@ -388,7 +388,7 @@ non-compliant licensing schemes or bad packaging practices.
  #### Tasks
- 
+
  * [ ] Add documentation about conda-forge in the release guide
 -* [ ] Add documentation about conda-forge in the plugin developer guide
 +* [ ] Add documentation about conda-forge in the plugin developer guide
  * [ ] Ensure the cookiecutter template has some notion of conda packaging
  * [ ] Decide which packages need to be governed by the _napari pinnings_ metapackage
- 
+
 diff --git a/docs/release/release_0_4_11.md b/docs/release/release_0_4_11.md
 index 6ebb55c0..e18d4a49 100644
 --- a/docs/release/release_0_4_11.md
@@ -199,8 +199,8 @@ index 6ebb55c0..e18d4a49 100644
  - Pin furo version (#3315)
 -- Update the affine parameter description in several classes (#3319)
 +- Update the affine parameter description in several classes (#3319)
- 
- 
+
+
  ## 21 authors added to this release (alphabetical)
 diff --git a/docs/release/release_0_4_13.md b/docs/release/release_0_4_13.md
 index 46ea0347..716dc279 100644
@@ -232,15 +232,15 @@ index 46ea0347..716dc279 100644
 +- Fix close_progress_bar with no current_pbar (#3961)
  - Switch append to concat (#3963)
  - Update plugin docs index (#3964)
- 
+
 @@ -189,7 +189,7 @@ Complete list of changes below:
  - Deprecate `qt_viewer.screenshot` & `clipboard` (#3765)
  - Restrict PublicOnlyProxy to napari namespace, allow napari-internal private usage (#3777)
  - Change PublicOnlyProxy deprecation expiry to 0.5.0 (#3788)
 -- Remove deprecation of sceenshot in qt_viewer (#3937)
 +- Remove deprecation of sceenshot in qt_viewer (#3937)
- 
- 
+
+
  ## Build Tools and Docs
 diff --git a/docs/release/release_0_4_8.md b/docs/release/release_0_4_8.md
 index 29679e92..47304bbf 100644
@@ -252,13 +252,13 @@ index 29679e92..47304bbf 100644
  - Change deprecation warnings to future warnings (#2707)
 -- Add strict_qt and block_plugin_discovery parameters to make_napari_viewer (#2715)
 +- Add strict_qt and block_plugin_discovery parameters to make_napari_viewer (#2715)
- 
+
  ## Bug Fixes
- 
+
 @@ -148,8 +148,8 @@ and
  - Fix tracks icons, and visibility icons (#2708)
  - Patch horizontalAdvance for older Qt versions (#2711)
- - Fix segfaults in test (#2716) 
+ - Fix segfaults in test (#2716)
 -- Fix napari_provide_sample_data documentation typo (#2718)
 -- Fix mpl colormaps (#2719)
 +- Fix napari_provide_sample_data documentation typo (#2718)
@@ -271,7 +271,7 @@ index 094e69fd..d00482da 100644
 --- a/docs/release/release_0_4_9.md
 +++ b/docs/release/release_0_4_9.md
 @@ -25,11 +25,11 @@ It also contains a variety of bug fixes and improvements.
- 
+
  ## Improvements
  - Global plugin setting (#2565)
 -- Provide interface for progress bars in @thread_workers (#2655)
@@ -309,8 +309,8 @@ index 094e69fd..d00482da 100644
 +- Update to openGL max texture size (#2845)
 +- Followup to #2485 to add opengl context (#2846)
 +- Do not store default values in preference files (#2848)
- 
- 
+
+
  ## Bug Fixes
 -- Fix Labels and Points properties set (#2657)
 +- Fix Labels and Points properties set (#2657)
@@ -343,13 +343,13 @@ index 094e69fd..d00482da 100644
 +- Fix Labels.fill for tensorstore data (#2856)
  - Be more robust for non-existant keybindings in settings (#2861)
  - trans NameError bugfix (#2865)
- 
+
 @@ -93,7 +93,7 @@ It also contains a variety of bug fixes and improvements.
  - Add PR labeler and update templates (#2775)
  - Add pytest-order and move threading tests to the top of the suite (#2779)
  - Auto assign PR to author (#2794)
 -- Typo in PR template (#2831)
 +- Typo in PR template (#2831)
- 
- 
+
+
  ## 12 authors added to this release (alphabetical)

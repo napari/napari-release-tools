@@ -36,7 +36,7 @@ index f4c59cb1..bbe7f123 100644
 --- a/.github/workflows/build_docs.yml
 +++ b/.github/workflows/build_docs.yml
 @@ -24,7 +24,7 @@ jobs:
- 
+
        - uses: actions/setup-python@v4
          with:
 -          python-version: 3.9
@@ -50,7 +50,7 @@ index f4c59cb1..bbe7f123 100644
            python -m pip install --upgrade pip
 -          python -m pip install -e ".[docs]" -c "resources/constraints/constraints_py3.9.txt"
 +          python -m pip install -e ".[docs]" -c "resources/constraints/constraints_py3.10.txt"
- 
+
        - name: Build Docs
          uses: aganders3/headless-gui@v1
 diff --git a/.github/workflows/test_comprehensive.yml b/.github/workflows/test_comprehensive.yml
@@ -107,7 +107,7 @@ index ca3b923e..83996380 100644
 +          - python: '3.11'
 +            platform: ubuntu-latest
 +            backend: pyside6
- 
+
      steps:
        - name: Cancel Previous Runs
 @@ -195,10 +202,13 @@ jobs:
@@ -181,10 +181,10 @@ index 6b0a1ba5..6ea1eda3 100644
 -          python3.9 -m piptools compile --upgrade -o resources/constraints/constraints_py3.9_examples.txt setup.cfg resources/constraints/version_denylist.txt resources/constraints/version_denylist_examples.txt --extra pyqt5 --extra pyqt6_experimental --extra pyside2 --extra pyside6_experimental --extra testing --allow-unsafe --strip-extras --resolver=backtracking
 -          python3.10 -m piptools compile --upgrade -o resources/constraints/constraints_py3.10.txt setup.cfg resources/constraints/version_denylist.txt --extra pyqt5 --extra pyqt6_experimental --extra pyside2 --extra pyside6_experimental --extra testing --allow-unsafe --strip-extras --resolver=backtracking
 -
--          # Explanation of above commands 
+-          # Explanation of above commands
 -          # python3.8 -m piptools compile - call pip-compile but ensure proper intepretter
 +          flags=""
-+          # Explanation of below commands 
++          # Explanation of below commands
 +          # python3.8 -m piptools compile - call pip-compile but ensure proper interpreter
            # --upgrade upgrade to the latest possible version. Without this pip-compile will take a look to output files and reuse versions (so will ad something on when adding dependency.
            # -o resources/constraints/constraints_py3.8.txt - output file
@@ -214,11 +214,11 @@ index 6b0a1ba5..6ea1eda3 100644
 +            python${pyv}  -m pip install -U pip pip-tools
 +            python${pyv}  -m piptools compile --upgrade -o resources/constraints/constraints_${pyv}.txt  setup.cfg resources/constraints/version_denylist.txt ${flags}
 +          done
- 
+
 +          python3.9 -m piptools compile --upgrade -o resources/constraints/constraints_py3.9_examples.txt setup.cfg resources/constraints/version_denylist.txt resources/constraints/version_denylist_examples.txt ${flags}
- 
+
        # END PYTHON DEPENDENCIES
- 
+
 diff --git a/napari/_qt/dialogs/qt_modal.py b/napari/_qt/dialogs/qt_modal.py
 index 6273b8dc..64739967 100644
 --- a/napari/_qt/dialogs/qt_modal.py
@@ -231,14 +231,14 @@ index 6273b8dc..64739967 100644
 +        flags = Qt.Popup | Qt.FramelessWindowHint
 +        self.setWindowFlags(flags)
          self.setLayout(QVBoxLayout())
- 
+
          self.frame = QFrame()
 diff --git a/napari/_qt/layer_controls/_tests/test_qt_layer_controls.py b/napari/_qt/layer_controls/_tests/test_qt_layer_controls.py
 index 7b1e2791..c70b948f 100644
 --- a/napari/_qt/layer_controls/_tests/test_qt_layer_controls.py
 +++ b/napari/_qt/layer_controls/_tests/test_qt_layer_controls.py
 @@ -5,6 +5,7 @@ from collections import namedtuple
- 
+
  import numpy as np
  import pytest
 +import qtpy
@@ -256,7 +256,7 @@ index 7b1e2791..c70b948f 100644
 @@ -177,6 +177,40 @@ def test_create_layer_controls(
                      assert qcombobox.currentText() == previous_qcombobox_text
              qcombobox.setCurrentIndex(qcombobox_initial_idx)
- 
+
 +
 +if sys.version_info[:2] == (3, 11) and qtpy.API == 'pyqt5':
 +    test_data = []
@@ -297,7 +297,7 @@ index 7b1e2791..c70b948f 100644
 @@ -227,6 +261,31 @@ def test_create_layer_controls(
          assert qspinbox.value() in [qspinbox_max, qspinbox_max - 1]
          qspinbox.setValue(qspinbox_initial_value)
- 
+
 +
 +@pytest.mark.parametrize(
 +    'layer_type_with_data',
@@ -329,7 +329,7 @@ index 7b1e2791..c70b948f 100644
 @@ -284,6 +343,31 @@ def test_create_layer_controls(
          else:
              assert qslider.value() == qslider.maximum()
- 
+
 +
 +@pytest.mark.parametrize(
 +    'layer_type_with_data',
@@ -915,19 +915,19 @@ index 3b872178..e1487515 100644
 +envlist = py{38,39,310,311}-{linux,macos,windows}-{pyqt5,pyside2,pyqt6,pyside6},mypy
  isolated_build = true
  toxworkdir=/tmp/.tox
- 
+
 @@ -25,13 +25,14 @@ python =
      3.9: py39
      3.9.0: py390
      3.10: py310
 +    3.11: py311
  fail_on_no_env = True
- 
+
  # This section turns environment variables from github actions
  # into tox environment factors. This, combined with the [gh-actions]
  # section above would mean that a test running python 3.9 on ubuntu-latest
  # with an environment variable of BACKEND=pyqt would be converted to a
--# tox env of `py39-linux-pyqt5`  
+-# tox env of `py39-linux-pyqt5`
 +# tox env of `py39-linux-pyqt5`
  [gh-actions:env]
  PLATFORM =
@@ -936,14 +936,14 @@ index 3b872178..e1487515 100644
  # Settings defined in the top-level testenv section are automatically
  # inherited by individual environments unless overridden.
  [testenv]
--platform = 
+-platform =
 +platform =
      macos: darwin
      linux: linux
      windows: win32
  # These environment variables will be passed from the calling environment
  # to the tox environment
--passenv = 
+-passenv =
 +passenv =
      CI
      GITHUB_ACTIONS
@@ -961,12 +961,12 @@ index 3b872178..e1487515 100644
      # the rest is for good measure
 @@ -105,7 +110,7 @@ commands =
          --json-report --json-report-file={toxinidir}/report-{envname}.json {posargs}
- 
- 
+
+
 -[testenv:py{38,39,310}-{linux,macos,windows}-{pyqt5,pyside2}-examples]
 +[testenv:py{38,39,310,311}-{linux,macos,windows}-{pyqt5,pyside2}-examples]
  deps =
      # For surface_timeseries_.py example
      nilearn
--- 
+--
 2.34.1

@@ -217,7 +217,7 @@ index dbd22221..28a1eed2 100644
 --- a/examples/action_manager.py
 +++ b/examples/action_manager.py
 @@ -51,7 +51,7 @@ layer_buttons.layout().insertWidget(3, rot_button)
- 
+
  def register_action():
      # Here we pass ViewerModel as the KeymapProvider as we want it to handle the shortcuts.
 -    # we could also pass none and bind the shortcuts at the window level – though we
@@ -236,7 +236,7 @@ index c12a9580..1f45dbe9 100644
 -    'size': ['none'] + list(coin_sizes),  # background is size: none
 +    'size': ["none", *coin_sizes],  # background is size: none
  }
- 
+
  color = {1: 'white', 2: 'blue', 3: 'green', 4: 'red', 5: 'yellow'}
 diff --git a/examples/affine_transforms.py b/examples/affine_transforms.py
 index 2f5572c1..48e38821 100644
@@ -244,7 +244,7 @@ index 2f5572c1..48e38821 100644
 +++ b/examples/affine_transforms.py
 @@ -34,8 +34,8 @@ viewer.add_points((corners_h @ affine.T)[:, :-1], size=0.5, opacity=.5, face_col
  # Note how the transformed corner points remain at the corners of the transformed image
- 
+
  # Now add the a regridded version of the image transformed with scipy.ndimage.affine_transform
 -# Note that we have to use the inverse of the affine as scipy does ‘pull’ (or ‘backward’) resampling,
 -# transforming the output space to the input to locate data, but napari does ‘push’ (or ‘forward’) direction,
@@ -272,7 +272,7 @@ index 92275e18..15025034 100644
 -        ).reshape((1,) + image.shape)
 +        ).reshape((1, *image.shape))
          layer = viewer.add_image(image, rendering='attenuated_mip')
- 
+
      # we want to show the last file added in the viewer to do so we want to
 diff --git a/examples/magic_image_arithmetic.py b/examples/magic_image_arithmetic.py
 index 5e30be5c..afe107da 100644
@@ -283,8 +283,8 @@ index 5e30be5c..afe107da 100644
      if layerA is not None and layerB is not None:
          return operation.value(layerA, layerB)
 +    return None
- 
- 
+
+
  # create a new viewer with a couple image layers
 diff --git a/examples/magic_parameter_sweep.py b/examples/magic_parameter_sweep.py
 index 521a02f2..f3d938d7 100644
@@ -295,15 +295,15 @@ index 521a02f2..f3d938d7 100644
      if layer:
          return skimage.filters.gaussian(layer.data, sigma=sigma, mode=mode)
 +    return None
- 
- 
+
+
  # create a viewer and add some images
 diff --git a/napari/__main__.py b/napari/__main__.py
 index 1a3f6978..1f0d5323 100644
 --- a/napari/__main__.py
 +++ b/napari/__main__.py
 @@ -77,26 +77,22 @@ def validate_unknown_args(unknown: List[str]) -> Dict[str, Any]:
- 
+
      out: Dict[str, Any] = {}
      valid = set.union(*valid_add_kwargs().values())
 -    for i, arg in enumerate(unknown):
@@ -312,7 +312,7 @@ index 1a3f6978..1f0d5323 100644
 +        if not raw_arg.startswith("--"):
              continue
 +        arg = raw_arg.lstrip('-')
- 
+
 -        if "=" in arg:
 -            key, value = arg.split("=", maxsplit=1)
 -        else:
@@ -341,13 +341,13 @@ index 1a3f6978..1f0d5323 100644
 +            value = unknown[i + 1]
          with contextlib.suppress(Exception):
              value = literal_eval(value)
- 
+
 diff --git a/napari/_lazy.py b/napari/_lazy.py
 index 35bd5217..413bf12a 100644
 --- a/napari/_lazy.py
 +++ b/napari/_lazy.py
 @@ -40,7 +40,7 @@ def install_lazy(module_name, submodules=None, submod_attrs=None):
- 
+
          if name in submodules:
              return import_module(f'{module_name}.{name}')
 -        elif name in attr_to_modules:
@@ -363,7 +363,7 @@ index 35bd5217..413bf12a 100644
 -            raise AttributeError(f'No {module_name} attribute {name}')
 +
 +        raise AttributeError(f'No {module_name} attribute {name}')
- 
+
      def __dir__():
          return __all__
 diff --git a/napari/_qt/__init__.py b/napari/_qt/__init__.py
@@ -388,13 +388,13 @@ index 94539394..aa3c9ae6 100644
          if _qmainwin := _QtMainWindow.current():
              return _qmainwin._window
 +        return None
- 
+
      @store.register_provider
      def _provide_qt_viewer() -> Optional[QtViewer]:
          if _qmainwin := _QtMainWindow.current():
              return _qmainwin._qt_viewer
 +        return None
- 
+
      # register actions
      for action in chain(Q_VIEW_ACTIONS, Q_HELP_ACTIONS):
 diff --git a/napari/_qt/_tests/test_sigint_interupt.py b/napari/_qt/_tests/test_sigint_interupt.py
@@ -411,8 +411,8 @@ index b24a0fd2..507d211a 100644
 +
 +    # we're not on windows
 +    return partial(os.kill, os.getpid(), signal.SIGINT)
- 
- 
+
+
  @pytest.mark.skipif(os.name != "Windows", reason="Windows specific")
 diff --git a/napari/_qt/containers/_base_item_view.py b/napari/_qt/containers/_base_item_view.py
 index 313c247c..4d04c476 100644
@@ -425,14 +425,14 @@ index 313c247c..4d04c476 100644
 -            return
 +            return None
          return super().keyPressEvent(e)
- 
+
      def currentChanged(
 diff --git a/napari/_qt/containers/qt_list_model.py b/napari/_qt/containers/qt_list_model.py
 index b80a6eeb..7d0c1bcc 100644
 --- a/napari/_qt/containers/qt_list_model.py
 +++ b/napari/_qt/containers/qt_list_model.py
 @@ -75,8 +75,8 @@ class QtListModel(_BaseEventedItemModel[ItemType]):
- 
+
              if len(moving_indices) == 1:
                  return self._root.move(moving_indices[0], destRow)
 -            else:
@@ -440,20 +440,20 @@ index b80a6eeb..7d0c1bcc 100644
 +
 +            return bool(self._root.move_multiple(moving_indices, destRow))
          return False
- 
- 
+
+
 diff --git a/napari/_qt/containers/qt_tree_model.py b/napari/_qt/containers/qt_tree_model.py
 index af5a5bcb..03f8a475 100644
 --- a/napari/_qt/containers/qt_tree_model.py
 +++ b/napari/_qt/containers/qt_tree_model.py
 @@ -159,7 +159,7 @@ class QtNodeTreeModel(_BaseEventedItemModel[NodeType]):
- 
+
          if isinstance(data, NodeMimeData):
              dest_idx = self.getItem(parent).index_from_root()
 -            dest_idx = dest_idx + (destRow,)
 +            dest_idx = (*dest_idx, destRow)
              moving_indices = data.node_indices()
- 
+
              logger.debug(
 diff --git a/napari/_qt/dialogs/_tests/test_qt_modal.py b/napari/_qt/dialogs/_tests/test_qt_modal.py
 index 19fbcd4f..a790cd5f 100644
@@ -462,11 +462,11 @@ index 19fbcd4f..a790cd5f 100644
 @@ -44,7 +44,7 @@ class TestQtPopup:
          with pytest.raises(ValueError):
              popup.move_to("dummy_text")
- 
+
 -        with pytest.raises(ValueError):
 +        with pytest.raises(TypeError):
              popup.move_to({})
- 
+
      @pytest.mark.parametrize("pos", [[10, 10, 10, 10], (15, 10, 10, 10)])
 diff --git a/napari/_qt/dialogs/qt_activity_dialog.py b/napari/_qt/dialogs/qt_activity_dialog.py
 index 5bb2a2b3..1d23bf9a 100644
@@ -477,7 +477,7 @@ index 5bb2a2b3..1d23bf9a 100644
                  if potential_parent.progress is prog:
                      return potential_parent
 +        return None
- 
+
      def close_progress_bar(self, prog):
          """Close `QtLabeledProgressBar` and parent `QtProgressBarGroup` if needed
 diff --git a/napari/_qt/dialogs/qt_modal.py b/napari/_qt/dialogs/qt_modal.py
@@ -500,7 +500,7 @@ index aa5d5d35..3dedfa29 100644
 @@ -362,7 +362,8 @@ class NapariQtNotification(QDialog):
                  )
                  tbdialog.show()
- 
+
 -            actions = tuple(notification.actions) + (
 +            actions = (
 +                *tuple(notification.actions),
@@ -527,7 +527,7 @@ index f9dc0713..b38c10f8 100644
          if checked_btn:
              return checked_btn.text()
 +        return None
- 
+
      def _get_persist_choice(self):
          """Get persistence checkbox choice"""
 diff --git a/napari/_qt/layer_controls/qt_image_controls_base.py b/napari/_qt/layer_controls/qt_image_controls_base.py
@@ -535,7 +535,7 @@ index e5047d80..a188f86a 100644
 --- a/napari/_qt/layer_controls/qt_image_controls_base.py
 +++ b/napari/_qt/layer_controls/qt_image_controls_base.py
 @@ -303,12 +303,12 @@ def range_to_decimals(range_, dtype):
- 
+
      if np.issubdtype(dtype, np.integer):
          return 0
 -    else:
@@ -566,7 +566,7 @@ index a8c1251c..33e40e72 100644
          self._is_close_dialog[quit_app] = True
 +        return None
          # here we inform that confirmation dialog is not open
- 
+
      def close_window(self):
 @@ -778,7 +779,7 @@ class Window:
          """
@@ -574,9 +574,9 @@ index a8c1251c..33e40e72 100644
          if full_name in self._dock_widgets:
 -            return
 +            return None
- 
+
          func = plugin_manager._function_widgets[plugin_name][widget_name]
- 
+
 @@ -926,7 +927,7 @@ class Window:
                  dock_widget.show()
                  dock_widget.raise_()
@@ -604,7 +604,7 @@ index a8c1251c..33e40e72 100644
 +            area=area,
 +            allowed_areas=allowed_areas,
 +        )
- 
+
      def resize(self, width, height):
          """Resize the window.
 diff --git a/napari/_qt/qt_viewer.py b/napari/_qt/qt_viewer.py
@@ -619,7 +619,7 @@ index 26988464..503a70c7 100644
 -                update_save_history(saved[0])
 +
 +            update_save_history(saved[0])
- 
+
      def _update_welcome_screen(self):
          """Update welcome screen display based on layer count."""
 diff --git a/napari/_qt/utils.py b/napari/_qt/utils.py
@@ -647,7 +647,7 @@ index fd4fa5d7..da5fcdb8 100644
 -from qtpy.QtWidgets import QSlider  # noqa
 +from qtpy.QtWidgets import QSlider
  from superqt import QDoubleSlider
- 
+
  # here until we can debug why labeled sliders render differently on 5.12
 diff --git a/napari/_qt/widgets/_tests/test_qt_color_swatch.py b/napari/_qt/widgets/_tests/test_qt_color_swatch.py
 index fcb1b495..23d78e85 100644
@@ -657,20 +657,20 @@ index fcb1b495..23d78e85 100644
 -import numpy
 +import numpy as np
  import pytest
- 
+
  from napari._qt.widgets.qt_color_swatch import (
 @@ -18,7 +18,7 @@ def test_succesfull_create_qcolorswatchedit(qtbot, color, tooltip):
      test_tooltip = tooltip or 'click to set color'
- 
+
      assert widget.color_swatch.toolTip() == test_tooltip
 -    numpy.testing.assert_array_equal(widget.color, test_color)
 +    np.testing.assert_array_equal(widget.color, test_color)
- 
- 
+
+
  @pytest.mark.parametrize('color', [None, [1, 1, 1, 1]])
 @@ -31,4 +31,4 @@ def test_succesfull_create_qcolorswatch(qtbot, color, tooltip):
      test_tooltip = tooltip or 'click to set color'
- 
+
      assert widget.toolTip() == test_tooltip
 -    numpy.testing.assert_array_equal(widget.color, test_color)
 +    np.testing.assert_array_equal(widget.color, test_color)
@@ -684,11 +684,11 @@ index 3ce55644..7f4fe276 100644
              self.color_changed.emit(_color)
 +            return None
 +        return None
- 
- 
+
+
  class QColorLineEdit(QLineEdit):
 @@ -213,7 +215,7 @@ class QColorLineEdit(QLineEdit):
- 
+
      def __init__(self, parent=None) -> None:
          super().__init__(parent)
 -        self._compl = QCompleter(list(get_color_dict()) + ['transparent'])
@@ -713,7 +713,7 @@ index 6ef9351f..69baea67 100644
 -                self.stop()
 +
 +            self.stop()
- 
+
          # we want to avoid playing a dimension that does not have a slider
          # (like X or Y, or a third dimension in volume view.)
 diff --git a/napari/_qt/widgets/qt_dims_slider.py b/napari/_qt/widgets/qt_dims_slider.py
@@ -721,12 +721,12 @@ index fa4cca23..3d52e40f 100644
 --- a/napari/_qt/widgets/qt_dims_slider.py
 +++ b/napari/_qt/widgets/qt_dims_slider.py
 @@ -402,7 +402,7 @@ class QtDimSliderWidget(QWidget):
- 
+
          # setting fps to 0 just stops the animation
          if fps == 0:
 -            return
 +            return None
- 
+
          worker, thread = _new_worker_qthread(
              AnimationWorker,
 @@ -553,10 +553,11 @@ class QtPlayButton(QPushButton):
@@ -739,7 +739,7 @@ index fa4cca23..3d52e40f 100644
              return qt_dims.stop()
          self.play_requested.emit(self.axis)
 +        return None
- 
+
      def _handle_start(self):
          """On animation start, set playing property to True & update style."""
 @@ -654,6 +655,7 @@ class AnimationWorker(QObject):
@@ -747,7 +747,7 @@ index fa4cca23..3d52e40f 100644
          self.step = 1 if fps > 0 else -1  # negative fps plays in reverse
          self.interval = 1000 / abs(fps)
 +        return None
- 
+
      @Slot(tuple)
      def set_frame_range(self, frame_range):
 @@ -741,6 +743,7 @@ class AnimationWorker(QObject):
@@ -755,7 +755,7 @@ index fa4cca23..3d52e40f 100644
              self.frame_requested.emit(self.axis, self.current)
          self.timer.start()
 +        return None
- 
+
      def finish(self):
          """Emit the finished event signal."""
 diff --git a/napari/_qt/widgets/qt_dims_sorter.py b/napari/_qt/widgets/qt_dims_sorter.py
@@ -770,17 +770,17 @@ index d7fad34c..65a27321 100644
 -            return repr(self) == other
 +
 +        return repr(self) == other
- 
- 
+
+
  def set_dims_order(dims: Dims, order: Tuple[int, ...]):
 diff --git a/napari/_qt/widgets/qt_keyboard_settings.py b/napari/_qt/widgets/qt_keyboard_settings.py
 index ab6d3daf..ecd7b67a 100644
 --- a/napari/_qt/widgets/qt_keyboard_settings.py
 +++ b/napari/_qt/widgets/qt_keyboard_settings.py
 @@ -315,11 +315,10 @@ class ShortcutEditor(QWidget):
- 
+
                  return False
- 
+
 -            else:
 -                # This shortcut was here.  Reformat and reset text.
 -                format_shortcut = Shortcut(new_shortcut).platform
@@ -790,9 +790,9 @@ index ab6d3daf..ecd7b67a 100644
 +            format_shortcut = Shortcut(new_shortcut).platform
 +            with lock_keybind_update(self):
 +                current_item.setText(format_shortcut)
- 
+
          return True
- 
+
 @@ -549,10 +548,10 @@ class EditorWidget(QLineEdit):
          if event.type() == QEvent.Type.ShortcutOverride:
              self.keyPressEvent(event)
@@ -804,7 +804,7 @@ index ab6d3daf..ecd7b67a 100644
 -            return super().event(event)
 +
 +        return super().event(event)
- 
+
      def keyPressEvent(self, event):
          """Qt method override."""
 diff --git a/napari/_tests/test_cli.py b/napari/_tests/test_cli.py
@@ -817,7 +817,7 @@ index 28bd2b4d..0f0d366d 100644
              __main__._run()
 -        assert str(e.value) == 'error: unrecognized arguments: --nonsense'
 +        assert str(e.value) == 'error: unrecognized argument: --nonsense'
- 
+
      with monkeypatch.context() as m:
          m.setattr(sys, 'argv', ['napari', 'path/to/file', '--gamma'])
 diff --git a/napari/_tests/test_function_widgets.py b/napari/_tests/test_function_widgets.py
@@ -829,7 +829,7 @@ index 81e4f44f..eff1cb1e 100644
          if layerA is not None and layerB is not None:
              return napari.layers.Image(layerA.data + layerB.data)
 +        return None
- 
+
      dwidg = viewer.window.add_function_widget(image_sum)
      assert dwidg.name == 'image sum'
 diff --git a/napari/_tests/test_magicgui.py b/napari/_tests/test_magicgui.py
@@ -837,8 +837,8 @@ index 49bf37f3..ab2cca0e 100644
 --- a/napari/_tests/test_magicgui.py
 +++ b/napari/_tests/test_magicgui.py
 @@ -20,7 +20,7 @@ if TYPE_CHECKING:
- 
- 
+
+
  try:
 -    import qtpy  # noqa
 +    import qtpy
@@ -892,33 +892,33 @@ index 10f51390..2cf78425 100644
 --- a/napari/_tests/test_with_screenshot.py
 +++ b/napari/_tests/test_with_screenshot.py
 @@ -198,23 +198,23 @@ def test_changing_image_gamma(make_napari_viewer):
- 
+
      screenshot = viewer.screenshot(canvas_only=True, flash=False)
      center = tuple(np.round(np.divide(screenshot.shape[:2], 2)).astype(int))
 -    assert 127 <= screenshot[center + (0,)] <= 129
 +    assert 127 <= screenshot[(*center, 0)] <= 129
- 
+
      layer.gamma = 0.1
      screenshot = viewer.screenshot(canvas_only=True, flash=False)
 -    assert screenshot[center + (0,)] > 230
 +    assert screenshot[(*center, 0)] > 230
- 
+
      viewer.dims.ndisplay = 3
      screenshot = viewer.screenshot(canvas_only=True, flash=False)
 -    assert screenshot[center + (0,)] > 230
 +    assert screenshot[(*center, 0)] > 230
- 
+
      layer.gamma = 1.9
      screenshot = viewer.screenshot(canvas_only=True, flash=False)
 -    assert screenshot[center + (0,)] < 80
 +    assert screenshot[(*center, 0)] < 80
- 
+
      viewer.dims.ndisplay = 2
      screenshot = viewer.screenshot(canvas_only=True, flash=False)
 -    assert screenshot[center + (0,)] < 80
 +    assert screenshot[(*center, 0)] < 80
- 
- 
+
+
  @skip_on_win_ci
 diff --git a/napari/_tests/utils.py b/napari/_tests/utils.py
 index dd44f6ba..2cbb7dc0 100644
@@ -930,7 +930,7 @@ index dd44f6ba..2cbb7dc0 100644
      if layer.multiscale:
 -        return None
 +        return
- 
+
      # Get an handle on visual layer:
      vis_lyr = viewer.window._qt_viewer.layer_to_visual[layer]
 diff --git a/napari/_vispy/camera.py b/napari/_vispy/camera.py
@@ -947,7 +947,7 @@ index 5b50b124..81a39f12 100644
 -        center = center[::-1]
 -        return center
 +        return center[::-1]
- 
+
      @center.setter
      def center(self, center):
 diff --git a/napari/_vispy/experimental/_tests/test_vispy_tiled_image.py b/napari/_vispy/experimental/_tests/test_vispy_tiled_image.py
@@ -955,7 +955,7 @@ index 1761537d..e099e3a4 100644
 --- a/napari/_vispy/experimental/_tests/test_vispy_tiled_image.py
 +++ b/napari/_vispy/experimental/_tests/test_vispy_tiled_image.py
 @@ -57,7 +57,7 @@ def test_tiled_screenshot(qtbot, monkeypatch, make_napari_viewer, dtype):
- 
+
      # Take the screenshot
      screenshot = viewer.screenshot(canvas_only=True, flash=False)
 -    center_coord = np.round(np.array(screenshot.shape[:2]) / 2).astype(np.int)
@@ -964,7 +964,7 @@ index 1761537d..e099e3a4 100644
      target_edge = np.array([0, 0, 0, 255], dtype='uint8')
      screen_offset = 3  # Offset is needed as our screenshots have black borders
 @@ -98,7 +98,7 @@ def test_tiled_rgb(qtbot, monkeypatch, make_napari_viewer):
- 
+
      # Take the screenshot
      screenshot = viewer.screenshot(canvas_only=True, flash=False)
 -    center_coord = np.round(np.array(screenshot.shape[:2]) / 2).astype(np.int)
@@ -973,7 +973,7 @@ index 1761537d..e099e3a4 100644
      target_edge = np.array([0, 0, 0, 255], dtype='uint8')
      screen_offset = 3  # Offset is needed as our screenshots have black borders
 @@ -144,7 +144,7 @@ def test_tiled_changing_contrast_limits(
- 
+
      # Take the screenshot
      screenshot = viewer.screenshot(canvas_only=True, flash=False)
 -    center_coord = np.round(np.array(screenshot.shape[:2]) / 2).astype(np.int)
@@ -982,16 +982,16 @@ index 1761537d..e099e3a4 100644
      target_edge = np.array([0, 0, 0, 255], dtype='uint8')
      screen_offset = 3  # Offset is needed as our screenshots have black borders
 @@ -198,7 +198,7 @@ def test_tiled_single_scale(qtbot, monkeypatch, make_napari_viewer):
- 
+
      # Take the screenshot
      screenshot = viewer.screenshot(canvas_only=True, flash=False)
 -    center_coord = np.round(np.array(screenshot.shape[:2]) / 2).astype(np.int)
 +    center_coord = np.round(np.array(screenshot.shape[:2]) / 2).astype(int)
      target_center = np.array([128, 128, 128, 255], dtype='uint8')
      screen_offset = 3  # Offset is needed as our screenshots have black borders
- 
+
 @@ -239,7 +239,7 @@ def test_tiled_labels(qtbot, monkeypatch, make_napari_viewer):
- 
+
      # Take the screenshot
      screenshot = viewer.screenshot(canvas_only=True, flash=False)
 -    center_coord = np.round(np.array(screenshot.shape[:2]) / 2).astype(np.int)
@@ -1009,7 +1009,7 @@ index 90eaaff8..6623c3ef 100644
          """
 -        raise NotImplementedError()
 +        raise NotImplementedError
- 
+
      def _update_tile_shape(self) -> None:
          """If the tile shape was changed, update our node."""
 diff --git a/napari/_vispy/layers/base.py b/napari/_vispy/layers/base.py
@@ -1017,12 +1017,12 @@ index 2f6841ae..f832991f 100644
 --- a/napari/_vispy/layers/base.py
 +++ b/napari/_vispy/layers/base.py
 @@ -111,7 +111,7 @@ class VispyBaseLayer(ABC):
- 
+
      @abstractmethod
      def _on_data_change(self):
 -        raise NotImplementedError()
 +        raise NotImplementedError
- 
+
      def _on_refresh_change(self):
          self.node.update()
 diff --git a/napari/_vispy/utils/gl.py b/napari/_vispy/utils/gl.py
@@ -1069,15 +1069,15 @@ index a405181e..56fd395b 100644
 +            )
 +        ) from e
 +    return data.astype(dtype)
- 
- 
+
+
  # blend_func parameters are multiplying:
 diff --git a/napari/_vispy/utils/quaternion.py b/napari/_vispy/utils/quaternion.py
 index b7bdd218..b362cd46 100644
 --- a/napari/_vispy/utils/quaternion.py
 +++ b/napari/_vispy/utils/quaternion.py
 @@ -53,5 +53,5 @@ def quaternion2euler(quaternion, degrees=False):
- 
+
      if degrees:
          return tuple(np.degrees(angles))
 -    else:
@@ -1113,8 +1113,8 @@ index 70781019..bd7e5e37 100644
 +            number=len(colors),
          )
 +    )
- 
- 
+
+
  def color_dashed_lines(colors):
 @@ -85,19 +85,19 @@ def color_dashed_lines(colors):
              [[colors[0]] * 2, [colors[1]] * 4 * 2],
@@ -1141,8 +1141,8 @@ index 70781019..bd7e5e37 100644
 +            number=len(colors),
          )
 +    )
- 
- 
+
+
  def color_arrowheads(colors, num_segments):
 @@ -106,7 +106,7 @@ def color_arrowheads(colors, num_segments):
              [[colors[0]] * num_segments, [colors[1]] * num_segments],
@@ -1172,8 +1172,8 @@ index 70781019..bd7e5e37 100644
 +            number=len(colors),
          )
 +    )
- 
- 
+
+
  class Axes(Compound):
 diff --git a/napari/_vispy/visuals/image.py b/napari/_vispy/visuals/image.py
 index 668e5ae2..533fb305 100644
@@ -1202,7 +1202,7 @@ index 03c7ec35..41d55cc6 100644
 -            return (0, 0)
 +
 +        return (0, 0)
- 
+
      @property
      def canvas_size_limits(self):
 diff --git a/napari/components/experimental/chunk/_commands/_loader.py b/napari/components/experimental/chunk/_commands/_loader.py
@@ -1214,18 +1214,18 @@ index 9977a410..4d3e51da 100644
  """
 -from typing import List
 +from typing import List, Optional
- 
+
  from napari._vendor.experimental.humanize.src.humanize import naturalsize
  from napari.components.experimental.chunk._commands._tables import (
 @@ -89,7 +89,7 @@ def _get_shape_str(layer):
- 
+
      data = layer.data
      if isinstance(data, list):
 -        if len(data) == 0:
 +        if not data:
              return "NONE"  # Shape layer is empty list?
          return f"{data[0].shape}"  # Multi-scale
- 
+
 @@ -212,7 +212,7 @@ class LevelsTable:
          data = layer.data
          if isinstance(data, list):
@@ -1234,16 +1234,16 @@ index 9977a410..4d3e51da 100644
 +                shape_str = level.shape or "NONE"
                  size_str = naturalsize(level.nbytes, gnu=True)
                  self.table.add_row([i, shape_str, size_str])
- 
+
 @@ -281,7 +281,7 @@ class LoaderCommands:
              print(f"Layer index {layer_index} is invalid.")
              return None
- 
+
 -    def _get_layer_info(self, layer_index) -> LayerInfo:
 +    def _get_layer_info(self, layer_index) -> Optional[LayerInfo]:
          """Return the LayerInfo at this index."""
          layer = self._get_layer(layer_index)
- 
+
 diff --git a/napari/components/grid.py b/napari/components/grid.py
 index 5305270c..f60c4fc4 100644
 --- a/napari/components/grid.py
@@ -1273,7 +1273,7 @@ index 5305270c..f60c4fc4 100644
 -        else:
 +        if not self.enabled:
              return (1, 1)
- 
+
 +        if nlayers == 0:
 +            return (1, 1)
 +
@@ -1295,7 +1295,7 @@ index 5305270c..f60c4fc4 100644
 +
      def position(self, index: int, nlayers: int) -> Tuple[int, int]:
          """Return the position of a given linear index in grid.
- 
+
 @@ -92,16 +93,16 @@ class GridCanvas(EventedModel):
          position : 2-tuple of int
              Row and column position of current index in the grid.
@@ -1368,7 +1368,7 @@ index ef777e4f..4d860642 100644
 -                for e, o1, o2 in zip(extrema, pixel_offsets, point_offsets)
 -            ]
 -            min_v, max_v = self._get_min_and_max(mins, maxs)
- 
+
 -            # form range tuples, switching back to original dimension order
 -            return [
 -                (start, stop, step)
@@ -1414,7 +1414,7 @@ index ef777e4f..4d860642 100644
 +            (start, stop, step)
 +            for start, stop, step in zip(min_v, max_v, min_steps)
 +        ]
- 
+
      @property
      def ndim(self) -> int:
 @@ -433,7 +433,7 @@ class LayerList(SelectableEventedList[Layer]):
@@ -1424,7 +1424,7 @@ index ef777e4f..4d860642 100644
 -        that plugin, and if it doesn’t return a ``WriterFunction`` we error,
 +        that plugin, and if it doesn`t return a ``WriterFunction`` we error,
          otherwise we call it and if that fails if it we error.
- 
+
          Parameters
 diff --git a/napari/components/viewer_model.py b/napari/components/viewer_model.py
 index c672cf74..0977535a 100644
@@ -1438,16 +1438,16 @@ index c672cf74..0977535a 100644
 -            return self.layers.extent.world[:, self.dims.displayed]
 +
 +        return self.layers.extent.world[:, self.dims.displayed]
- 
+
      def reset_view(self):
          """Reset the camera view."""
 @@ -870,16 +870,15 @@ class ViewerModel(KeymapProvider, MousemapProvider, EventedModel):
              self.layers.append(layer)
- 
+
              return layer
 -        else:
 -            layerdata_list = split_channels(data, channel_axis, **kwargs)
- 
+
 -            layer_list = []
 -            for image, i_kwargs, _ in layerdata_list:
 -                layer = Image(image, **i_kwargs)
@@ -1459,10 +1459,10 @@ index c672cf74..0977535a 100644
 +            Image(image, **i_kwargs) for image, i_kwargs, _ in layerdata_list
 +        ]
 +        self.layers.extend(layer_list)
- 
+
 -            return layer_list
 +        return layer_list
- 
+
      def open_sample(
          self,
 @@ -963,18 +962,18 @@ class ViewerModel(KeymapProvider, MousemapProvider, EventedModel):
@@ -1491,7 +1491,7 @@ index c672cf74..0977535a 100644
 +                    data_type=type(data),
                  )
 +            )
- 
+
      def open(
          self,
 @@ -1365,7 +1364,7 @@ class ViewerModel(KeymapProvider, MousemapProvider, EventedModel):
@@ -1540,8 +1540,8 @@ index 9062f927..6309368a 100644
 -        return None
 +
 +    return None
- 
- 
+
+
  @pytest.fixture()
 @@ -208,11 +208,11 @@ def _is_async_mode() -> bool:
      """
@@ -1550,25 +1550,25 @@ index 9062f927..6309368a 100644
 -    else:
 -        # Late import so we don't import experimental code unless using it.
 -        from napari.components.experimental.chunk import chunk_loader
- 
+
 -        return not chunk_loader.force_synchronous
 +    # Late import so we don't import experimental code unless using it.
 +    from napari.components.experimental.chunk import chunk_loader
 +
 +    return not chunk_loader.force_synchronous
- 
- 
+
+
  @pytest.fixture(autouse=True)
 @@ -319,8 +319,8 @@ def napari_svg_name():
- 
+
      if parse_version(version('napari-svg')) < parse_version('0.1.6'):
          return 'svg'
 -    else:
 -        return 'napari-svg'
 +
 +    return 'napari-svg'
- 
- 
+
+
  @pytest.fixture(autouse=True, scope='session')
 diff --git a/napari/layers/_layer_actions.py b/napari/layers/_layer_actions.py
 index e6301d16..df325d96 100644
@@ -1582,8 +1582,8 @@ index e6301d16..df325d96 100644
 -        layer.data = layer.data.astype(np.dtype(mode))
 +
 +    layer.data = layer.data.astype(np.dtype(mode))
- 
- 
+
+
  def _project(ll: LayerList, axis: int = 0, mode='max'):
 diff --git a/napari/layers/_tests/test_layer_attributes.py b/napari/layers/_tests/test_layer_attributes.py
 index 3d55893d..b70320f0 100644
@@ -1604,12 +1604,12 @@ index 1f38a868..418c434b 100644
 +++ b/napari/layers/base/base.py
 @@ -71,7 +71,7 @@ def no_op(layer: Layer, event: Event) -> None:
      None
- 
+
      """
 -    return None
 +    return
- 
- 
+
+
  @mgui.register_type(choices=get_layers, return_callback=add_layer_to_viewer)
 @@ -748,12 +748,12 @@ class Layer(KeymapProvider, MousemapProvider, ABC):
      @abstractmethod
@@ -1617,13 +1617,13 @@ index 1f38a868..418c434b 100644
          # user writes own docstring
 -        raise NotImplementedError()
 +        raise NotImplementedError
- 
+
      @data.setter
      @abstractmethod
      def data(self, data):
 -        raise NotImplementedError()
 +        raise NotImplementedError
- 
+
      @property
      @abstractmethod
 @@ -764,7 +764,7 @@ class Layer(KeymapProvider, MousemapProvider, ABC):
@@ -1632,43 +1632,43 @@ index 1f38a868..418c434b 100644
          """
 -        raise NotImplementedError()
 +        raise NotImplementedError
- 
+
      @property
      def _extent_world(self) -> np.ndarray:
 @@ -818,7 +818,7 @@ class Layer(KeymapProvider, MousemapProvider, ABC):
- 
+
      @abstractmethod
      def _get_ndim(self):
 -        raise NotImplementedError()
 +        raise NotImplementedError
- 
+
      def _get_base_state(self):
          """Get dictionary of attributes on base layer.
 @@ -847,7 +847,7 @@ class Layer(KeymapProvider, MousemapProvider, ABC):
- 
+
      @abstractmethod
      def _get_state(self):
 -        raise NotImplementedError()
 +        raise NotImplementedError
- 
+
      @property
      def _type_string(self):
 @@ -973,7 +973,7 @@ class Layer(KeymapProvider, MousemapProvider, ABC):
- 
+
      @abstractmethod
      def _set_view_slice(self):
 -        raise NotImplementedError()
 +        raise NotImplementedError
- 
+
      def _slice_dims(self, point=None, ndisplay=2, order=None):
          """Slice data with values from a global dims model.
 @@ -1024,7 +1024,7 @@ class Layer(KeymapProvider, MousemapProvider, ABC):
- 
+
      @abstractmethod
      def _update_thumbnail(self):
 -        raise NotImplementedError()
 +        raise NotImplementedError
- 
+
      @abstractmethod
      def _get_value(self, position):
 @@ -1040,7 +1040,7 @@ class Layer(KeymapProvider, MousemapProvider, ABC):
@@ -1677,7 +1677,7 @@ index 1f38a868..418c434b 100644
          """
 -        raise NotImplementedError()
 +        raise NotImplementedError
- 
+
      def get_value(
          self,
 @@ -1122,7 +1122,9 @@ class Layer(KeymapProvider, MousemapProvider, ABC):
@@ -1689,7 +1689,7 @@ index 1f38a868..418c434b 100644
 +        float, int, None, Tuple[Union[float, int, None], Optional[int]]
 +    ]:
          """Get the layer data value along a ray
- 
+
          Parameters
 @@ -1138,9 +1140,7 @@ class Layer(KeymapProvider, MousemapProvider, ABC):
          -------
@@ -1698,7 +1698,7 @@ index 1f38a868..418c434b 100644
 -
          """
 -        return None
- 
+
      def projected_distance_from_mouse_drag(
          self,
 @@ -1362,8 +1362,8 @@ class Layer(KeymapProvider, MousemapProvider, ABC):
@@ -1709,13 +1709,13 @@ index 1f38a868..418c434b 100644
 -            return list(order[order >= offset] - offset)
 +
 +        return list(order[order >= offset] - offset)
- 
+
      def _display_bounding_box(self, dims_displayed: np.ndarray):
          """An axis aligned (ndisplay, 2) bounding box around the data"""
 @@ -1635,7 +1635,7 @@ class Layer(KeymapProvider, MousemapProvider, ABC):
                  components['plugin'] = self.source.reader_plugin
              return components
- 
+
 -        elif self.source.sample:
 +        if self.source.sample:
              components['layer_base'] = self.name
@@ -1724,14 +1724,14 @@ index 1f38a868..418c434b 100644
 @@ -1646,17 +1646,16 @@ class Layer(KeymapProvider, MousemapProvider, ABC):
                  components['plugin'] = self.source.sample[0]
              return components
- 
+
 -        elif self.source.widget:
 +        if self.source.widget:
              components['layer_base'] = self.name
              components['source_type'] = 'widget'
              components['plugin'] = self.source.widget._function.__name__
              return components
- 
+
 -        else:
 -            components['layer_base'] = self.name
 -            components['source_type'] = ''
@@ -1741,7 +1741,7 @@ index 1f38a868..418c434b 100644
 +        components['source_type'] = ''
 +        components['plugin'] = ''
 +        return components
- 
+
      def get_source_str(self):
          source_info = self._get_source_info()
 @@ -1851,7 +1850,7 @@ class Layer(KeymapProvider, MousemapProvider, ABC):
@@ -1750,7 +1750,7 @@ index 1f38a868..418c434b 100644
              if 'unexpected keyword argument' not in str(exc):
 -                raise exc
 +                raise
- 
+
              bad_key = str(exc).split('keyword argument ')[-1]
              raise TypeError(
 diff --git a/napari/layers/image/_image_slice.py b/napari/layers/image/_image_slice.py
@@ -1759,21 +1759,21 @@ index e5b0bdcc..950a3e51 100644
 +++ b/napari/layers/image/_image_slice.py
 @@ -32,8 +32,8 @@ def _create_loader_class() -> ImageLoader:
          )
- 
+
          return ChunkedImageLoader()
 -    else:
 -        return ImageLoader()
 +
 +    return ImageLoader()
- 
- 
+
+
  class ImageSlice:
 diff --git a/napari/layers/image/_tests/test_image_utils.py b/napari/layers/image/_tests/test_image_utils.py
 index 37578abe..08e78bcb 100644
 --- a/napari/layers/image/_tests/test_image_utils.py
 +++ b/napari/layers/image/_tests/test_image_utils.py
 @@ -84,9 +84,7 @@ def test_guess_multiscale_strip_single_scale():
- 
+
  def test_guess_multiscale_non_array_list():
      """Check that non-decreasing list input raises ValueError"""
 -    data = [
@@ -1782,7 +1782,7 @@ index 37578abe..08e78bcb 100644
 +    data = [np.empty((10, 15, 6))] * 2
      with pytest.raises(ValueError):
          _, _ = guess_multiscale(data)
- 
+
 diff --git a/napari/layers/image/experimental/_octree_loader.py b/napari/layers/image/experimental/_octree_loader.py
 index 79a2d1ec..70130c01 100644
 --- a/napari/layers/image/experimental/_octree_loader.py
@@ -1807,12 +1807,12 @@ index 79a2d1ec..70130c01 100644
 +        # collect it!
 +        root_tile = self._octree.levels[-1].get_chunk(0, 0, create=True)
 +        return [root_tile]
- 
+
      def _get_permanent_chunks(self) -> List[OctreeChunk]:
          """Get any permanent chunks we want to always draw.
 @@ -341,14 +341,14 @@ class OctreeLoader:
              drawn_ancestors = [drawn_ancestors[-1]]
- 
+
          # If the closest ancestor is drawn just take that one
 -        if len(ancestors) > 0 and ancestors == drawn_ancestors:  # noqa SIM114
 +        if len(ancestors) > 0 and ancestors == drawn_ancestors:
@@ -1827,7 +1827,7 @@ index 79a2d1ec..70130c01 100644
 +
 +        # Otherwise that the close in memory ancestor
 +        return children + drawn_ancestors + ancestors
- 
+
      def _load_chunk(self, octree_chunk: OctreeChunk, priority: int) -> bool:
          """Load the data for one OctreeChunk.
 diff --git a/napari/layers/image/experimental/octree.py b/napari/layers/image/experimental/octree.py
@@ -1842,7 +1842,7 @@ index 4d60a5b2..19022641 100644
 -            return ancestors[0]
 +
 +        return ancestors[0]
- 
+
      def get_ancestors(
          self,
 diff --git a/napari/layers/image/experimental/octree_level.py b/napari/layers/image/experimental/octree_level.py
@@ -1870,7 +1870,7 @@ index dd324b23..bf484e12 100644
 +        if rgb is None:
              rgb = rgb_guess
          self.rgb = rgb
- 
+
 @@ -407,8 +407,8 @@ class _ImageBase(IntensityVisualizationMixin, Layer):
          """Get empty image to use as the default before data is loaded."""
          if self.rgb:
@@ -1879,7 +1879,7 @@ index dd324b23..bf484e12 100644
 -            return np.zeros((1,) * self._slice_input.ndisplay)
 +
 +        return np.zeros((1,) * self._slice_input.ndisplay)
- 
+
      def _get_order(self) -> Tuple[int]:
          """Return the ordered displayed dimensions, but reduced to fit in the slice space."""
 @@ -417,9 +417,9 @@ class _ImageBase(IntensityVisualizationMixin, Layer):
@@ -1892,7 +1892,7 @@ index dd324b23..bf484e12 100644
 +            return (*order, max(order) + 1)
 +
 +        return order
- 
+
      @property
      def _data_view(self):
 @@ -957,7 +957,7 @@ class _ImageBase(IntensityVisualizationMixin, Layer):
@@ -1903,7 +1903,7 @@ index dd324b23..bf484e12 100644
 +            colormapped = color_array.reshape((*downsampled.shape, 4))
              colormapped[..., 3] *= self.opacity
          self.thumbnail = colormapped
- 
+
 diff --git a/napari/layers/labels/_tests/test_labels.py b/napari/layers/labels/_tests/test_labels.py
 index 58b17aab..0d663019 100644
 --- a/napari/layers/labels/_tests/test_labels.py
@@ -1950,7 +1950,7 @@ index 2060f057..51273700 100644
 +            self._all_vals = np.roll(new_all_vals, min_label_val0)
 +            self._all_vals[0] = 0
 +        return self._lookup_with_index
- 
+
      def _raw_to_displayed(self, raw):
          """Determine displayed image from a saved raw image and a saved seed.
 @@ -1516,8 +1516,8 @@ def _coerce_indices_for_vectorization(array, indices: list) -> tuple:
@@ -1976,7 +1976,7 @@ index 70b748bf..c267a846 100644
 +    keep = [1, 2, *range(4, 10)]
      assert np.all(layer.data == data[keep])
      assert layer._value is None
- 
+
 @@ -828,14 +828,14 @@ def test_text_from_property_fstring(properties):
      layer.selected_data = {0}
      layer._copy_data()
@@ -1984,7 +1984,7 @@ index 70b748bf..c267a846 100644
 -    expected_text_3 = expected_text_2 + ['type-ish: A']
 +    expected_text_3 = [*expected_text_2, "type-ish: A"]
      np.testing.assert_equal(layer.text.values, expected_text_3)
- 
+
      # add point
      layer.selected_data = {0}
      new_shape = np.random.random((1, 2))
@@ -1992,8 +1992,8 @@ index 70b748bf..c267a846 100644
 -    expected_text_4 = expected_text_3 + ['type-ish: A']
 +    expected_text_4 = [*expected_text_3, "type-ish: A"]
      np.testing.assert_equal(layer.text.values, expected_text_4)
- 
- 
+
+
 diff --git a/napari/layers/points/points.py b/napari/layers/points/points.py
 index 9434e656..a2947fbe 100644
 --- a/napari/layers/points/points.py
@@ -2001,11 +2001,11 @@ index 9434e656..a2947fbe 100644
 @@ -1575,7 +1575,7 @@ class Points(Layer):
          else:
              return [], np.empty(0)
- 
+
 -    def _get_value(self, position) -> Union[None, int]:
 +    def _get_value(self, position) -> Optional[int]:
          """Index of the point at a given 2D position in data coordinates.
- 
+
          Parameters
 @@ -1616,7 +1616,7 @@ class Points(Layer):
          start_point: np.ndarray,
@@ -2014,7 +2014,7 @@ index 9434e656..a2947fbe 100644
 -    ) -> Union[int, None]:
 +    ) -> Optional[int]:
          """Get the layer data value along a ray
- 
+
          Parameters
 @@ -1835,7 +1835,7 @@ class Points(Layer):
                  pos = _create_box_from_corners_3d(
@@ -2024,10 +2024,10 @@ index 9434e656..a2947fbe 100644
 +            pos = pos[[*range(4), 0]]
          else:
              pos = None
- 
+
 @@ -1880,7 +1880,7 @@ class Points(Layer):
              coords = np.clip(coords, 0, thumbnail_shape - 1)
- 
+
              # Draw single pixel points in the colormapped thumbnail.
 -            colormapped = np.zeros(tuple(thumbnail_shape) + (4,))
 +            colormapped = np.zeros((*thumbnail_shape, 4))
@@ -2059,7 +2059,7 @@ index 59468f49..2ad1a8ec 100644
 @@ -1034,14 +1034,14 @@ class ShapeList:
          indices = inside_triangles(triangles - coord)
          shapes = self._mesh.displayed_triangles_index[indices, 0]
- 
+
 -        if len(shapes) > 0:
 -            z_list = self._z_order.tolist()
 -            order_indices = np.array([z_list.index(m) for m in shapes])
@@ -2068,7 +2068,7 @@ index 59468f49..2ad1a8ec 100644
 -        else:
 +        if len(shapes) == 0:
              return None
- 
+
 +        z_list = self._z_order.tolist()
 +        order_indices = np.array([z_list.index(m) for m in shapes])
 +        ordered_shapes = shapes[np.argsort(order_indices)]
@@ -2096,7 +2096,7 @@ index 59468f49..2ad1a8ec 100644
 -        else:
 +        if len(intersected_shapes) == 0:
              return None, None
- 
+
 +        intersection_points = self._triangle_intersection(
 +            triangle_indices=inside,
 +            ray_position=ray_position,
@@ -2118,20 +2118,20 @@ index 59468f49..2ad1a8ec 100644
          if labels_shape is None:
 -            labels_shape = self.displayed_vertices.max(axis=0).astype(np.int)
 +            labels_shape = self.displayed_vertices.max(axis=0).astype(int)
- 
+
          labels = np.zeros(labels_shape, dtype=int)
- 
+
 @@ -1226,9 +1226,9 @@ class ShapeList:
              value of the shape for points inside the corresponding shape.
          """
          if colors_shape is None:
 -            colors_shape = self.displayed_vertices.max(axis=0).astype(np.int)
 +            colors_shape = self.displayed_vertices.max(axis=0).astype(int)
- 
+
 -        colors = np.zeros(tuple(colors_shape) + (4,), dtype=float)
 +        colors = np.zeros((*colors_shape, 4), dtype=float)
          colors[..., 3] = 1
- 
+
          z_order = self._z_order[::-1]
 diff --git a/napari/layers/shapes/_shapes_models/shape.py b/napari/layers/shapes/_shapes_models/shape.py
 index 7f8419ef..002fa510 100644
@@ -2143,18 +2143,18 @@ index 7f8419ef..002fa510 100644
          # user writes own docstring
 -        raise NotImplementedError()
 +        raise NotImplementedError
- 
+
      @data.setter
      @abstractmethod
      def data(self, data):
 -        raise NotImplementedError()
 +        raise NotImplementedError
- 
+
      @abstractmethod
      def _update_displayed_data(self):
 -        raise NotImplementedError()
 +        raise NotImplementedError
- 
+
      @property
      def ndisplay(self):
 diff --git a/napari/layers/shapes/_shapes_utils.py b/napari/layers/shapes/_shapes_utils.py
@@ -2172,8 +2172,8 @@ index 97058b02..808aed7b 100644
 -        raise ValueError(x.shape[1], y.shape[1])
 +
 +    raise ValueError(x.shape[1], y.shape[1])
- 
- 
+
+
  def generate_2D_edge_meshes(path, closed=False, limit=3, bevel=False):
 diff --git a/napari/layers/shapes/_tests/test_shapes.py b/napari/layers/shapes/_tests/test_shapes.py
 index 91e396cf..93943b85 100644
@@ -2186,7 +2186,7 @@ index 91e396cf..93943b85 100644
 -    expected_text_3 = expected_text_2 + ['type-ish: A']
 +    expected_text_3 = [*expected_text_2, "type-ish: A"]
      np.testing.assert_equal(layer.text.values, expected_text_3)
- 
+
      # add shape
      layer.selected_data = {0}
      new_shape = np.random.random((1, 4, 2))
@@ -2194,8 +2194,8 @@ index 91e396cf..93943b85 100644
 -    expected_text_4 = expected_text_3 + ['type-ish: A']
 +    expected_text_4 = [*expected_text_3, "type-ish: A"]
      np.testing.assert_equal(layer.text.values, expected_text_4)
- 
- 
+
+
 @@ -1233,7 +1233,7 @@ def test_removing_selected_shapes():
      # Select three shapes and remove them
      layer.selected_data = {1, 7, 8}
@@ -2211,7 +2211,7 @@ index 91e396cf..93943b85 100644
      assert len(layer.edge_width) == shape[0] + 1
 -    assert layer.edge_width == width_list + [4]
 +    assert layer.edge_width == [*width_list, 4]
- 
+
      # Check removing data adjusts colors correctly
      layer.selected_data = {0, 2}
 @@ -1847,7 +1847,7 @@ def test_z_index():
@@ -2220,7 +2220,7 @@ index 91e396cf..93943b85 100644
      assert len(layer.z_index) == shape[0] + 1
 -    assert layer.z_index == z_index_list + [4]
 +    assert layer.z_index == [*z_index_list, 4]
- 
+
      # Check removing data adjusts colors correctly
      layer.selected_data = {0, 2}
 diff --git a/napari/layers/shapes/_tests/test_shapes_mouse_bindings.py b/napari/layers/shapes/_tests/test_shapes_mouse_bindings.py
@@ -2233,8 +2233,8 @@ index 3b07aa0a..c9ba094d 100644
      assert layer.selected_data == {0}
 -    np.testing.assert_allclose(layer.data[0], orig_data + [10, 5])
 +    np.testing.assert_allclose(layer.data[0], orig_data + np.array([10, 5]))
- 
- 
+
+
  def test_rotate_shape(create_known_shapes_layer, Event):
 diff --git a/napari/layers/shapes/shapes.py b/napari/layers/shapes/shapes.py
 index abb435e2..71cf9a2a 100644
@@ -2250,7 +2250,7 @@ index abb435e2..71cf9a2a 100644
 +            widths = width
          else:
              widths = [width for _ in range(self.nshapes)]
- 
+
 @@ -1147,8 +1147,8 @@ class Shapes(Layer):
                  raise ValueError(
                      trans._('Length of list does not match number of shapes')
@@ -2261,7 +2261,7 @@ index abb435e2..71cf9a2a 100644
 +            z_indices = z_index
          else:
              z_indices = [z_index for _ in range(self.nshapes)]
- 
+
 @@ -1478,15 +1478,15 @@ class Shapes(Layer):
          """determines if the new color argument is for directly setting or cycle/colormap"""
          if isinstance(color, str):
@@ -2282,16 +2282,16 @@ index abb435e2..71cf9a2a 100644
 +                deferred=True,
              )
 +        )
- 
+
      def _get_state(self):
          """Get dictionary of layer state.
 @@ -2720,7 +2720,7 @@ class Shapes(Layer):
              dims_displayed=dims_displayed,
          )
- 
+
 -        return (value, None)
 +        return value, None
- 
+
      def _get_index_and_intersection(
          self,
 diff --git a/napari/layers/surface/surface.py b/napari/layers/surface/surface.py
@@ -2302,16 +2302,16 @@ index 5de6331c..13c5129c 100644
  import warnings
 -from typing import List, Tuple, Union
 +from typing import List, Optional, Tuple, Union
- 
+
  import numpy as np
- 
+
 @@ -505,14 +505,14 @@ class Surface(IntensityVisualizationMixin, Layer):
          value : None
              Value of the data at the coord.
          """
 -        return None
 +        return
- 
+
      def _get_value_3d(
          self,
          start_point: np.ndarray,
@@ -2320,7 +2320,7 @@ index 5de6331c..13c5129c 100644
 -    ) -> Tuple[Union[None, float, int], None]:
 +    ) -> Tuple[Union[None, float, int], Optional[int]]:
          """Get the layer data value along a ray
- 
+
          Parameters
 @@ -529,7 +529,7 @@ class Surface(IntensityVisualizationMixin, Layer):
          value
@@ -2336,7 +2336,7 @@ index b83f7b97..a5b0d3ed 100644
 --- a/napari/layers/tracks/_track_utils.py
 +++ b/napari/layers/tracks/_track_utils.py
 @@ -264,7 +264,7 @@ class TrackManager:
- 
+
          # check that graph nodes exist in the track id lookup
          for node_idx, parents_idx in graph.items():
 -            nodes = [node_idx] + parents_idx
@@ -2350,17 +2350,17 @@ index b83f7b97..a5b0d3ed 100644
          if self._kdtree is None:
 -            return
 +            return None
- 
+
          # query can return indices to points that do not exist, trim that here
          # then prune to only those in the current frame/time
 @@ -356,7 +356,8 @@ class TrackManager:
- 
+
          # if we have found a point, return it
          if pruned and self._points_id is not None:
 -            return self._points_id[pruned[0]]  # return the track ID
 +            return self._points_id[pruned[0]]
 +        return None  # return the track ID
- 
+
      @property
      def ndim(self) -> int:
 diff --git a/napari/layers/tracks/tracks.py b/napari/layers/tracks/tracks.py
@@ -2373,7 +2373,7 @@ index 2601462a..c3e6db95 100644
          if vertices is None:
 -            return
 +            return None
- 
+
          data = vertices[:, self._slice_input.displayed]
          # if we're only displaying two dimensions, then pad the display dim
 @@ -337,8 +337,8 @@ class Tracks(Layer):
@@ -2384,7 +2384,7 @@ index 2601462a..c3e6db95 100644
 -            return data[:, (2, 1, 0)]  # z, y, x -> x, y, z
 +
 +        return data[:, (2, 1, 0)]  # z, y, x -> x, y, z
- 
+
      @property
      def current_time(self):
 diff --git a/napari/layers/utils/color_manager.py b/napari/layers/utils/color_manager.py
@@ -2393,14 +2393,14 @@ index 3742f248..e0da9c1c 100644
 +++ b/napari/layers/utils/color_manager.py
 @@ -96,8 +96,8 @@ class ColorProperties:
              )
- 
+
              return np.all([name_eq, values_eq, current_value_eq])
 -        else:
 -            return False
 +
 +        return False
- 
- 
+
+
  class ColorManager(EventedModel):
 @@ -164,17 +164,17 @@ class ColorManager(EventedModel):
      def _ensure_color_array(cls, v):
@@ -2410,7 +2410,7 @@ index 3742f248..e0da9c1c 100644
 -            return np.empty((0, 4))
 +
 +        return np.empty((0, 4))
- 
+
      @validator('current_color', pre=True)
      def _coerce_current_color(cls, v):
          if v is None:
@@ -2422,7 +2422,7 @@ index 3742f248..e0da9c1c 100644
 -            return transform_color(v)[0]
 +
 +        return transform_color(v)[0]
- 
+
      @root_validator()
      def _validate_colors(cls, values):
 @@ -183,14 +183,12 @@ class ColorManager(EventedModel):
@@ -2432,7 +2432,7 @@ index 3742f248..e0da9c1c 100644
 -        elif color_mode == ColorMode.DIRECT:
 +        else:  # color_mode == ColorMode.DIRECT:
              colors = values['colors']
- 
+
 -        # FIXME Local variable 'colors' might be referenced before assignment
 -
          # set the current color to the last color/property value
@@ -2469,8 +2469,8 @@ index 6e881247..e67c72c9 100644
 +            deferred=True,
          )
 +    )
- 
- 
+
+
  def map_property(
 diff --git a/napari/layers/utils/interaction_box.py b/napari/layers/utils/interaction_box.py
 index b7f2ef2b..ceb13db2 100644
@@ -2532,8 +2532,8 @@ index 411ccbf3..e8a9b821 100644
 +            out_dtype
 +        )
 +    return None
- 
- 
+
+
  def prepare_properties(
 diff --git a/napari/layers/utils/style_encoding.py b/napari/layers/utils/style_encoding.py
 index 4b92d1ec..aa659a27 100644
@@ -2547,9 +2547,9 @@ index 4b92d1ec..aa659a27 100644
 +            shape = (features.shape[0], *self.fallback.shape)
              array = np.broadcast_to(self.fallback, shape)
          return array
- 
+
 @@ -291,5 +291,5 @@ def _get_style_values(
- 
+
  def _empty_array_like(value: StyleValue) -> StyleArray:
      """Returns an empty array with the same type and remaining shape of the given value."""
 -    shape = (0,) + value.shape
@@ -2562,7 +2562,7 @@ index 5911a635..79afec2f 100644
 @@ -617,44 +617,42 @@ class Vectors(Layer):
              values, based on how far from the current slice they originate.
          """
- 
+
 -        if len(self.data) > 0:
 -            dims_not_displayed = self._slice_input.not_displayed
 -
@@ -2601,7 +2601,7 @@ index 5911a635..79afec2f 100644
 -        else:
 +        if len(self.data) == 0:
              return [], np.empty(0)
- 
+
 +        dims_not_displayed = self._slice_input.not_displayed
 +
 +        # We want a numpy array so we can use fancy indexing with the non-displayed
@@ -2637,7 +2637,7 @@ index 5911a635..79afec2f 100644
 +
      def _set_view_slice(self):
          """Sets the view given the indices to slice with."""
- 
+
 @@ -739,4 +737,4 @@ class Vectors(Layer):
          value : None
              Value of the data at the coord.
@@ -2660,8 +2660,8 @@ index 6b1061b9..7fb9f382 100644
 +    else:
 +        return layer_data, _FakeHookimpl(reader.plugin_name)
      return None
- 
- 
+
+
 @@ -101,9 +102,10 @@ def write_layers(
              paths, writer = io_utils.write_get_writer(
                  path=path, layer_data=layer_data, plugin_name=plugin_name
@@ -2672,7 +2672,7 @@ index 6b1061b9..7fb9f382 100644
 +            return [], ''
 +        else:
 +            return paths, writer.plugin_name
- 
+
      n = sum(ltc.max() for ltc in writer.layer_type_constraints())
      args = (path, *layer_data[0][:2]) if n <= 1 else (path, layer_data)
 @@ -111,8 +113,8 @@ def write_layers(
@@ -2683,8 +2683,8 @@ index 6b1061b9..7fb9f382 100644
 -    return (res or [], writer.plugin_name)
 +        return [res], writer.plugin_name
 +    return res or [], writer.plugin_name
- 
- 
+
+
  def get_widget_contribution(
 diff --git a/napari/plugins/_tests/test_plugins_manager.py b/napari/plugins/_tests/test_plugins_manager.py
 index 75152912..8b365577 100644
@@ -2695,13 +2695,13 @@ index 75152912..8b365577 100644
              if path.endswith('.png'):
                  return lambda x: None
 +            return None
- 
+
          @napari_hook_implementation
          def napari_get_writer(path, *args):
              if path.endswith('.png'):
                  return lambda x: None
 +            return None
- 
+
      tnpm: NapariPluginManager = napari_plugin_manager
      tnpm.register(Plugin, name='test_plugin')
 diff --git a/napari/plugins/io.py b/napari/plugins/io.py
@@ -2709,30 +2709,30 @@ index e723391b..fd3008e2 100644
 --- a/napari/plugins/io.py
 +++ b/napari/plugins/io.py
 @@ -196,7 +196,7 @@ def save_layers(
- 
+
      If a ``plugin`` is provided and multiple layers are passed, then
      we call we call ``napari_get_writer`` for that plugin, and if it
 -    doesn’t return a WriterFunction we error, otherwise we call it and if
 +    doesn`t return a WriterFunction we error, otherwise we call it and if
      that fails if it we error.
- 
+
      Parameters
 @@ -299,7 +299,7 @@ def _write_multiple_layers_with_plugins(
      to unique files in the folder.
- 
+
      If a ``plugin_name`` is provided, then call ``napari_get_writer`` for that
 -    plugin. If it doesn’t return a ``WriterFunction`` we error, otherwise we
 +    plugin. If it doesn`t return a ``WriterFunction`` we error, otherwise we
      call it and if that fails if it we error.
- 
+
      Exceptions will be caught and stored as PluginErrors
 @@ -384,7 +384,7 @@ def _write_multiple_layers_with_plugins(
                  layer_types=layer_types,
              )
- 
+
 -        raise ValueError(msg)
 +        raise TypeError(msg)
- 
+
      try:
          return (
 diff --git a/napari/settings/_fields.py b/napari/settings/_fields.py
@@ -2745,7 +2745,7 @@ index 61035003..37868f7b 100644
          if not isinstance(v, str):
 -            raise ValueError(trans._('must be a string', deferred=True))
 +            raise TypeError(trans._('must be a string', deferred=True))
- 
+
          value = v.lower()
          if not is_theme_available(value):
 @@ -64,7 +64,7 @@ class Language(str):
@@ -2754,7 +2754,7 @@ index 61035003..37868f7b 100644
          if not isinstance(v, str):
 -            raise ValueError(trans._('must be a string', deferred=True))
 +            raise TypeError(trans._('must be a string', deferred=True))
- 
+
          language_packs = list(get_language_packs(_load_language()).keys())
          if v not in language_packs:
 diff --git a/napari/types.py b/napari/types.py
@@ -2763,7 +2763,7 @@ index 5833ea14..3b1c2461 100644
 +++ b/napari/types.py
 @@ -20,7 +20,10 @@ import numpy as np
  from typing_extensions import TypedDict, get_args
- 
+
  if TYPE_CHECKING:
 -    import dask.array
 +    # dask zarr should be imported as `import dask.array as da` But here it is used only in type annotation to
@@ -2782,8 +2782,8 @@ index f7531291..c77ae904 100644
      if '64' in dtype_str:
          return bit_dict[64]
 +    return None
- 
- 
+
+
  def normalize_dtype(dtype_spec):
 @@ -83,8 +84,8 @@ def normalize_dtype(dtype_spec):
      # If we don't find one of the named dtypes, return the dtype_spec
@@ -2793,8 +2793,8 @@ index f7531291..c77ae904 100644
 -        return dtype_spec
 +
 +    return dtype_spec
- 
- 
+
+
  def get_dtype_limits(dtype_spec) -> Tuple[float, float]:
 diff --git a/napari/utils/_proxies.py b/napari/utils/_proxies.py
 index e7ac4ca5..de780186 100644
@@ -2807,7 +2807,7 @@ index e7ac4ca5..de780186 100644
  import warnings
 @@ -94,6 +95,14 @@ class PublicOnlyProxy(wrapt.ObjectProxy, Generic[_T]):
          return self.create(super().__getattr__(name))
- 
+
      def __setattr__(self, name: str, value: Any):
 +        if (
 +            os.environ.get("NAPARI_ENSURE_PLUGIN_MAIN_THREAD", "0")
@@ -2822,10 +2822,10 @@ index e7ac4ca5..de780186 100644
                  return super().__setattr__(name, value)
 @@ -102,6 +111,7 @@ class PublicOnlyProxy(wrapt.ObjectProxy, Generic[_T]):
              self._private_attr_warning(name, typ)
- 
+
          setattr(self.__wrapped__, name, value)
 +        return None
- 
+
      def __getitem__(self, key):
          return self.create(super().__getitem__(key))
 @@ -128,3 +138,50 @@ class PublicOnlyProxy(wrapt.ObjectProxy, Generic[_T]):
@@ -2884,7 +2884,7 @@ index 52a2ec88..b90e263a 100644
 --- a/napari/utils/_register.py
 +++ b/napari/utils/_register.py
 @@ -45,8 +45,10 @@ def create_func(cls, name=None, doc=None, filename: str = '<string>'):
- 
+
      sig = signature(cls)
      new_sig = sig.replace(
 -        parameters=[Parameter('self', Parameter.POSITIONAL_OR_KEYWORD)]
@@ -2901,8 +2901,8 @@ index e455b225..45359694 100644
 --- a/napari/utils/_tests/test_dtype.py
 +++ b/napari/utils/_tests/test_dtype.py
 @@ -20,7 +20,7 @@ pure_py = ['int', 'float']
- 
- 
+
+
  @pytest.mark.parametrize(
 -    'dtype_str', ['uint8'] + ints + floats + complex_types + bools
 +    'dtype_str', ['uint8', *ints, *floats, *complex_types, *bools]
@@ -2933,7 +2933,7 @@ index e151f245..624bd510 100644
 +                deferred=True,
              )
 +        )
- 
+
      def __eq__(self, other):
          if isinstance(other, CategoricalColormap):
 @@ -112,5 +112,5 @@ class CategoricalColormap(EventedModel):
@@ -2959,7 +2959,7 @@ index c1ce34a6..4e6b9aea 100644
 -            return _coerce_colorcycle_from_colors(val)
 +
 +        return _coerce_colorcycle_from_colors(val)
- 
+
      def _json_encode(self):
          return {'values': self.values.tolist()}
 diff --git a/napari/utils/colormaps/colorbars.py b/napari/utils/colormaps/colorbars.py
@@ -2968,11 +2968,11 @@ index eec1a931..7f9294bb 100644
 +++ b/napari/utils/colormaps/colorbars.py
 @@ -30,6 +30,6 @@ def make_colorbar(cmap, size=(18, 28), horizontal=True):
          bar = np.tile(np.expand_dims(basic_values, 1), size[1])
- 
+
      color_array = cmap.map(bar.ravel())
 -    cbar = color_array.reshape(bar.shape + (4,))
 +    cbar = color_array.reshape((*bar.shape, 4))
- 
+
      return np.round(255 * cbar).astype(np.uint8).copy(order='C')
 diff --git a/napari/utils/colormaps/colormap_utils.py b/napari/utils/colormaps/colormap_utils.py
 index f30a59bf..e526bdb2 100644
@@ -3019,12 +3019,12 @@ index 61ed00e5..a02c1c32 100644
      if color_array.dtype.kind in ['U', 'O']:
          return _handle_str_list_like(color_array.ravel())
 +    return None
- 
- 
+
+
  def _handle_generator(colors) -> np.ndarray:
 @@ -178,17 +179,17 @@ def _handle_array(colors: np.ndarray) -> np.ndarray:
          return np.ones((max(len(colors), 1), 4), dtype=np.float32)
- 
+
      # An array of strings will be treated as a list if compatible
 -    elif kind == 'U':
 +    if kind == 'U':
@@ -3045,13 +3045,13 @@ index 61ed00e5..a02c1c32 100644
 -            return np.ones((len(colors), 4), dtype=np.float32)
 +        )
 +        return np.ones((len(colors), 4), dtype=np.float32)
- 
+
      # Test the dimensionality of the input array
- 
+
 @@ -250,14 +251,13 @@ def _handle_array(colors: np.ndarray) -> np.ndarray:
      if kind in ['f', 'i', 'u']:
          return _convert_array_to_correct_format(colors)
- 
+
 -    else:
 -        raise ValueError(
 -            trans._(
@@ -3066,8 +3066,8 @@ index 61ed00e5..a02c1c32 100644
 +            color_dtype=colors.dtype,
          )
 +    )
- 
- 
+
+
  def _convert_array_to_correct_format(colors: np.ndarray) -> np.ndarray:
 diff --git a/napari/utils/colormaps/vendored/_cm_listed.py b/napari/utils/colormaps/vendored/_cm_listed.py
 index 63d3fe03..fc08edfc 100644
@@ -3077,7 +3077,7 @@ index 63d3fe03..fc08edfc 100644
 -from napari.utils.colormaps.vendored.colors import ListedColormap
 +# closest mpl commit is 3fda6a719d, except it is missing turbo data
 +from .colors import ListedColormap
- 
+
  _magma_data = [
      [0.001462, 0.000466, 0.013866],
 diff --git a/napari/utils/colormaps/vendored/cm.py b/napari/utils/colormaps/vendored/cm.py
@@ -3087,15 +3087,15 @@ index 16e05b33..36dbe412 100644
 @@ -23,9 +23,9 @@ import functools
  import numpy as np
  from numpy import ma
- 
+
 -from napari.utils.colormaps.vendored import colors
 -from napari.utils.colormaps.vendored._cm import datad
 -from napari.utils.colormaps.vendored._cm_listed import cmaps as cmaps_listed
 +from . import colors
 +from ._cm import datad
 +from ._cm_listed import cmaps as cmaps_listed
- 
- 
+
+
  cmap_d = {}
 diff --git a/napari/utils/colormaps/vendored/colors.py b/napari/utils/colormaps/vendored/colors.py
 index 6d969366..3e887a19 100644
@@ -3103,25 +3103,25 @@ index 6d969366..3e887a19 100644
 +++ b/napari/utils/colormaps/vendored/colors.py
 @@ -65,7 +65,7 @@ import itertools
  import re
- 
+
  import numpy as np
 -from napari.utils.colormaps.vendored._color_data import (BASE_COLORS, TABLEAU_COLORS, CSS4_COLORS,
 +from ._color_data import (BASE_COLORS, TABLEAU_COLORS, CSS4_COLORS,
                            XKCD_COLORS, NTH_COLORS)
- 
- 
+
+
 diff --git a/napari/utils/events/containers/_dict.py b/napari/utils/events/containers/_dict.py
 index 14f4482d..81474bd2 100644
 --- a/napari/utils/events/containers/_dict.py
 +++ b/napari/utils/events/containers/_dict.py
 @@ -33,7 +33,7 @@ class TypedMutableMapping(MutableMapping[_K, _T]):
- 
+
      # #### START Required Abstract Methods
- 
+
 -    def __setitem__(self, key: int, value: _T):  # noqa: F811
 +    def __setitem__(self, key: int, value: _T):
          self._dict[key] = self._type_check(value)
- 
+
      def __delitem__(self, key: _K) -> None:
 diff --git a/napari/utils/events/containers/_evented_dict.py b/napari/utils/events/containers/_evented_dict.py
 index a5db7db5..8731d96a 100644
@@ -3146,7 +3146,7 @@ index 510e1584..2db01140 100644
 -        elif type(key) in self._lookup:
 +        if type(key) in self._lookup:
              return [(self, self.index(key))]
- 
+
          valid = {int, slice}.union(set(self._lookup))
 diff --git a/napari/utils/events/containers/_nested_list.py b/napari/utils/events/containers/_nested_list.py
 index 3b5f1eef..632bb785 100644
@@ -3159,16 +3159,16 @@ index 3b5f1eef..632bb785 100644
 -    elif isinstance(index, tuple):
 +    if isinstance(index, tuple):
          return index
- 
+
      raise TypeError(
 @@ -173,7 +173,7 @@ class NestableEventedList(EventedList[_T]):
          ...  # pragma: no cover
- 
+
      @overload
 -    def __getitem__(self, key: slice) -> NestableEventedList[_T]:  # noqa
 +    def __getitem__(self, key: slice) -> NestableEventedList[_T]:
          ...  # pragma: no cover
- 
+
      @overload
 @@ -242,7 +242,7 @@ class NestableEventedList(EventedList[_T]):
          if hasattr(event, 'index'):
@@ -3180,7 +3180,7 @@ index 3b5f1eef..632bb785 100644
                  if hasattr(event, attr):
                      setattr(event, attr, ei)
 @@ -311,7 +311,7 @@ class NestableEventedList(EventedList[_T]):
- 
+
          dest_par, dest_i = split_nested_index(dest_index)
          if isinstance(dest_i, slice):
 -            raise ValueError(
@@ -3189,7 +3189,7 @@ index 3b5f1eef..632bb785 100644
                      "Destination index may not be a slice",
                      deferred=True,
 @@ -353,7 +353,7 @@ class NestableEventedList(EventedList[_T]):
- 
+
              src_par, src_i = split_nested_index(idx)
              if isinstance(src_i, slice):
 -                raise ValueError(
@@ -3200,19 +3200,19 @@ index 3b5f1eef..632bb785 100644
 @@ -375,7 +375,7 @@ class NestableEventedList(EventedList[_T]):
              if src_par == dest_par and src_i == dest_i - ddec:
                  continue
- 
+
 -            yield src_par + (src_i,), dest_par + (dest_i - ddec,)
 +            yield (*src_par, src_i), (*dest_par, dest_i - ddec)
              popped[src_par].append(src_i)
              dumped.append(dest_i - ddec)
- 
+
 @@ -413,10 +413,10 @@ class NestableEventedList(EventedList[_T]):
          src_par_i, src_i = split_nested_index(src_index)
          dest_par_i, dest_i = split_nested_index(dest_index)
          dest_i = self._non_negative_index(dest_par_i, dest_i)
 -        dest_index = dest_par_i + (dest_i,)
 +        dest_index = (*dest_par_i, dest_i)
- 
+
          if isinstance(src_i, slice):
 -            raise ValueError(
 +            raise TypeError(
@@ -3221,7 +3221,7 @@ index 3b5f1eef..632bb785 100644
                      deferred=True,
 @@ -424,7 +424,7 @@ class NestableEventedList(EventedList[_T]):
              )
- 
+
          if isinstance(dest_i, slice):
 -            raise ValueError(
 +            raise TypeError(
@@ -3246,7 +3246,7 @@ index 3b5f1eef..632bb785 100644
              if isinstance(item, NestableEventedList):
 -                yield from item._iter_indices(root=root + (i,))
 +                yield from item._iter_indices(root=(*root, i))
- 
+
      def has_index(self, index: Union[int, Tuple[int, ...]]) -> bool:
          """Return true if `index` is valid for this nestable list."""
 @@ -490,7 +490,8 @@ class NestableEventedList(EventedList[_T]):
@@ -3278,17 +3278,17 @@ index 4dee3322..bbb7bfee 100644
 +++ b/napari/utils/events/containers/_typed.py
 @@ -75,14 +75,14 @@ class TypedMutableSequence(MutableSequence[_T]):
          return id(self)
- 
+
      @overload
 -    def __setitem__(self, key: int, value: _T):  # noqa: F811
 +    def __setitem__(self, key: int, value: _T):
          ...  # pragma: no cover
- 
+
      @overload
 -    def __setitem__(self, key: slice, value: Iterable[_T]):  # noqa: F811
 +    def __setitem__(self, key: slice, value: Iterable[_T]):
          ...  # pragma: no cover
- 
+
 -    def __setitem__(self, key, value):  # noqa: F811
 +    def __setitem__(self, key, value):
          if isinstance(key, slice):
@@ -3296,58 +3296,58 @@ index 4dee3322..bbb7bfee 100644
                  raise TypeError(
 @@ -109,14 +109,14 @@ class TypedMutableSequence(MutableSequence[_T]):
          return super().__contains__(key)
- 
+
      @overload
 -    def __getitem__(self, key: int) -> _T:  # noqa: F811
 +    def __getitem__(self, key: int) -> _T:
          ...  # pragma: no cover
- 
+
      @overload
 -    def __getitem__(self, key: slice) -> 'TypedMutableSequence[_T]':  # noqa
 +    def __getitem__(self, key: slice) -> 'TypedMutableSequence[_T]':
          ...  # pragma: no cover
- 
+
 -    def __getitem__(self, key):  # noqa: F811
 +    def __getitem__(self, key):
          """Get an item from the list
- 
+
          Parameters
 @@ -245,7 +245,8 @@ class TypedMutableSequence(MutableSequence[_T]):
- 
+
      def _ipython_key_completions_(self):
          if str in self._lookup:
 -            return (self._lookup[str](x) for x in self)  # type: ignore
 +            return (self._lookup[str](x) for x in self)
 +        return None  # type: ignore
- 
- 
+
+
  def _noop(x):
 diff --git a/napari/utils/events/debugging.py b/napari/utils/events/debugging.py
 index 0ae03847..cc032b96 100644
 --- a/napari/utils/events/debugging.py
 +++ b/napari/utils/events/debugging.py
 @@ -112,7 +112,7 @@ def log_event_stack(event: 'Event', cfg: EventDebugSettings = _SETTINGS):
- 
+
      # seperate groups of events
      if not cfg._cur_depth:
 -        lines = ["─" * 79, ''] + lines
 +        lines = ["─" * 79, "", *lines]
      elif not cfg.nesting_allowance:
          return
- 
+
 diff --git a/napari/utils/events/event.py b/napari/utils/events/event.py
 index a999a3c0..a3c34fb8 100644
 --- a/napari/utils/events/event.py
 +++ b/napari/utils/events/event.py
 @@ -193,9 +193,9 @@ class Event:
                  attr = getattr(self, name)
- 
+
                  attrs.append(f"{name}={attr!r}")
 -            return "<{} {}>".format(self.__class__.__name__, " ".join(attrs))
          finally:
              _event_repr_depth -= 1
 +        return f'<{self.__class__.__name__} {" ".join(attrs)}>'
- 
+
      def __str__(self) -> str:
          """Shorter string representation"""
 @@ -390,16 +390,18 @@ class EventEmitter:
@@ -3377,14 +3377,14 @@ index a999a3c0..a3c34fb8 100644
 +            return obj.__module__.startswith(f'{core}.')
          except AttributeError:
              return False
- 
+
 @@ -470,7 +472,7 @@ class EventEmitter:
          callback, pass_event = self._normalize_cb(callback)
- 
+
          if callback in callbacks:
 -            return
 +            return None
- 
+
          # deal with the ref
          _ref: Union[str, None]
 @@ -1024,7 +1026,7 @@ class EmitterGroup(EventEmitter):
@@ -3416,7 +3416,7 @@ index 8d7375c5..820645b3 100644
 @@ -29,7 +29,14 @@ def _linux_sys_name():
                  return f'{data["NAME"]} {data["VERSION_ID"]}'
              return f'{data["NAME"]} (no version)'
- 
+
 -    try:
 +    return _linux_sys_name_lsb_release()
 +
@@ -3436,14 +3436,14 @@ index 8d7375c5..820645b3 100644
 -    except subprocess.CalledProcessError:
 -        pass
      return ""
- 
- 
+
+
 diff --git a/napari/utils/key_bindings.py b/napari/utils/key_bindings.py
 index c1530a66..b5266f93 100644
 --- a/napari/utils/key_bindings.py
 +++ b/napari/utils/key_bindings.py
 @@ -458,7 +458,7 @@ class KeymapHandler:
- 
+
          if func is Ellipsis:  # blocker
              return
 -        elif not callable(func):
@@ -3460,8 +3460,8 @@ index 4cadb036..a255093b 100644
      if os_path.isdir(bin_path):
          return bin_path
 +    return None
- 
- 
+
+
  def in_jupyter() -> bool:
 @@ -135,8 +136,8 @@ def ensure_iterable(arg, color=False):
      """
@@ -3471,8 +3471,8 @@ index 4cadb036..a255093b 100644
 -        return itertools.repeat(arg)
 +
 +    return itertools.repeat(arg)
- 
- 
+
+
  def is_iterable(arg, color=False, allow_none=False):
 @@ -150,10 +151,10 @@ def is_iterable(arg, color=False, allow_none=False):
          or np.isscalar(arg)
@@ -3485,8 +3485,8 @@ index 4cadb036..a255093b 100644
 -        return True
 +
 +    return True
- 
- 
+
+
  def is_sequence(arg):
 @@ -254,9 +255,9 @@ def formatdoc(obj):
          obj.__doc__ = obj.__doc__.format(
@@ -3496,8 +3496,8 @@ index 4cadb036..a255093b 100644
      finally:
          del frame
 +    return obj
- 
- 
+
+
  class StringEnumMeta(EnumMeta):
 @@ -282,17 +283,17 @@ class StringEnumMeta(EnumMeta):
          if names is None:
@@ -3523,7 +3523,7 @@ index 4cadb036..a255093b 100644
 +                    dtype=builtins.type(value),
                  )
 +            )
- 
+
          # otherwise create new Enum class
          return cls._create_(
 @@ -322,7 +323,7 @@ class StringEnum(Enum, metaclass=StringEnumMeta):
@@ -3534,14 +3534,14 @@ index 4cadb036..a255093b 100644
 +        if isinstance(other, str):
              return str(self) == other
          return NotImplemented
- 
+
 diff --git a/napari/utils/perf/_config.py b/napari/utils/perf/_config.py
 index c49c0140..1a966e2d 100644
 --- a/napari/utils/perf/_config.py
 +++ b/napari/utils/perf/_config.py
 @@ -138,7 +138,7 @@ class PerfmonConfig:
              return False
- 
+
      @property
 -    def trace_file_on_start(self) -> str:
 +    def trace_file_on_start(self) -> Optional[str]:
@@ -3550,18 +3550,18 @@ index c49c0140..1a966e2d 100644
              return None  # don't trace on start in legacy mode
 @@ -146,9 +146,10 @@ class PerfmonConfig:
              path = self.data["trace_file_on_start"]
- 
+
              # Return None if it was empty string or false.
 -            return path if path else None
          except KeyError:
              return None
 +        else:
 +            return path or None
- 
- 
+
+
  def _create_perf_config():
 @@ -156,10 +157,10 @@ def _create_perf_config():
- 
+
      if value is None or value == "0":
          return None  # Totally disabled
 -    elif value == "1":
@@ -3571,8 +3571,8 @@ index c49c0140..1a966e2d 100644
 -        return PerfmonConfig(value)  # Normal parse the config file.
 +
 +    return PerfmonConfig(value)  # Normal parse the config file.
- 
- 
+
+
  # The global instance
 diff --git a/napari/utils/perf/_patcher.py b/napari/utils/perf/_patcher.py
 index d51070df..db375571 100644
@@ -3583,8 +3583,8 @@ index d51070df..db375571 100644
              attribute_str = '.'.join(parts[i - 1 :])
              return module, attribute_str
 +    return None
- 
- 
+
+
  def patch_callables(callables: List[str], patch_func: PatchFunction) -> None:
 diff --git a/napari/utils/status_messages.py b/napari/utils/status_messages.py
 index bf6725e7..5f7d1fc7 100644
@@ -3600,8 +3600,8 @@ index bf6725e7..5f7d1fc7 100644
 -        return str(value)
 +
 +    return str(value)
- 
- 
+
+
  def generate_layer_coords_status(position, value):
 diff --git a/napari/utils/theme.py b/napari/utils/theme.py
 index 797985af..67d8fbf4 100644
@@ -3613,17 +3613,17 @@ index 797985af..67d8fbf4 100644
  from contextlib import suppress
 -from typing import Union
 +from typing import List, Union
- 
+
  import npe2
  from pydantic import validator
 @@ -281,7 +281,7 @@ def unregister_theme(theme_id):
      _themes.pop(theme_id, None)
- 
- 
+
+
 -def available_themes():
 +def available_themes() -> List[str]:
      """List available themes.
- 
+
      Returns
 @@ -289,7 +289,7 @@ def available_themes():
      list of str
@@ -3631,8 +3631,8 @@ index 797985af..67d8fbf4 100644
      """
 -    return tuple(_themes) + ("system",)
 +    return [*_themes, 'system']
- 
- 
+
+
  def is_theme_available(theme_id):
 @@ -389,8 +389,8 @@ def _install_npe2_themes(themes=None):
              theme_dict.update(theme_colors)
@@ -3642,8 +3642,8 @@ index 797985af..67d8fbf4 100644
 -                logging.exception("Registration theme failed.\n%s", e)
 +            except ValueError:
 +                logging.exception("Registration theme failed.")
- 
- 
+
+
  _install_npe2_themes(_themes)
 diff --git a/napari/utils/transforms/transform_utils.py b/napari/utils/transforms/transform_utils.py
 index 0a172108..7e7d85d0 100644
@@ -3657,9 +3657,9 @@ index 0a172108..7e7d85d0 100644
 +    if np.array(rotate).ndim == 1 and len(rotate) == 3:
          return _make_3d_rotation(*rotate)
      return np.array(rotate)
- 
+
 @@ -328,10 +328,10 @@ def embed_in_identity_matrix(matrix, ndim):
- 
+
      if matrix.shape[0] == ndim:
          return matrix
 -    else:
@@ -3670,8 +3670,8 @@ index 0a172108..7e7d85d0 100644
 +    full_matrix = np.eye(ndim)
 +    full_matrix[-matrix.shape[0] :, -matrix.shape[1] :] = matrix
 +    return full_matrix
- 
- 
+
+
  def decompose_linear_matrix(
 @@ -494,5 +494,5 @@ def is_diagonal(matrix, tol=1e-8):
      non_diag = matrix[~np.eye(matrix.shape[0], dtype=bool)]
@@ -3697,7 +3697,7 @@ index 090a1743..3856fa9b 100644
 +        raise ValueError(
 +            trans._('Inverse function was not provided.', deferred=True)
 +        )
- 
+
      def compose(self, transform: 'Transform') -> 'Transform':
          """Return the composite of this transform and the provided one."""
 @@ -147,8 +147,8 @@ class TransformChain(EventedList, Transform):
@@ -3708,7 +3708,7 @@ index 090a1743..3856fa9b 100644
 -            return tz.pipe(self[0], *[tf.compose for tf in self[1:]])
 +
 +        return tz.pipe(self[0], *[tf.compose for tf in self[1:]])
- 
+
      def set_slice(self, axes: Sequence[int]) -> 'TransformChain':
          """Return a transform chain subset to the visible dimensions.
 @@ -433,10 +433,10 @@ class Affine(Transform):
@@ -3723,7 +3723,7 @@ index 090a1743..3856fa9b 100644
 +        return decompose_linear_matrix(
 +            self._linear_matrix, upper_triangular=self._upper_triangular
 +        )[1]
- 
+
      @scale.setter
      def scale(self, scale):
 diff --git a/napari/viewer.py b/napari/viewer.py
@@ -3737,7 +3737,7 @@ index 2dc77b45..8a521646 100644
 -        else:
 -            self.window._qt_viewer.console.push(variables)
 +        self.window._qt_viewer.console.push(variables)
- 
+
      def screenshot(
          self,
 @@ -184,7 +183,7 @@ def current_viewer() -> Optional[Viewer]:
@@ -3794,8 +3794,8 @@ index 5de12a89..082d882f 100644
 -    )
 +    assert layer_data.shape == tuple(i for i in (stacks, *spec.shape) if i > 1)
      assert layer_data.dtype == spec.dtype
- 
- 
+
+
 @@ -253,7 +251,7 @@ def test_magic_imread(_write_spec, spec: ImageSpec, stack, use_dask):
      if isinstance(spec, ImageSpec):
          expect_shape = spec.shape
@@ -3803,7 +3803,7 @@ index 5de12a89..082d882f 100644
 -        expect_shape = (len(spec),) + spec[0].shape if stack else spec[0].shape
 +        expect_shape = (len(spec), *spec[0].shape) if stack else spec[0].shape
      expect_shape = tuple(i for i in expect_shape if i > 1)
- 
+
      expected_arr_type = (
 @@ -289,8 +287,8 @@ def test_irregular_images(_write_spec, stack):
          ):
@@ -3839,8 +3839,8 @@ index 29bdb2fa..2860e06f 100644
 -    else:
 -        return None
 +    return None
- 
- 
+
+
  def read_csv(
 @@ -414,7 +413,7 @@ def read_csv(
                          filename=filename,
@@ -3857,23 +3857,23 @@ index 2dbacb77..3934131d 100644
 +++ b/napari_builtins/io/_write.py
 @@ -191,9 +191,9 @@ def napari_write_points(path: str, data: Any, meta: dict) -> Optional[str]:
          prop_table = []
- 
+
      # add index of each point
 -    column_names = ['index'] + column_names
 +    column_names = ["index", *column_names]
      indices = np.expand_dims(list(range(data.shape[0])), axis=1)
 -    table = np.concatenate([indices, data] + prop_table, axis=1)
 +    table = np.concatenate([indices, data, *prop_table], axis=1)
- 
+
      # write table to csv file
      write_csv(path, table, column_names)
 @@ -239,7 +239,7 @@ def napari_write_shapes(path: str, data: Any, meta: dict) -> Optional[str]:
      column_names = [f'axis-{str(n)}' for n in range(n_dimensions)]
- 
+
      # add shape id and vertex id of each vertex
 -    column_names = ['index', 'shape-type', 'vertex-index'] + column_names
 +    column_names = ["index", "shape-type", "vertex-index", *column_names]
- 
+
      # concatenate shape data into 2D array
      len_shapes = [s.shape[0] for s in data]
 @@ -317,8 +317,8 @@ def write_layer_data_with_plugins(
@@ -3914,11 +3914,11 @@ index 859e9d1e..99fe5cb0 100644
 +    "RET504", # not fixed yet https://github.com/charliermarsh/ruff/issues/2950
 +    "TRY003", # require implement multiple exception class
 +    "RUF005", # problem with numpy compatybility, see https://github.com/charliermarsh/ruff/issues/2142#issuecomment-1451038741
- 
+
  ]
- 
+
 @@ -124,12 +137,34 @@ fix = true
- 
+
  [tool.ruff.per-file-ignores]
  "napari/_vispy/__init__.py" = ["E402"]
 -"**/_tests/*.py" = ["B011"]
@@ -3940,10 +3940,10 @@ index 859e9d1e..99fe5cb0 100644
 +[tool.ruff.pyupgrade]
 +# Preserve types, even if a file imports `from __future__ import annotations`.
 +keep-runtime-typing = true
- 
+
  [tool.ruff.isort]
  known-first-party=['napari']
- 
+
 +[tool.ruff.flake8-import-conventions]
 +[tool.ruff.flake8-import-conventions.extend-aliases]
 +# Declare a custom alias for the `matplotlib` module.
@@ -3958,7 +3958,7 @@ index 393c5903..95ecabb0 100644
 --- a/tools/test_strings.py
 +++ b/tools/test_strings.py
 @@ -625,12 +625,12 @@ if __name__ == '__main__':
- 
+
              print()
              print(
 -                f"{RED}i{NORMAL} : ignore –  add to ignored localised strings"
@@ -3974,6 +3974,5 @@ index 393c5903..95ecabb0 100644
              else:
                  print(
                      "- : Edit not available, call with python tools/test_strings.py  '$COMMAND {filename} {linenumber} '"
--- 
+--
 2.34.1
-

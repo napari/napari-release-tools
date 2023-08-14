@@ -20,7 +20,7 @@ index 339080aa..df89f5e7 100644
 --- a/docs/release/generate_release_notes.py
 +++ b/docs/release/generate_release_notes.py
 @@ -211,26 +211,28 @@ def add_to_users(users, new_user):
- 
+
  highlights['Highlights'] = {}
  highlights['New Features'] = {}
 -highlights['Improvements'] = {}
@@ -34,7 +34,7 @@ index 339080aa..df89f5e7 100644
 +highlights['Dependencies'] = {}
  highlights['Documentation'] = {}
  other_pull_requests = {}
- 
+
  label_to_section = {
 -    "bug": "Bug Fixes",
      "bugfix": "Bug Fixes",
@@ -54,5 +54,5 @@ index 339080aa..df89f5e7 100644
 +    "dependencies": "Dependencies",
 +    "deprecation": "Deprecations",
  }
- 
+
  pr_count = 0

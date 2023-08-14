@@ -72,7 +72,7 @@ index 331a437f..23be94b2 100644
 @@ -1,3 +1,4 @@
 +(napari-workshops)=
  # napari workshops
- 
+
  There have been many workshops and tutorials given about napari.
 @@ -51,3 +52,16 @@ You can find more videos of talks, tutorials and demos on the
  * June 2020, [NEUBIAS Academy@Home workshop](http://eubias.org/NEUBIAS/training-schools/neubias-academy-home/neubias-academy-archive-spring2020/)
@@ -98,7 +98,7 @@ index ae4d4e0a..dd7063b4 100644
 @@ -1,3 +1,4 @@
 +(explanations)=
  # In-depth explanations
- 
+
  ```{note}
 diff --git a/docs/howtos/index.md b/docs/howtos/index.md
 index 33dea374..81ccddd4 100644
@@ -107,7 +107,7 @@ index 33dea374..81ccddd4 100644
 @@ -1,3 +1,4 @@
 +(how-tos)=
  # How-to guides
- 
+
  These guides show you how to complete tasks with napari. They assume you have
 diff --git a/docs/howtos/layers/index.md b/docs/howtos/layers/index.md
 index 95fcac39..98cdfbed 100644
@@ -116,7 +116,7 @@ index 95fcac39..98cdfbed 100644
 @@ -1,3 +1,4 @@
 +(using-layers)=
  # Using layers
- 
+
  [Layers](napari.layers) are the viewable objects that can be added to a viewer.
 diff --git a/docs/plugins/first_plugin.md b/docs/plugins/first_plugin.md
 index 89ae8aae..5a6296fe 100644
@@ -125,7 +125,7 @@ index 89ae8aae..5a6296fe 100644
 @@ -54,14 +54,16 @@ cd napari-hello
  In your root `napari-hello` folder, create a `pyproject.toml` and `setup.cfg` file,
  then create a `napari_hello` directory with a single `__init__.py` file inside of it.
- 
+
 -````{tabbed} macOS / Linux
 +::::{tab-set}
 +
@@ -136,7 +136,7 @@ index 89ae8aae..5a6296fe 100644
  ```
 -````
 +:::
- 
+
 -````{tabbed} Windows
 +:::{tab-item} Windows
  ```bat
@@ -150,9 +150,9 @@ index 89ae8aae..5a6296fe 100644
 +:::
 +
 +::::
- 
+
  Your project should now look like this:
- 
+
 diff --git a/docs/requirements.txt b/docs/requirements.txt
 index f735e869..6c112435 100644
 --- a/docs/requirements.txt
@@ -184,7 +184,7 @@ index 8e779ead..3a3165c8 100644
 -
 +(napari-quick-start)=
  # napari quick start
- 
+
  +++
 diff --git a/docs/tutorials/index.md b/docs/tutorials/index.md
 index 7c1ffea6..64d23c1a 100644
@@ -193,7 +193,7 @@ index 7c1ffea6..64d23c1a 100644
 @@ -1,3 +1,4 @@
 +(napari-tutorials)=
  # napari tutorials
- 
+
  These tutorials will help you explore the main usage modes and methods of
 diff --git a/docs/usage.md b/docs/usage.md
 index 1c881143..42bebd5a 100644
@@ -202,16 +202,16 @@ index 1c881143..42bebd5a 100644
 @@ -3,9 +3,59 @@
  napari leverages the power of Python to enable fast and interactive browsing,
  annotation and analysis of large multi-dimensional images.
- 
+
 -The tutorials and guides to your left are meant to help you understand how to use
 -napari, as well as learn about its features and use cases. The
 -*In-depth explanations* are aimed at those looking for best practices and more
--information on how napari works. 
+-information on how napari works.
 +::::{grid}
 +:::{grid-item-card} napari quick start
 +:link: napari-quick-start
 +:link-type: ref
- 
+
 -If you are new to napari, check out the [napari quickstart tutorial](tutorials/fundamentals/quick_start).
 +If you are new to napari, check out the **napari quickstart tutorial**.
 +:::

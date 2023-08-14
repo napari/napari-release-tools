@@ -21,7 +21,7 @@ index f6e58d80..efebf13b 100644
 --- a/pyproject.toml
 +++ b/pyproject.toml
 @@ -184,6 +184,9 @@ markers = [
- 
+
  [tool.mypy]
  files = "napari"
 +# This file triggers an internal mypy error, so exclude collection
@@ -51,5 +51,5 @@ index f6e58d80..efebf13b 100644
  warn_unused_ignores = true
  check_untyped_defs = true
  plugins =  "numpy.typing.mypy_plugin, pydantic.mypy"
--- 
+--
 2.34.1

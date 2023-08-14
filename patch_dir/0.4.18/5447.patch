@@ -15,7 +15,7 @@ index 7b8c7974..5aa7051c 100644
 @@ -672,6 +672,17 @@ QPushButton#close_button:disabled {
    padding: 2px;
  }
- 
+
 +#success_label {
 +  image: url("theme_{{ name }}:/check.svg");
 +  max-width: 18px;
@@ -30,5 +30,5 @@ index 7b8c7974..5aa7051c 100644
  #help_label {
    image: url("theme_{{ id }}:/help.svg");
    max-width: 18px;
--- 
+--
 2.34.1

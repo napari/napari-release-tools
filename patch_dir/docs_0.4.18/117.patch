@@ -17,11 +17,11 @@ index 4a37e792..9d00cd8c 100644
 --- a/docs/howtos/napari_imageJ.md
 +++ b/docs/howtos/napari_imageJ.md
 @@ -27,7 +27,7 @@ ij = imagej.init('sc.fiji:fiji') # Fiji includes Bio-Formats.
- 
+
  viewer = napari.Viewer()
  for path in sys.argv[1:]:
 -    print('--> Reading {}'.format(path))
 +    print(f'--> Reading {path}')
- 
+
      dataset = ij.io().open(path)
      image = ij.py.from_java(dataset)

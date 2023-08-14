@@ -155,7 +155,7 @@ index a879d2c9..a69a4db1 100644
      widget.resized = MagicMock()
 -    mock_window._qt_viewer._canvas_overlay = widget
 +    mock_window._qt_viewer._welcome_widget = widget
- 
+
      def mock_current_main_window(*_, **__):
          """
 @@ -132,7 +132,7 @@ def ensure_qtbot(monkeypatch, qtbot):
@@ -165,14 +165,14 @@ index a879d2c9..a69a4db1 100644
 -        make_napari_viewer().window._qt_viewer._canvas_overlay, QWidget
 +        make_napari_viewer().window._qt_viewer._welcome_widget, QWidget
      )
- 
- 
+
+
 diff --git a/napari/_qt/_tests/test_qt_viewer.py b/napari/_qt/_tests/test_qt_viewer.py
 index 25bc4bcb..bbdd3580 100644
 --- a/napari/_qt/_tests/test_qt_viewer.py
 +++ b/napari/_qt/_tests/test_qt_viewer.py
 @@ -367,15 +367,15 @@ def test_qt_viewer_clipboard_with_flash(make_napari_viewer, qtbot):
- 
+
      # ensure the flash effect is applied
      assert (
 -        viewer.window._qt_viewer._canvas_overlay.graphicsEffect() is not None
@@ -189,11 +189,11 @@ index 25bc4bcb..bbdd3580 100644
 -        viewer.window._qt_viewer._canvas_overlay, "_flash_animation"
 +        viewer.window._qt_viewer._welcome_widget, "_flash_animation"
      )
- 
+
      # clear clipboard and grab image from application view
 @@ -414,9 +414,9 @@ def test_qt_viewer_clipboard_without_flash(make_napari_viewer):
      assert not clipboard_image.isNull()
- 
+
      # ensure the flash effect is not applied
 -    assert viewer.window._qt_viewer._canvas_overlay.graphicsEffect() is None
 +    assert viewer.window._qt_viewer._welcome_widget.graphicsEffect() is None
@@ -201,7 +201,7 @@ index 25bc4bcb..bbdd3580 100644
 -        viewer.window._qt_viewer._canvas_overlay, "_flash_animation"
 +        viewer.window._qt_viewer._welcome_widget, "_flash_animation"
      )
- 
+
      # clear clipboard and grab image from application view
 diff --git a/napari/_qt/dialogs/qt_notification.py b/napari/_qt/dialogs/qt_notification.py
 index ce93dd7d..02c6a649 100644
@@ -214,8 +214,8 @@ index ce93dd7d..02c6a649 100644
 -            canvas = _QtMainWindow.current()._qt_viewer._canvas_overlay
 +            canvas = _QtMainWindow.current()._qt_viewer._welcome_widget
              cls.from_notification(notification, canvas).show()
- 
- 
+
+
 diff --git a/napari/_qt/qt_main_window.py b/napari/_qt/qt_main_window.py
 index d52a4a77..bf49115b 100644
 --- a/napari/_qt/qt_main_window.py
@@ -223,7 +223,7 @@ index d52a4a77..bf49115b 100644
 @@ -124,8 +124,8 @@ class _QtMainWindow(QMainWindow):
          # this ia sa workaround for #5335 issue. The dict is used to not
          # collide shortcuts for close and close all windows
- 
+
 -        act_dlg = QtActivityDialog(self._qt_viewer._canvas_overlay)
 -        self._qt_viewer._canvas_overlay.resized.connect(
 +        act_dlg = QtActivityDialog(self._qt_viewer._welcome_widget)
@@ -257,7 +257,7 @@ index 1a884ddb..a4886c64 100644
  from napari.plugins import _npe2
 @@ -64,13 +62,10 @@ from napari.utils.translations import trans
  from napari_builtins.io import imsave_extensions
- 
+
  from napari._vispy import (  # isort:skip
 -    VispyAxesOverlay,
      VispyCamera,
@@ -268,16 +268,16 @@ index 1a884ddb..a4886c64 100644
      create_vispy_layer,
 +    create_vispy_overlay,
  )
- 
- 
+
+
 @@ -223,20 +218,21 @@ class QtViewer(QSplitter):
- 
+
          # This dictionary holds the corresponding vispy visual for each layer
          self.layer_to_visual = {}
 +        self.overlay_to_visual = {}
- 
+
          self._create_canvas()
- 
+
          # Stacked widget to provide a welcome page
 -        self._canvas_overlay = QtWidgetOverlay(self, self.canvas.native)
 -        self._canvas_overlay.set_welcome_visible(show_welcome_screen)
@@ -289,7 +289,7 @@ index 1a884ddb..a4886c64 100644
 +        self._welcome_widget.sig_dropped.connect(self.dropEvent)
 +        self._welcome_widget.leave.connect(self._leave_canvas)
 +        self._welcome_widget.enter.connect(self._enter_canvas)
- 
+
          main_widget = QWidget()
          main_layout = QVBoxLayout()
          main_layout.setContentsMargins(0, 2, 0, 2)
@@ -301,31 +301,31 @@ index 1a884ddb..a4886c64 100644
 @@ -272,9 +268,6 @@ class QtViewer(QSplitter):
          )
          self.canvas.events.draw.connect(self.camera.on_draw)
- 
+
 -        # Add axes, scale bar
 -        self._add_visuals()
 -
          # Create the experimental QtPool for octree and/or monitor.
          self._qt_poll = _create_qt_poll(self, self.viewer.camera)
- 
+
 @@ -301,6 +294,8 @@ class QtViewer(QSplitter):
- 
+
          for layer in self.viewer.layers:
              self._add_layer(layer)
 +        for overlay in self.viewer._overlays.values():
 +            self._add_overlay(overlay)
- 
+
      @property
      def controls(self) -> QtLayerControlsContainer:
 @@ -446,34 +441,15 @@ class QtViewer(QSplitter):
      def _diconnect_theme(self):
          self.viewer.events.theme.disconnect(self.canvas._on_theme_change)
- 
+
 -    def _add_visuals(self) -> None:
 -        """Add visuals for axes, scale bar, and welcome text."""
 +    def _add_overlay(self, overlay: Overlay) -> None:
 +        vispy_overlay = create_vispy_overlay(overlay, viewer=self.viewer)
- 
+
 -        self.axes = VispyAxesOverlay(
 -            overlay=self.viewer.axes,
 -            viewer=self.viewer,
@@ -357,7 +357,7 @@ index 1a884ddb..a4886c64 100644
 +            vispy_overlay.node.parent = self.view.scene
 +
 +        self.overlay_to_visual[overlay] = vispy_overlay
- 
+
      def _create_performance_dock_widget(self):
          """Create the dock widget that shows performance metrics."""
 @@ -672,7 +648,7 @@ class QtViewer(QSplitter):
@@ -366,13 +366,13 @@ index 1a884ddb..a4886c64 100644
          if self._show_welcome_screen:
 -            self._canvas_overlay.set_welcome_visible(not self.viewer.layers)
 +            self._welcome_widget.set_welcome_visible(not self.viewer.layers)
- 
+
      def _screenshot(self, flash=True):
          """Capture a screenshot of the Vispy canvas.
 @@ -688,11 +664,11 @@ class QtViewer(QSplitter):
          if flash:
              from napari._qt.utils import add_flash_animation
- 
+
 -            # Here we are actually applying the effect to the `_canvas_overlay`
 +            # Here we are actually applying the effect to the `_welcome_widget`
              # and not # the `native` widget because it does not work on the
@@ -381,7 +381,7 @@ index 1a884ddb..a4886c64 100644
 -            add_flash_animation(self._canvas_overlay)
 +            add_flash_animation(self._welcome_widget)
          return img
- 
+
      def screenshot(self, path=None, flash=True):
 @@ -1129,7 +1105,7 @@ class QtViewer(QSplitter):
      def set_welcome_visible(self, visible):
@@ -389,7 +389,7 @@ index 1a884ddb..a4886c64 100644
          self._show_welcome_screen = visible
 -        self._canvas_overlay.set_welcome_visible(visible)
 +        self._welcome_widget.set_welcome_visible(visible)
- 
+
      def keyPressEvent(self, event):
          """Called whenever a key is pressed.
 diff --git a/napari/_tests/test_interactive_transforms.py b/napari/_tests/test_interactive_transforms.py
@@ -564,7 +564,7 @@ index bfe281e5..9c4c7800 100644
 +            viewer.window._qt_viewer._welcome_widget, '_flash_animation'
          )
      )
- 
+
 diff --git a/napari/_vispy/__init__.py b/napari/_vispy/__init__.py
 index beb41cb9..8ecf69e2 100644
 --- a/napari/_vispy/__init__.py
@@ -583,7 +583,7 @@ index beb41cb9..8ecf69e2 100644
  from napari._vispy.utils.quaternion import quaternion2euler
 -from napari._vispy.utils.visual import create_vispy_layer
 +from napari._vispy.utils.visual import create_vispy_layer, create_vispy_overlay
- 
+
  __all__ = [
      "VispyCamera",
      "VispyCanvas",
@@ -608,11 +608,11 @@ index 81e24961..4ba0b9b3 100644
 -from pint import UndefinedUnitError
 +from napari._vispy.overlays.scale_bar import VispyScaleBarOverlay
 +from napari.components.overlays import ScaleBarOverlay
- 
+
 -from napari.components import ViewerModel
 -from napari.components._viewer_constants import CanvasPosition
 -from napari.qt import QtViewer
- 
+
 -
 -def test_vispy_text_visual(make_napari_viewer):
 +def test_scale_bar_instantiation(make_napari_viewer):
@@ -729,9 +729,9 @@ index 0a93c516..bff7f959 100644
 -import pytest
 +from napari._vispy.overlays.text import VispyTextOverlay
 +from napari.components.overlays import TextOverlay
- 
+
 -from napari.components._viewer_constants import CanvasPosition
- 
+
 -
 -def test_vispy_text_visual(make_napari_viewer):
 +def test_text_instantiation(make_napari_viewer):
@@ -781,18 +781,18 @@ index 810fd1b4..6b94ee25 100644
 +++ b/napari/_vispy/layers/base.py
 @@ -4,6 +4,7 @@ import numpy as np
  from vispy.visuals.transforms import MatrixTransform
- 
+
  from napari._vispy.utils.gl import BLENDING_MODES, get_max_texture_sizes
 +from napari.components.overlays.base import CanvasOverlay, SceneOverlay
  from napari.utils.events import disconnect_events
- 
- 
+
+
 @@ -48,6 +49,7 @@ class VispyBaseLayer(ABC):
          self.layer = layer
          self._array_like = False
          self.node = node
 +        self.overlays = {}
- 
+
          (
              self.MAX_TEXTURE_SIZE_2D,
 @@ -67,6 +69,7 @@ class VispyBaseLayer(ABC):
@@ -800,13 +800,13 @@ index 810fd1b4..6b94ee25 100644
              self._on_experimental_clipping_planes_change
          )
 +        self.layer.events._overlays.connect(self._on_overlays_change)
- 
+
      @property
      def _master_transform(self):
 @@ -122,6 +125,31 @@ class VispyBaseLayer(ABC):
          self.node.set_gl_state(**blending_kwargs)
          self.node.update()
- 
+
 +    def _on_overlays_change(self):
 +        # avoid circular import; TODO: fix?
 +        from napari._vispy.utils.visual import create_vispy_overlay
@@ -840,7 +840,7 @@ index 810fd1b4..6b94ee25 100644
          self._on_matrix_change()
          self._on_experimental_clipping_planes_change()
 +        self._on_overlays_change()
- 
+
      def _on_poll(self, event=None):  # noqa: B027
          """Called when camera moves, before we are drawn.
 diff --git a/napari/_vispy/layers/image.py b/napari/_vispy/layers/image.py
@@ -848,13 +848,13 @@ index 632587bc..ffe0d225 100644
 --- a/napari/_vispy/layers/image.py
 +++ b/napari/_vispy/layers/image.py
 @@ -107,6 +107,8 @@ class VispyImageLayer(VispyBaseLayer):
- 
+
          self.node.parent = parent
          self.node.order = self.order
 +        for overlay_visual in self.overlays.values():
 +            overlay_visual.node.parent = self.node
          self.reset()
- 
+
      def _on_data_change(self):
 diff --git a/napari/_vispy/overlays/axes.py b/napari/_vispy/overlays/axes.py
 index 1b322546..82462f58 100644
@@ -862,24 +862,24 @@ index 1b322546..82462f58 100644
 +++ b/napari/_vispy/overlays/axes.py
 @@ -1,20 +1,22 @@
  import numpy as np
- 
+
 -from napari._vispy.overlays.base import VispySceneOverlay
 +from napari._vispy.overlays.base import ViewerOverlayMixin, VispySceneOverlay
  from napari._vispy.visuals.axes import Axes
  from napari.utils.theme import get_theme
- 
- 
+
+
 -class VispyAxesOverlay(VispySceneOverlay):
 +class VispyAxesOverlay(ViewerOverlayMixin, VispySceneOverlay):
      """Axes indicating world coordinate origin and orientation."""
- 
+
 -    def __init__(self, **kwargs) -> None:
 +    def __init__(self, *, viewer, overlay, parent=None) -> None:
          self._scale = 1
- 
+
          # Target axes length in canvas pixels
          self._target_length = 80
- 
+
 -        super().__init__(node=Axes(), **kwargs)
 +        super().__init__(
 +            node=Axes(), viewer=viewer, overlay=overlay, parent=parent
@@ -892,8 +892,8 @@ index a1ff4725..2fa67421 100644
 --- a/napari/_vispy/overlays/base.py
 +++ b/napari/_vispy/overlays/base.py
 @@ -6,17 +6,26 @@ from napari.utils.translations import trans
- 
- 
+
+
  class VispyBaseOverlay:
 -    def __init__(self, *, overlay, node, parent) -> None:
 +    """
@@ -906,30 +906,30 @@ index a1ff4725..2fa67421 100644
 +    def __init__(self, *, overlay, node, parent=None) -> None:
          super().__init__()
          self.overlay = overlay
- 
+
          self.node = node
 -        self.node.parent = parent
          self.node.order = self.overlay.order
- 
+
          self.overlay.events.visible.connect(self._on_visible_change)
          self.overlay.events.opacity.connect(self._on_opacity_change)
- 
+
 +        if parent is not None:
 +            self.node.parent = parent
 +
      def _on_visible_change(self):
          self.node.visible = self.overlay.visible
- 
+
 @@ -28,24 +37,39 @@ class VispyBaseOverlay:
          self._on_opacity_change()
- 
+
      def close(self):
 -        disconnect_events(self.layer.events, self)
 +        disconnect_events(self.overlay.events, self)
          self.node.transforms = MatrixTransform()
          self.node.parent = None
- 
- 
+
+
  class VispyCanvasOverlay(VispyBaseOverlay):
 -    def __init__(self, *, viewer, **kwargs) -> None:
 -        super().__init__(**kwargs)
@@ -937,7 +937,7 @@ index a1ff4725..2fa67421 100644
 +    """
 +    Vispy overlay backend for overlays that live in canvas space.
 +    """
- 
+
 +    def __init__(self, *, overlay, node, parent=None) -> None:
 +        super().__init__(overlay=overlay, node=node, parent=None)
 +
@@ -957,7 +957,7 @@ index a1ff4725..2fa67421 100644
 +        if event.new is not None and self.node.canvas is not None:
 +            # connect the canvas resize to recalculating the position
 +            event.new.canvas.events.resize.connect(self._on_position_change)
- 
+
      def _on_position_change(self, event=None):
 +        # subclasses should set sizes correctly and adjust offsets to get
 +        # the optimal positioning
@@ -965,8 +965,8 @@ index a1ff4725..2fa67421 100644
              return
          x_max, y_max = list(self.node.canvas.size)
 @@ -102,7 +126,40 @@ class VispyCanvasOverlay(VispyBaseOverlay):
- 
- 
+
+
  class VispySceneOverlay(VispyBaseOverlay):
 -    def __init__(self, *, viewer, **kwargs) -> None:
 -        super().__init__(**kwargs)
@@ -1149,14 +1149,14 @@ index 4f219b0e..bdf4ea84 100644
 -        """sequence of float: Scale factors."""
 -        return self.node._subvisuals[2]
 +        self.layer.events.set_data.connect(self._on_visible_change)
- 
+
 -    @property
 -    def line_node(self):
 -        """sequence of float: Scale factors."""
 -        return self.node._subvisuals[0]
 +    def _on_bounds_change(self):
 +        pass
- 
+
 -    def _on_interaction_box_change(self, event=None):
 -        """Called whenever the interaction box changed."""
 -
@@ -1180,7 +1180,7 @@ index 4f219b0e..bdf4ea84 100644
          else:
 -            size = self._vertex_size
 +            self.node.visible = False
- 
+
 -        self.square_marker_node.set_data(
 -            vertices[: Box.LEN_WITHOUT_HANDLE],
 -            size=size,
@@ -1213,10 +1213,10 @@ index 4f219b0e..bdf4ea84 100644
 +    def reset(self):
 +        super().reset()
 +        self._on_bounds_change()
- 
+
 -    def _compute_vertices_and_box(self):
 -        """Compute location of the box for rendering.
- 
+
 -        Returns
 -        -------
 -        vertices : np.ndarray
@@ -1261,7 +1261,7 @@ index 4f219b0e..bdf4ea84 100644
 +                handles=self.overlay.handles,
 +                selected=self.overlay.selected_handle,
 +            )
- 
+
 -            edge_color = self._highlight_color
 -            if self._interaction_box.show_vertices:
 -                colors = np.array([(1.0, 1.0, 1.0) for point in box])
@@ -1275,7 +1275,7 @@ index 4f219b0e..bdf4ea84 100644
 -                else:
 -                    vertices = box[Box.WITHOUT_HANDLE][:, ::-1]
 -                    face_color = ColorArray(colors[Box.WITHOUT_HANDLE])
- 
+
 -            else:
 -                vertices = np.empty((0, 2))
 -                face_color = 'white'
@@ -1300,7 +1300,7 @@ index 4f219b0e..bdf4ea84 100644
 +            )
 +            # invert axes for vispy
 +            top_left, bot_right = (tuple(point) for point in bounds.T[:, ::-1])
- 
+
 -            # Use a subset of the vertices of the interaction_box to plot
 -            # the line around the edge
 -            if self._interaction_box.show_handle:
@@ -1320,7 +1320,7 @@ index 4f219b0e..bdf4ea84 100644
 -            width = 0
 -            self._box = None
 +                selected = self.overlay.selected_handle
- 
+
 -        return vertices, face_color, edge_color, pos, width
 -
 -    def _add_rotation_handle(self, box):
@@ -1352,27 +1352,27 @@ index 5d5bb2f1..b560ec7c 100644
 --- a/napari/_vispy/overlays/scale_bar.py
 +++ b/napari/_vispy/overlays/scale_bar.py
 @@ -2,22 +2,24 @@ import bisect
- 
+
  import numpy as np
- 
+
 -from napari._vispy.overlays.base import VispyCanvasOverlay
 +from napari._vispy.overlays.base import ViewerOverlayMixin, VispyCanvasOverlay
  from napari._vispy.visuals.scale_bar import ScaleBar
  from napari.utils._units import PREFERRED_VALUES, get_unit_registry
  from napari.utils.colormaps.standardize_color import transform_color
  from napari.utils.theme import get_theme
- 
- 
+
+
 -class VispyScaleBarOverlay(VispyCanvasOverlay):
 +class VispyScaleBarOverlay(ViewerOverlayMixin, VispyCanvasOverlay):
      """Scale bar in world coordinates."""
- 
+
 -    def __init__(self, **kwargs) -> None:
 +    def __init__(self, *, viewer, overlay, parent=None) -> None:
          self._target_length = 150
          self._scale = 1
          self._unit = None
- 
+
 -        super().__init__(node=ScaleBar(), **kwargs)
 +        super().__init__(
 +            node=ScaleBar(), viewer=viewer, overlay=overlay, parent=parent
@@ -1398,16 +1398,16 @@ index 5723de66..424249c4 100644
 +++ b/napari/_vispy/overlays/text.py
 @@ -1,14 +1,19 @@
  from vispy.scene.visuals import Text
- 
+
 -from napari._vispy.overlays.base import VispyCanvasOverlay
 +from napari._vispy.overlays.base import ViewerOverlayMixin, VispyCanvasOverlay
  from napari.components._viewer_constants import CanvasPosition
- 
- 
+
+
 -class VispyTextOverlay(VispyCanvasOverlay):
 +class VispyTextOverlay(ViewerOverlayMixin, VispyCanvasOverlay):
      """Text overlay."""
- 
+
 -    def __init__(self, **kwargs) -> None:
 -        super().__init__(node=Text(pos=(0, 0)), **kwargs)
 +    def __init__(self, *, viewer, overlay, parent=None) -> None:
@@ -1417,7 +1417,7 @@ index 5723de66..424249c4 100644
 +            overlay=overlay,
 +            parent=parent,
 +        )
- 
+
          self.node.font_size = self.overlay.font_size
          self.node.anchors = ("left", "top")
 diff --git a/napari/_vispy/utils/visual.py b/napari/_vispy/utils/visual.py
@@ -1429,7 +1429,7 @@ index 427726f2..f55f990f 100644
 +from __future__ import annotations
 +
 +from typing import List, Tuple
- 
+
  import numpy as np
  from vispy.scene.widgets.viewbox import ViewBox
 @@ -11,6 +13,24 @@ from napari._vispy.layers.shapes import VispyShapesLayer
@@ -1459,8 +1459,8 @@ index 427726f2..f55f990f 100644
      Labels,
 @@ -35,6 +55,15 @@ layer_to_visual = {
  }
- 
- 
+
+
 +overlay_to_visual = {
 +    ScaleBarOverlay: VispyScaleBarOverlay,
 +    TextOverlay: VispyTextOverlay,
@@ -1474,7 +1474,7 @@ index 427726f2..f55f990f 100644
      from napari._vispy.experimental.vispy_tiled_image_layer import (
          VispyTiledImageLayer,
 @@ -57,8 +86,8 @@ def create_vispy_layer(layer: Layer) -> VispyBaseLayer:
- 
+
      Returns
      -------
 -    visual : vispy.scene.visuals.VisualNode
@@ -1486,8 +1486,8 @@ index 427726f2..f55f990f 100644
          if isinstance(layer, layer_type):
 @@ -73,6 +102,33 @@ def create_vispy_layer(layer: Layer) -> VispyBaseLayer:
      )
- 
- 
+
+
 +def create_vispy_overlay(overlay: Overlay, **kwargs) -> List[VispyBaseOverlay]:
 +    """
 +    Create vispy visuals for each overlay contained in an Overlays model based on their type,
@@ -1707,7 +1707,7 @@ index c3781d01..f157955b 100644
 +++ b/napari/components/_tests/test_interaction_box.py
 @@ -1,52 +1,103 @@
  import numpy as np
- 
+
 -from napari.components.overlays.interaction_box import InteractionBox
 -from napari.utils.transforms import Affine
 +from napari.components.overlays.interaction_box import SelectionBoxOverlay
@@ -1718,8 +1718,8 @@ index c3781d01..f157955b 100644
 +    generate_transform_box_from_layer,
 +    get_nearby_handle,
 +)
- 
- 
+
+
 -def test_creation():
 -    """Test creating interaction box object"""
 -    interaction_box = InteractionBox()
@@ -1773,8 +1773,8 @@ index c3781d01..f157955b 100644
 +        ]
 +    )
 +    np.testing.assert_allclose(vertices, expected)
- 
- 
+
+
 -def test_box_from_points():
 -    """Test whether setting points creates a axis-aligned containing box"""
 -    interaction_box = InteractionBox()
@@ -1817,8 +1817,8 @@ index c3781d01..f157955b 100644
 +    outside = [12, -1]
 +    none = get_nearby_handle(outside, vertices)
 +    assert none is None
- 
- 
+
+
 -def test_transform():
 -    """Tests whether setting a transform changes the box adequatly"""
 -    interaction_box = InteractionBox()
@@ -1854,8 +1854,8 @@ index aa68b9ce..ea2fa6d8 100644
 @@ -1,8 +1,6 @@
 -"""Test label"""
  from napari.components.overlays.text import TextOverlay
- 
- 
+
+
 -def test_label():
 -    """Test creating label object"""
 +def test_text_overlay():
@@ -1866,8 +1866,8 @@ index 55ef0148..f757316e 100644
 --- a/napari/components/_tests/test_viewer_model.py
 +++ b/napari/components/_tests/test_viewer_model.py
 @@ -773,7 +773,7 @@ def test_add_remove_layer_external_callbacks(Layer, data, ndim):
- 
- 
+
+
  @pytest.mark.parametrize(
 -    'field', ['camera', 'cursor', 'dims', 'grid', 'layers', 'scale_bar']
 +    'field', ['camera', 'cursor', 'dims', 'grid', 'layers']
@@ -1876,12 +1876,12 @@ index 55ef0148..f757316e 100644
      """Test appropriate fields are not mutable."""
 @@ -785,7 +785,7 @@ def test_not_mutable_fields(field):
      assert not hasattr(viewer.events, field)
- 
+
      # Check attribute is not settable
 -    with pytest.raises(TypeError) as err:
 +    with pytest.raises((TypeError, ValueError)) as err:
          setattr(viewer, field, 'test')
- 
+
      assert 'has allow_mutation set to False and cannot be assigned' in str(
 diff --git a/napari/components/overlays/__init__.py b/napari/components/overlays/__init__.py
 index 0873edea..6280b025 100644
@@ -1903,7 +1903,7 @@ index 0873edea..6280b025 100644
 +)
  from napari.components.overlays.scale_bar import ScaleBarOverlay
  from napari.components.overlays.text import TextOverlay
- 
+
  __all__ = [
      "AxesOverlay",
 -    "BaseOverlay",
@@ -2417,7 +2417,7 @@ index f55e715b..c92d817d 100644
 --- a/napari/components/overlays/axes.py
 +++ b/napari/components/overlays/axes.py
 @@ -6,8 +6,6 @@ class AxesOverlay(SceneOverlay):
- 
+
      Attributes
      ----------
 -    visible : bool
@@ -2436,7 +2436,7 @@ index f55e715b..c92d817d 100644
 +    order : int
 +        The rendering order of the overlay: lower numbers get rendered first.
      """
- 
+
      labels: bool = True
 diff --git a/napari/components/overlays/base.py b/napari/components/overlays/base.py
 index 4575bfca..51c528c7 100644
@@ -2444,14 +2444,14 @@ index 4575bfca..51c528c7 100644
 +++ b/napari/components/overlays/base.py
 @@ -2,38 +2,67 @@ from napari.components._viewer_constants import CanvasPosition
  from napari.utils.events import EventedModel
- 
- 
+
+
 -class BaseOverlay(EventedModel):
 +class Overlay(EventedModel):
      """
 -    Base class for overlay evented models.
 +    Overlay evented model.
- 
+
      An overlay is a renderable entity meant to display additional information
      on top of the layer data, but is not data per se.
      For example: a scale bar, a color bar, axes, bounding boxes, etc.
@@ -2465,20 +2465,20 @@ index 4575bfca..51c528c7 100644
 +    order : int
 +        The rendering order of the overlay: lower numbers get rendered first.
      """
- 
+
      visible: bool = False
      opacity: float = 1
      order: int = 1e6
- 
+
 +    def __hash__(self):
 +        return id(self)
 +
- 
+
 -class CanvasOverlay(BaseOverlay):
 +class CanvasOverlay(Overlay):
      """
      Canvas overlay model.
- 
+
 -    Canvas overlays live in canvas space; they do not live in the 2- or 3-dimensional
 -    scene being rendered, but in the 2D space of the screen.
 +    Canvas overlays live in canvas space; they do not live in the 2- or 3-dimensional scene being rendered, but in the 2D space of the screen.
@@ -2495,19 +2495,19 @@ index 4575bfca..51c528c7 100644
 +    order : int
 +        The rendering order of the overlay: lower numbers get rendered first.
      """
- 
+
      position: CanvasPosition = CanvasPosition.BOTTOM_RIGHT
- 
- 
+
+
 -class SceneOverlay(BaseOverlay):
 +class SceneOverlay(Overlay):
      """
      Scene overlay model.
- 
+
      Scene overlays live in the 2- or 3-dimensional space of the rendered data.
      For example: bounding boxes, data grids, etc.
 -    """
- 
+
 -    # TODO: should transform live here?
 +    Attributes
 +    ----------
@@ -2567,7 +2567,7 @@ index 062b13ac..d061b2ed 100644
 @@ -1,93 +1,53 @@
 -import numpy as np
 +from typing import Optional, Tuple
- 
+
 -from napari.utils.events import EventedModel
 -from napari.utils.events.custom_types import Array
 -from napari.utils.transforms import Affine
@@ -2576,13 +2576,13 @@ index 062b13ac..d061b2ed 100644
 +    InteractionBoxHandle,
 +    calculate_bounds_from_contained_points,
 +)
- 
- 
+
+
 -class InteractionBox(EventedModel):
 -    """Models a box that can be used to transform an object or a set of objects
 +class SelectionBoxOverlay(SceneOverlay):
 +    """A box that can be used to select and transform objects.
- 
+
 -    Parameters
 +    Attributes
      ----------
@@ -2622,7 +2622,7 @@ index 062b13ac..d061b2ed 100644
 +    order : int
 +        The rendering order of the overlay: lower numbers get rendered first.
      """
- 
+
 -    points: Array[float, (-1, 2)] = None
 -    show: bool = False
 -    show_handle: bool = False
@@ -2638,7 +2638,7 @@ index 062b13ac..d061b2ed 100644
 +    bounds: Tuple[Tuple[float, float], Tuple[float, float]] = ((0, 0), (0, 0))
 +    handles: bool = False
 +    selected_handle: Optional[InteractionBoxHandle] = None
- 
+
 -    @property
 -    def _box(self):
 -        box = self._create_box_from_points()
@@ -2650,16 +2650,16 @@ index 062b13ac..d061b2ed 100644
 +    def update_from_points(self, points):
 +        """Create as a bounding box of the given points"""
 +        self.bounds = calculate_bounds_from_contained_points(points)
- 
+
 -    def _create_box_from_points(self):
 -        """Creates the axis aligned interaction box from the list of points"""
 -        if self.points is None or len(self.points) < 1:
 -            return None
- 
+
 -        data = self.points
 +class TransformBoxOverlay(SceneOverlay):
 +    """A box that can be used to transform layers.
- 
+
 -        min_val = np.array([data[:, 0].min(axis=0), data[:, 1].min(axis=0)])
 -        max_val = np.array([data[:, 0].max(axis=0), data[:, 1].max(axis=0)])
 +    Attributes
@@ -2673,7 +2673,7 @@ index 062b13ac..d061b2ed 100644
 +    order : int
 +        The rendering order of the overlay: lower numbers get rendered first.
 +    """
- 
+
 -        tl = np.array([min_val[0], min_val[1]])
 -        tr = np.array([max_val[0], min_val[1]])
 -        br = np.array([max_val[0], max_val[1]])
@@ -2729,7 +2729,7 @@ index 9f8c8021..d8bc0c23 100644
 --- a/napari/components/overlays/scale_bar.py
 +++ b/napari/components/overlays/scale_bar.py
 @@ -10,8 +10,6 @@ class ScaleBarOverlay(CanvasOverlay):
- 
+
      Attributes
      ----------
 -    visible : bool
@@ -2761,14 +2761,14 @@ index 9f8c8021..d8bc0c23 100644
 +    order : int
 +        The rendering order of the overlay: lower numbers get rendered first.
      """
- 
+
      colored: bool = False
 diff --git a/napari/components/overlays/text.py b/napari/components/overlays/text.py
 index 0926408c..e6eff29b 100644
 --- a/napari/components/overlays/text.py
 +++ b/napari/components/overlays/text.py
 @@ -8,19 +8,20 @@ class TextOverlay(CanvasOverlay):
- 
+
      Attributes
      ----------
 -    visible : bool
@@ -2793,7 +2793,7 @@ index 0926408c..e6eff29b 100644
 +    order : int
 +        The rendering order of the overlay: lower numbers get rendered first.
      """
- 
+
      color: ColorValue = (0.5, 0.5, 0.5, 1.0)
 diff --git a/napari/components/viewer_model.py b/napari/components/viewer_model.py
 index b8c491ea..3986fb1e 100644
@@ -2801,11 +2801,11 @@ index b8c491ea..3986fb1e 100644
 +++ b/napari/components/viewer_model.py
 @@ -20,7 +20,7 @@ from typing import (
  )
- 
+
  import numpy as np
 -from pydantic import Extra, Field, validator
 +from pydantic import Extra, Field, PrivateAttr, validator
- 
+
  from napari import layers
  from napari.components._viewer_mouse_bindings import dims_scroll
 @@ -31,7 +31,7 @@ from napari.components.grid import GridCanvas
@@ -2859,8 +2859,8 @@ index b8c491ea..3986fb1e 100644
  from napari.utils.migrations import rename_argument
 @@ -88,6 +106,13 @@ def _current_theme() -> str:
      return get_settings().appearance.theme
- 
- 
+
+
 +DEFAULT_OVERLAYS = {
 +    'scale_bar': ScaleBarOverlay,
 +    'text': TextOverlay,
@@ -2872,7 +2872,7 @@ index b8c491ea..3986fb1e 100644
  class ViewerModel(KeymapProvider, MousemapProvider, EventedModel):
      """Viewer containing the rendered scene, layers, and controlling elements
 @@ -118,9 +143,6 @@ class ViewerModel(KeymapProvider, MousemapProvider, EventedModel):
- 
+
      # Using allow_mutation=False means these attributes aren't settable and don't
      # have an event emitter associated with them
 -    axes: AxesOverlay = Field(
@@ -2909,7 +2909,7 @@ index b8c491ea..3986fb1e 100644
 @@ -219,6 +236,21 @@ class ViewerModel(KeymapProvider, MousemapProvider, EventedModel):
          # Add mouse callback
          self.mouse_wheel_callbacks.append(dims_scroll)
- 
+
 +        self._overlays.update({k: v() for k, v in DEFAULT_OVERLAYS.items()})
 +
 +    # simple properties exposing overlays for backward compatibility
@@ -2927,15 +2927,15 @@ index b8c491ea..3986fb1e 100644
 +
      def _tooltip_visible_update(self, event):
          self.tooltip.visible = event.value
- 
+
 @@ -399,7 +431,8 @@ class ViewerModel(KeymapProvider, MousemapProvider, EventedModel):
- 
+
      def _update_interactive(self, event):
          """Set the viewer interactivity with the `event.interactive` bool."""
 -        self.camera.interactive = event.interactive
 +        if event.source is self.layers.selection.active:
 +            self.camera.interactive = event.interactive
- 
+
      def _update_cursor(self, event):
          """Set the viewer cursor with the `event.cursor` string."""
 @@ -523,6 +556,10 @@ class ViewerModel(KeymapProvider, MousemapProvider, EventedModel):
@@ -2947,7 +2947,7 @@ index b8c491ea..3986fb1e 100644
 +            Surface: surface_fun_to_mode,
 +            Tracks: tracks_fun_to_mode,
          }
- 
+
          help_li = []
 @@ -533,7 +570,7 @@ class ViewerModel(KeymapProvider, MousemapProvider, EventedModel):
                  continue
@@ -2966,7 +2966,7 @@ index 09a79e45..4b76881d 100644
  from collections import OrderedDict
 -from enum import auto
 +from enum import IntEnum, auto
- 
+
  from napari.utils.misc import StringEnum
  from napari.utils.translations import trans
 @@ -53,3 +53,66 @@ BLENDING_TRANSLATIONS = OrderedDict(
@@ -3326,7 +3326,7 @@ index 214338aa..c0c0f7cc 100644
 @@ -13,7 +13,11 @@ import magicgui as mgui
  import numpy as np
  from npe2 import plugin_manager as pm
- 
+
 -from napari.layers.base._base_constants import Blending
 +from napari.layers.base._base_constants import Blending, Mode
 +from napari.layers.base._base_mouse_bindings import (
@@ -3348,7 +3348,7 @@ index 214338aa..c0c0f7cc 100644
 @@ -214,6 +218,22 @@ class Layer(KeymapProvider, MousemapProvider, ABC):
      * `_basename()`: base/default name of the layer
      """
- 
+
 +    _modeclass = Mode
 +
 +    _drag_modes = {
@@ -3375,19 +3375,19 @@ index 214338aa..c0c0f7cc 100644
 +        mode='pan_zoom',
      ) -> None:
          super().__init__()
- 
+
 @@ -267,6 +288,7 @@ class Layer(KeymapProvider, MousemapProvider, ABC):
          self.scale_factor = 1
          self.multiscale = multiscale
          self._experimental_clipping_planes = ClippingPlaneList()
 +        self._mode = self._modeclass('pan_zoom')
- 
+
          self._ndim = ndim
- 
+
 @@ -321,6 +343,15 @@ class Layer(KeymapProvider, MousemapProvider, ABC):
          self._name = ''
          self.experimental_clipping_planes = experimental_clipping_planes
- 
+
 +        # circular import
 +        from napari.components.overlays.bounding_box import BoundingBoxOverlay
 +        from napari.components.overlays.interaction_box import (
@@ -3427,18 +3427,18 @@ index 214338aa..c0c0f7cc 100644
 +        # TODO: we try to avoid inner event connection, but this might be the only way
 +        #       until we figure out nested evented objects
 +        self._overlays.events.connect(self.events._overlays)
- 
+
      def __str__(self):
          """Return self.name."""
 @@ -369,37 +414,33 @@ class Layer(KeymapProvider, MousemapProvider, ABC):
          cls = type(self)
          return f"<{cls.__name__} layer {repr(self.name)} at {hex(id(self))}>"
- 
+
 -    def _mode_setter_helper(self, mode, Modeclass):
 +    def _mode_setter_helper(self, mode):
          """
          Helper to manage callbacks in multiple layers
- 
+
          Parameters
          ----------
 -        mode : Modeclass | str
@@ -3447,12 +3447,12 @@ index 214338aa..c0c0f7cc 100644
 -        Modeclass : Enum
 -            Enum for the current class representing the modes it can takes,
 -            this is usually specific on each subclass.
- 
+
          Returns
          -------
 -        tuple (new Mode, mode changed)
 +        bool : whether mode changed
- 
+
          """
 -        mode = Modeclass(mode)
 +        mode = self._modeclass(mode)
@@ -3473,7 +3473,7 @@ index 214338aa..c0c0f7cc 100644
              )
 -        old_mode = self._mode
 -        self._mode = mode
- 
+
          for callback_list, mode_dict in [
              (self.mouse_drag_callbacks, self._drag_modes),
 @@ -411,13 +452,44 @@ class Layer(KeymapProvider, MousemapProvider, ABC):
@@ -3486,7 +3486,7 @@ index 214338aa..c0c0f7cc 100644
 +                callback_list.remove(mode_dict[self._mode])
              callback_list.append(mode_dict[mode])
          self.cursor = self._cursor_modes[mode]
- 
+
 -        self.interactive = mode == Modeclass.PAN_ZOOM
 -        return mode, True
 +        self.interactive = mode == self._modeclass.PAN_ZOOM
@@ -3522,13 +3522,13 @@ index 214338aa..c0c0f7cc 100644
 +        self._mode = mode
 +
 +        self.events.mode(mode=str(mode))
- 
+
      @classmethod
      def _basename(cls):
 @@ -894,6 +966,10 @@ class Layer(KeymapProvider, MousemapProvider, ABC):
              plane.update(new_plane)
              self._experimental_clipping_planes.append(plane)
- 
+
 +    @property
 +    def bounding_box(self):
 +        return self._overlays['bounding_box']
@@ -3542,8 +3542,8 @@ index 4021b01f..4a17244e 100644
 +++ b/napari/layers/image/_image_constants.py
 @@ -41,18 +41,6 @@ class Interpolation(StringEnum):
          )
- 
- 
+
+
 -class Mode(StringEnum):
 -    """
 -    Mode: Interactive mode. The normal, default mode is PAN_ZOOM, which
@@ -3558,14 +3558,14 @@ index 4021b01f..4a17244e 100644
 -
  class ImageRendering(StringEnum):
      """Rendering: Rendering mode for the layer.
- 
+
 diff --git a/napari/layers/image/_image_key_bindings.py b/napari/layers/image/_image_key_bindings.py
 index e825d707..71d1f487 100644
 --- a/napari/layers/image/_image_key_bindings.py
 +++ b/napari/layers/image/_image_key_bindings.py
 @@ -1,7 +1,7 @@
  from __future__ import annotations
- 
+
  import napari
 -from napari.layers.image._image_constants import Mode
 +from napari.layers.base._base_constants import Mode
@@ -3587,7 +3587,7 @@ index 28a8df2b..10c5d98d 100644
 --- a/napari/layers/image/image.py
 +++ b/napari/layers/image/image.py
 @@ -11,11 +11,10 @@ from scipy import ndimage as ndi
- 
+
  from napari.layers._data_protocols import LayerDataProtocol
  from napari.layers._multiscale_data import MultiScaleData
 -from napari.layers.base import Layer, no_op
@@ -3604,12 +3604,12 @@ index 28a8df2b..10c5d98d 100644
          elif rgb is None:
              rgb = rgb_guess
 +        self.rgb = rgb
- 
+
          # Determine dimensionality of the data
          ndim = len(data.shape)
 @@ -295,7 +295,6 @@ class _ImageBase(IntensityVisualizationMixin, Layer):
          )
- 
+
          self.events.add(
 -            mode=Event,
              interpolation=WarningEmitter(
@@ -3617,7 +3617,7 @@ index 28a8df2b..10c5d98d 100644
                      "'layer.events.interpolation' is deprecated please use `interpolation2d` and `interpolation3d`",
 @@ -315,7 +314,6 @@ class _ImageBase(IntensityVisualizationMixin, Layer):
          self._array_like = True
- 
+
          # Set data
 -        self.rgb = rgb
          self._data = data
@@ -3634,7 +3634,7 @@ index 28a8df2b..10c5d98d 100644
 @@ -687,44 +684,6 @@ class _ImageBase(IntensityVisualizationMixin, Layer):
          """
          return self._slice.loaded
- 
+
 -    @property
 -    def mode(self) -> str:
 -        """str: Interactive mode
@@ -3675,14 +3675,14 @@ index 28a8df2b..10c5d98d 100644
 -
      def _raw_to_displayed(self, raw):
          """Determine displayed image from raw image.
- 
+
 diff --git a/napari/layers/labels/_labels_constants.py b/napari/layers/labels/_labels_constants.py
 index 850048fa..72ca153c 100644
 --- a/napari/layers/labels/_labels_constants.py
 +++ b/napari/layers/labels/_labels_constants.py
 @@ -31,11 +31,11 @@ class Mode(StringEnum):
      """
- 
+
      PAN_ZOOM = auto()
 +    TRANSFORM = auto()
      PICK = auto()
@@ -3690,8 +3690,8 @@ index 850048fa..72ca153c 100644
      FILL = auto()
      ERASE = auto()
 -    TRANSFORM = auto()
- 
- 
+
+
  class LabelColorMode(StringEnum):
 diff --git a/napari/layers/labels/_labels_key_bindings.py b/napari/layers/labels/_labels_key_bindings.py
 index 7e1afd2b..df21c10c 100644
@@ -3699,8 +3699,8 @@ index 7e1afd2b..df21c10c 100644
 +++ b/napari/layers/labels/_labels_key_bindings.py
 @@ -12,20 +12,6 @@ MIN_BRUSH_SIZE = 1
  MAX_BRUSH_SIZE = 40
- 
- 
+
+
 -@Labels.bind_key('Space')
 -def hold_to_pan_zoom(layer: Labels):
 -    """Hold to pan and zoom in the viewer."""
@@ -3717,11 +3717,11 @@ index 7e1afd2b..df21c10c 100644
 -
  def register_label_action(description: str, repeatable: bool = False):
      return register_layer_action(Labels, description, repeatable)
- 
+
 @@ -34,38 +20,44 @@ def register_label_mode_action(description):
      return register_layer_attr_action(Labels, description, 'mode')
- 
- 
+
+
 +@register_label_mode_action(trans._('Transform'))
 +def activate_labels_transform_mode(layer):
 +    layer.mode = Mode.TRANSFORM
@@ -3736,14 +3736,14 @@ index 7e1afd2b..df21c10c 100644
 -def activate_paint_mode(layer: Labels):
 +def activate_labels_paint_mode(layer: Labels):
      layer.mode = Mode.PAINT
- 
- 
+
+
  @register_label_mode_action(trans._("Activate the fill bucket"))
 -def activate_fill_mode(layer: Labels):
 +def activate_labels_fill_mode(layer: Labels):
      layer.mode = Mode.FILL
- 
- 
+
+
 -@register_label_mode_action(trans._('Pan/zoom mode'))
 -def activate_label_pan_zoom_mode(layer: Labels):
 -    layer.mode = Mode.PAN_ZOOM
@@ -3754,14 +3754,14 @@ index 7e1afd2b..df21c10c 100644
 +def activate_labels_picker_mode(layer: Labels):
      """Activate the label picker."""
      layer.mode = Mode.PICK
- 
- 
+
+
  @register_label_mode_action(trans._("Activate the label eraser"))
 -def activate_label_erase_mode(layer: Labels):
 +def activate_labels_erase_mode(layer: Labels):
      layer.mode = Mode.ERASE
- 
- 
+
+
  labels_fun_to_mode = [
 -    (activate_label_erase_mode, Mode.ERASE),
 -    (activate_paint_mode, Mode.PAINT),
@@ -3775,8 +3775,8 @@ index 7e1afd2b..df21c10c 100644
 +    (activate_labels_fill_mode, Mode.FILL),
 +    (activate_labels_picker_mode, Mode.PICK),
  ]
- 
- 
+
+
 diff --git a/napari/layers/labels/labels.py b/napari/layers/labels/labels.py
 index b8f43a93..f821e2c3 100644
 --- a/napari/layers/labels/labels.py
@@ -3784,7 +3784,7 @@ index b8f43a93..f821e2c3 100644
 @@ -7,7 +7,11 @@ import numpy as np
  import pandas as pd
  from scipy import ndimage as ndi
- 
+
 -from napari.layers.base import no_op
 +from napari.layers.base import Layer, no_op
 +from napari.layers.base._base_mouse_bindings import (
@@ -3797,7 +3797,7 @@ index b8f43a93..f821e2c3 100644
 @@ -204,6 +208,34 @@ class Labels(_ImageBase):
          background label `0` is selected.
      """
- 
+
 +    _modeclass = Mode
 +
 +    _drag_modes = {
@@ -3827,20 +3827,20 @@ index b8f43a93..f821e2c3 100644
 +    }
 +
      _history_limit = 100
- 
+
      def __init__(
 @@ -300,7 +332,6 @@ class Labels(_ImageBase):
          self._selected_color = self.get_color(self._selected_label)
          self.color = color
- 
+
 -        self._mode = Mode.PAN_ZOOM
          self._status = self.mode
          self._preserve_labels = False
- 
+
 @@ -661,7 +692,7 @@ class Labels(_ImageBase):
          self._show_selected_label = filter
          self.refresh()
- 
+
 -    @property
 +    @Layer.mode.getter
      def mode(self):
@@ -3849,7 +3849,7 @@ index b8f43a93..f821e2c3 100644
 @@ -688,43 +719,15 @@ class Labels(_ImageBase):
          """
          return str(self._mode)
- 
+
 -    _drag_modes = {
 -        Mode.PAN_ZOOM: no_op,
 -        Mode.TRANSFORM: no_op,
@@ -3885,14 +3885,14 @@ index b8f43a93..f821e2c3 100644
 +        mode = super()._mode_setter_helper(mode)
 +        if mode == self._mode:
 +            return mode
- 
+
          if mode in {Mode.PAINT, Mode.ERASE}:
              self.cursor_size = self._calculate_cursor_size()
- 
+
 -        self.events.mode(mode=mode)
 -        self.refresh()
 +        return mode
- 
+
      @property
      def preserve_labels(self):
 diff --git a/napari/layers/points/_points_constants.py b/napari/layers/points/_points_constants.py
@@ -3902,15 +3902,15 @@ index 56f4976b..b86be8b2 100644
 @@ -31,10 +31,10 @@ class Mode(StringEnum):
      SELECT allows the user to select points by clicking on them
      """
- 
+
 -    ADD = auto()
 -    SELECT = auto()
      PAN_ZOOM = auto()
      TRANSFORM = auto()
 +    ADD = auto()
 +    SELECT = auto()
- 
- 
+
+
  class Symbol(StringEnum):
 diff --git a/napari/layers/points/_points_key_bindings.py b/napari/layers/points/_points_key_bindings.py
 index 956359cf..e77db613 100644
@@ -3918,8 +3918,8 @@ index 956359cf..e77db613 100644
 +++ b/napari/layers/points/_points_key_bindings.py
 @@ -19,21 +19,14 @@ def register_points_mode_action(description):
      return register_layer_attr_action(Points, description, 'mode')
- 
- 
+
+
 -@Points.bind_key('Space')
 -def hold_to_pan_zoom(layer: Points):
 -    """Hold to pan and zoom in the viewer."""
@@ -3931,9 +3931,9 @@ index 956359cf..e77db613 100644
 +@register_points_mode_action(trans._('Transform'))
 +def activate_points_transform_mode(layer):
 +    layer.mode = Mode.TRANSFORM
- 
+
 -        yield
- 
+
 -        # on key release
 -        layer.mode = prev_mode
 -        layer.selected_data = prev_selected
@@ -3941,13 +3941,13 @@ index 956359cf..e77db613 100644
 +@register_points_mode_action(trans._('Pan/zoom'))
 +def activate_points_pan_zoom_mode(layer):
 +    layer.mode = Mode.PAN_ZOOM
- 
- 
+
+
  @register_points_mode_action(trans._('Add points'))
 @@ -46,15 +39,11 @@ def activate_points_select_mode(layer: Points):
      layer.mode = Mode.SELECT
- 
- 
+
+
 -@register_points_mode_action(trans._('Pan/zoom'))
 -def activate_points_pan_zoom_mode(layer: Points):
 -    layer.mode = Mode.PAN_ZOOM
@@ -3960,16 +3960,16 @@ index 956359cf..e77db613 100644
      (activate_points_select_mode, Mode.SELECT),
 -    (activate_points_pan_zoom_mode, Mode.PAN_ZOOM),
  ]
- 
- 
+
+
 diff --git a/napari/layers/points/_tests/test_points_key_bindings.py b/napari/layers/points/_tests/test_points_key_bindings.py
 index 4b877c11..130f642d 100644
 --- a/napari/layers/points/_tests/test_points_key_bindings.py
 +++ b/napari/layers/points/_tests/test_points_key_bindings.py
 @@ -2,15 +2,6 @@ from napari.layers.points import Points
  from napari.layers.points import _points_key_bindings as key_bindings
- 
- 
+
+
 -def test_hold_to_pan_zoom(layer):
 -    data = [[1, 3], [8, 4], [10, 10], [15, 4]]
 -    layer = Points(data, size=1)
@@ -3988,7 +3988,7 @@ index cc88aebd..d5db1ad3 100644
 +++ b/napari/layers/points/points.py
 @@ -9,6 +9,10 @@ import pandas as pd
  from scipy.stats import gmean
- 
+
  from napari.layers.base import Layer, no_op
 +from napari.layers.base._base_mouse_bindings import (
 +    highlight_box_handles,
@@ -4000,7 +4000,7 @@ index cc88aebd..d5db1ad3 100644
 @@ -284,6 +288,28 @@ class Points(Layer):
          None after dragging is done.
      """
- 
+
 +    _modeclass = Mode
 +
 +    _drag_modes = {
@@ -4024,12 +4024,12 @@ index cc88aebd..d5db1ad3 100644
 +    }
 +
      # TODO  write better documentation for edge_color and face_color
- 
+
      # The max number of points that will ever be used to render the thumbnail
 @@ -335,6 +361,32 @@ class Points(Layer):
- 
+
          data, ndim = fix_data_points(data, ndim)
- 
+
 +        # Indices of selected points
 +        self._selected_data = set()
 +        self._selected_data_stored = set()
@@ -4061,7 +4061,7 @@ index cc88aebd..d5db1ad3 100644
              ndim,
 @@ -353,7 +405,6 @@ class Points(Layer):
          )
- 
+
          self.events.add(
 -            mode=Event,
              size=Event,
@@ -4087,22 +4087,22 @@ index cc88aebd..d5db1ad3 100644
 -        self._is_selecting = False
 -        self._clipboard = {}
 -        self._round_index = False
- 
+
          color_properties = (
              self.properties if self._data.size > 0 else self.property_choices
 @@ -1304,7 +1339,7 @@ class Points(Layer):
              return create_box(data)
          return None
- 
+
 -    @property
 +    @Layer.mode.getter
      def mode(self) -> str:
          """str: Interactive mode
- 
+
 @@ -1319,45 +1354,19 @@ class Points(Layer):
          """
          return str(self._mode)
- 
+
 -    _drag_modes = {
 -        Mode.ADD: add,
 -        Mode.SELECT: select,
@@ -4134,7 +4134,7 @@ index cc88aebd..d5db1ad3 100644
 +        mode = super()._mode_setter_helper(mode)
 +        if mode == self._mode:
 +            return mode
- 
+
          if mode == Mode.ADD:
              self.selected_data = set()
              self.interactive = True
@@ -4144,11 +4144,11 @@ index cc88aebd..d5db1ad3 100644
 -        if mode != Mode.SELECT or old_mode != Mode.SELECT:
 +        elif mode != Mode.SELECT or self._mode != Mode.SELECT:
              self._selected_data_stored = set()
- 
+
          self._set_highlight()
 -        self.events.mode(mode=mode)
 +        return mode
- 
+
      @property
      def _indices_view(self):
 diff --git a/napari/layers/shapes/_shapes_constants.py b/napari/layers/shapes/_shapes_constants.py
@@ -4157,7 +4157,7 @@ index cd05dcd9..89408e0e 100644
 +++ b/napari/layers/shapes/_shapes_constants.py
 @@ -30,6 +30,7 @@ class Mode(StringEnum):
      """
- 
+
      PAN_ZOOM = auto()
 +    TRANSFORM = auto()
      SELECT = auto()
@@ -4168,8 +4168,8 @@ index cd05dcd9..89408e0e 100644
      VERTEX_INSERT = auto()
      VERTEX_REMOVE = auto()
 -    TRANSFORM = auto()
- 
- 
+
+
  class ColorMode(StringEnum):
 diff --git a/napari/layers/shapes/_shapes_key_bindings.py b/napari/layers/shapes/_shapes_key_bindings.py
 index 23150e0d..0a54df4c 100644
@@ -4178,13 +4178,13 @@ index 23150e0d..0a54df4c 100644
 @@ -1,4 +1,5 @@
  import numpy as np
 +from app_model.types import KeyCode
- 
+
  from napari.layers.shapes._shapes_constants import Box, Mode
  from napari.layers.shapes._shapes_mouse_bindings import _move
 @@ -10,23 +11,6 @@ from napari.layers.utils.layer_utils import (
  from napari.utils.translations import trans
- 
- 
+
+
 -@Shapes.bind_key('Space')
 -def hold_to_pan_zoom(layer: Shapes):
 -    """Hold to pan and zoom in the viewer."""
@@ -4207,8 +4207,8 @@ index 23150e0d..0a54df4c 100644
      """Hold to lock aspect ratio when resizing a shape."""
 @@ -61,6 +45,16 @@ def register_shapes_mode_action(description):
      return register_layer_attr_action(Shapes, description, 'mode')
- 
- 
+
+
 +@register_shapes_mode_action(trans._('Transform'))
 +def activate_shapes_transform_mode(layer):
 +    layer.mode = Mode.TRANSFORM
@@ -4224,8 +4224,8 @@ index 23150e0d..0a54df4c 100644
      """Activate add rectangle tool."""
 @@ -103,12 +97,6 @@ def activate_select_mode(layer: Shapes):
      layer.mode = Mode.SELECT
- 
- 
+
+
 -@register_shapes_mode_action(trans._('Pan/Zoom'))
 -def activate_shape_pan_zoom_mode(layer: Shapes):
 -    """Activate pan and zoom mode."""
@@ -4236,8 +4236,8 @@ index 23150e0d..0a54df4c 100644
  def activate_vertex_insert_mode(layer: Shapes):
      """Activate vertex insertion tool."""
 @@ -122,6 +110,8 @@ def activate_vertex_remove_mode(layer: Shapes):
- 
- 
+
+
  shapes_fun_to_mode = [
 +    (activate_shapes_pan_zoom_mode, Mode.PAN_ZOOM),
 +    (activate_shapes_transform_mode, Mode.TRANSFORM),
@@ -4258,8 +4258,8 @@ index 0148f2ae..9c1de772 100644
 +++ b/napari/layers/shapes/_tests/test_shapes_key_bindings.py
 @@ -35,14 +35,6 @@ def test_lock_aspect_ratio_selected_box_zeros():
      _ = list(key_bindings.hold_to_lock_aspect_ratio(layer))
- 
- 
+
+
 -def test_hold_to_pan_zoom():
 -    # Test a single four corner rectangle
 -    layer = Shapes(20 * np.random.random((1, 4, 2)))
@@ -4286,7 +4286,7 @@ index c6fbc9cb..fc9d938b 100644
 +++ b/napari/layers/shapes/shapes.py
 @@ -9,6 +9,10 @@ import pandas as pd
  from vispy.color import get_color_names
- 
+
  from napari.layers.base import Layer, no_op
 +from napari.layers.base._base_mouse_bindings import (
 +    highlight_box_handles,
@@ -4298,13 +4298,13 @@ index c6fbc9cb..fc9d938b 100644
 @@ -307,6 +311,7 @@ class Shapes(Layer):
          won't update during interactive events
      """
- 
+
 +    _modeclass = Mode
      _colors = get_color_names()
      _vertex_size = 10
      _rotation_handle_length = 20
 @@ -319,6 +324,7 @@ class Shapes(Layer):
- 
+
      _drag_modes = {
          Mode.PAN_ZOOM: no_op,
 +        Mode.TRANSFORM: transform_with_box,
@@ -4317,7 +4317,7 @@ index c6fbc9cb..fc9d938b 100644
          Mode.ADD_POLYGON: add_path_polygon,
 -        Mode.TRANSFORM: no_op,
      }
- 
+
      _move_modes = {
          Mode.PAN_ZOOM: no_op,
 +        Mode.TRANSFORM: highlight_box_handles,
@@ -4330,7 +4330,7 @@ index c6fbc9cb..fc9d938b 100644
          Mode.ADD_POLYGON: add_path_polygon_creating,
 -        Mode.TRANSFORM: no_op,
      }
- 
+
      _double_click_modes = {
          Mode.PAN_ZOOM: no_op,
 +        Mode.TRANSFORM: no_op,
@@ -4343,7 +4343,7 @@ index c6fbc9cb..fc9d938b 100644
          Mode.ADD_POLYGON: finish_drawing_shape,
 -        Mode.TRANSFORM: no_op,
      }
- 
+
      _cursor_modes = {
          Mode.PAN_ZOOM: 'standard',
 +        Mode.TRANSFORM: 'standard',
@@ -4356,11 +4356,11 @@ index c6fbc9cb..fc9d938b 100644
          Mode.ADD_POLYGON: 'cross',
 -        Mode.TRANSFORM: 'standard',
      }
- 
+
      _interactive_modes = {
 @@ -444,7 +449,6 @@ class Shapes(Layer):
          )
- 
+
          self.events.add(
 -            mode=Event,
              edge_width=Event,
@@ -4369,25 +4369,25 @@ index c6fbc9cb..fc9d938b 100644
 @@ -510,10 +514,6 @@ class Shapes(Layer):
          self._is_creating = False
          self._clipboard = {}
- 
+
 -        # change mode once to trigger the
 -        # Mode setting logic
 -        self._mode = Mode.SELECT
 -        self.mode = Mode.PAN_ZOOM
          self._status = self.mode
- 
+
          self._init_shapes(
 @@ -1575,7 +1575,7 @@ class Shapes(Layer):
          self.text.color._apply(self.features)
          return self.text._view_color(self._indices_view)
- 
+
 -    @property
 +    @Layer.mode.getter
      def mode(self):
          """MODE: Interactive mode. The normal, default mode is PAN_ZOOM, which
          allows for normal interactivity with the canvas.
 @@ -1597,19 +1597,12 @@ class Shapes(Layer):
- 
+
      @mode.setter
      def mode(self, mode: Union[str, Mode]):
 -        mode, changed = self._mode_setter_helper(mode, Mode)
@@ -4395,7 +4395,7 @@ index c6fbc9cb..fc9d938b 100644
 +        mode = self._mode_setter_helper(mode)
 +        if mode == self._mode:
              return
- 
+
 -        if mode.value not in Mode.keys():
 -            raise ValueError(
 -                trans._(
@@ -4406,13 +4406,13 @@ index c6fbc9cb..fc9d938b 100644
 -        old_mode = self._mode
          self._mode = mode
 +        self.events.mode(mode=mode)
- 
+
          draw_modes = {
              Mode.SELECT,
 @@ -1618,11 +1611,9 @@ class Shapes(Layer):
              Mode.VERTEX_REMOVE,
          }
- 
+
 -        self.events.mode(mode=mode)
 -
          # don't update thumbnail on mode changes
@@ -4709,7 +4709,7 @@ index 8ea814ba..a5db7db5 100644
 +
 +        # re-emit with this object's EventEmitter
 +        self.events(event)
- 
+
      def _disconnect_child_emitters(self, child: _T):
          """Disconnect all events from the child from the re-emitter."""
 diff --git a/napari/utils/events/containers/_evented_list.py b/napari/utils/events/containers/_evented_list.py
@@ -4726,7 +4726,7 @@ index 83c4d0cd..c04c7bd2 100644
 +
 +        # reemit with this object's EventEmitter
 +        self.events(event)
- 
+
      def _disconnect_child_emitters(self, child: _T):
          """Disconnect all events from the child from the reemitter."""
 diff --git a/napari/utils/events/containers/_nested_list.py b/napari/utils/events/containers/_nested_list.py
@@ -4736,7 +4736,7 @@ index 89436a3a..3b5f1eef 100644
 @@ -4,6 +4,7 @@ see module docstring of evented_list.py for more details
  """
  from __future__ import annotations
- 
+
 +import contextlib
  import logging
  from collections import defaultdict
@@ -4761,7 +4761,7 @@ index 89436a3a..3b5f1eef 100644
 +                event.index = self.index(event.source)
 +
 +        emitter(event)
- 
+
      def _non_negative_index(
          self, parent_index: ParentIndex, dest_index: Index
 diff --git a/napari/utils/shortcuts.py b/napari/utils/shortcuts.py
@@ -4825,5 +4825,5 @@ index cb3b20ee..45a1a25c 100644
 +    'napari:activate_surface_transform_mode': ['2'],
 +
  }
--- 
+--
 2.34.1

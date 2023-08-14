@@ -34,10 +34,9 @@ index 2808d293..72fae9df 100644
 +++ b/docs/conf.py
 @@ -83,7 +83,7 @@
  html_theme = 'napari'
- 
+
  # Define the json_url for our version switcher.
 -json_url = "https://napari.org/version_switcher.json"
 +json_url = "https://napari.org/dev/_static/version_switcher.json"
- 
- version_match = "latest" if version == "dev" else release
 
+ version_match = "latest" if version == "dev" else release

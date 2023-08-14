@@ -59,7 +59,7 @@ index 59e1b198..b64e6b36 100644
      qtctrl = QtImageControls(layer)
      qtbot.addWidget(qtctrl)
 +    qtctrl.ndisplay = 3
- 
+
      layer.depiction = 'volume'
      assert qtctrl.planeThicknessSlider.isHidden()
 @@ -81,22 +81,22 @@ def test_plane_controls_show_hide_on_depiction_change(qtbot):
@@ -69,7 +69,7 @@ index 59e1b198..b64e6b36 100644
 +    layer.depiction = 'plane'
      qtctrl = QtImageControls(layer)
      qtbot.addWidget(qtctrl)
- 
+
 -    layer._slice_dims(ndisplay=3)
 -    layer.depiction = 'plane'
 -    assert not qtctrl.planeThicknessSlider.isHidden()
@@ -83,14 +83,14 @@ index 59e1b198..b64e6b36 100644
      assert qtctrl.planeThicknessLabel.isHidden()
      assert qtctrl.planeNormalButtons.isHidden()
      assert qtctrl.planeNormalLabel.isHidden()
- 
+
 +    qtctrl.ndisplay = 3
 +    assert not qtctrl.planeThicknessSlider.isHidden()
 +    assert not qtctrl.planeThicknessLabel.isHidden()
 +    assert not qtctrl.planeNormalButtons.isHidden()
 +    assert not qtctrl.planeNormalLabel.isHidden()
 +
- 
+
  def test_plane_slider_value_change(qtbot):
      """Changing the model should update the view."""
 diff --git a/napari/_qt/layer_controls/qt_image_controls.py b/napari/_qt/layer_controls/qt_image_controls.py
@@ -112,7 +112,7 @@ index 19929d1a..cc994526 100644
 -        self._on_ndisplay_change()
 +
 +        self._on_ndisplay_changed()
- 
+
          colormap_layout = QHBoxLayout()
          if hasattr(self.layer, 'rgb') and self.layer.rgb:
 @@ -198,7 +198,7 @@ class QtImageControls(QtBaseImageControls):
@@ -130,12 +130,12 @@ index 19929d1a..cc994526 100644
          self.layer.rendering = text
 -        self._toggle_rendering_parameter_visbility()
 +        self._update_rendering_parameter_visibility()
- 
+
      def changeDepiction(self, text):
          self.layer.depiction = text
 -        self._toggle_plane_parameter_visibility()
 +        self._update_plane_parameter_visibility()
- 
+
      def changePlaneThickness(self, value: float):
          self.layer.plane.thickness = value
 @@ -297,7 +297,7 @@ class QtImageControls(QtBaseImageControls):
@@ -144,7 +144,7 @@ index 19929d1a..cc994526 100644
              self.renderComboBox.setCurrentIndex(index)
 -            self._toggle_rendering_parameter_visbility()
 +            self._update_rendering_parameter_visibility()
- 
+
      def _on_depiction_change(self):
          """Receive layer model depiction change event and update combobox."""
 @@ -306,48 +306,36 @@ class QtImageControls(QtBaseImageControls):
@@ -153,11 +153,11 @@ index 19929d1a..cc994526 100644
              self.depictionComboBox.setCurrentIndex(index)
 -            self._toggle_plane_parameter_visibility()
 +            self._update_plane_parameter_visibility()
- 
+
      def _on_plane_thickness_change(self):
          with self.layer.plane.events.blocker():
              self.planeThicknessSlider.setValue(self.layer.plane.thickness)
- 
+
 -    def _toggle_rendering_parameter_visbility(self):
 +    def _update_rendering_parameter_visibility(self):
          """Hide isosurface rendering parameters if they aren't needed."""
@@ -202,7 +202,7 @@ index 19929d1a..cc994526 100644
 +        self.planeNormalLabel.setVisible(visible)
 +        self.planeThicknessSlider.setVisible(visible)
 +        self.planeThicknessLabel.setVisible(visible)
- 
+
      def _update_interpolation_combo(self):
          interp_names = [i.value for i in Interpolation.view_subset()]
          interp = (
@@ -215,7 +215,7 @@ index 19929d1a..cc994526 100644
 @@ -355,11 +343,11 @@ class QtImageControls(QtBaseImageControls):
              self.interpComboBox.addItems(interp_names)
              self.interpComboBox.setCurrentText(interp)
- 
+
 -    def _on_ndisplay_change(self):
 -        """Toggle between 2D and 3D visualization modes."""
 +    def _on_ndisplay_changed(self):
@@ -236,14 +236,14 @@ index 19929d1a..cc994526 100644
 +            self._update_rendering_parameter_visibility()
              self.depictionComboBox.show()
              self.depictionLabel.show()
- 
+
 diff --git a/napari/_qt/layer_controls/qt_labels_controls.py b/napari/_qt/layer_controls/qt_labels_controls.py
 index 0ca652f3..845b81b6 100644
 --- a/napari/_qt/layer_controls/qt_labels_controls.py
 +++ b/napari/_qt/layer_controls/qt_labels_controls.py
 @@ -87,7 +87,6 @@ class QtLabelsControls(QtLayerControls):
          super().__init__(layer)
- 
+
          self.layer.events.mode.connect(self._on_mode_change)
 -        self.layer.events._ndisplay.connect(self._on_ndisplay_change)
          self.layer.events.rendering.connect(self._on_rendering_change)
@@ -256,13 +256,13 @@ index 0ca652f3..845b81b6 100644
 -        self._on_ndisplay_change()
 +
 +        self._on_ndisplay_changed()
- 
+
          color_mode_comboBox = QComboBox(self)
          for index, (data, text) in enumerate(
 @@ -478,15 +478,10 @@ class QtLabelsControls(QtLayerControls):
              )
              self.renderComboBox.setCurrentIndex(index)
- 
+
 -    def _on_ndisplay_change(self):
 -        """Toggle between 2D and 3D visualization modes."""
 -        if self.layer._slice_input.ndisplay == 2:
@@ -277,28 +277,28 @@ index 0ca652f3..845b81b6 100644
 +        self.renderComboBox.setVisible(render_visible)
 +        self.renderLabel.setVisible(render_visible)
          self._on_editable_change()
- 
+
      def deleteLater(self):
 diff --git a/napari/_qt/layer_controls/qt_layer_controls_base.py b/napari/_qt/layer_controls/qt_layer_controls_base.py
 index d872a9ac..47850387 100644
 --- a/napari/_qt/layer_controls/qt_layer_controls_base.py
 +++ b/napari/_qt/layer_controls/qt_layer_controls_base.py
 @@ -3,6 +3,7 @@ from qtpy.QtWidgets import QComboBox, QFormLayout, QFrame, QLabel
- 
+
  from napari._qt.widgets._slider_compat import QDoubleSlider
  from napari.layers.base._base_constants import BLENDING_TRANSLATIONS, Blending
 +from napari.layers.base.base import Layer
  from napari.utils.events import disconnect_events
  from napari.utils.translations import trans
- 
+
 @@ -42,9 +43,11 @@ class QtLayerControls(QFrame):
          Label for the opacity slider widget.
      """
- 
+
 -    def __init__(self, layer):
 +    def __init__(self, layer: Layer):
          super().__init__()
- 
+
 +        self._ndisplay: int = 2
 +
          self.layer = layer
@@ -307,7 +307,7 @@ index d872a9ac..47850387 100644
 @@ -131,6 +134,24 @@ class QtLayerControls(QFrame):
                  self.blendComboBox.findData(self.layer.blending)
              )
- 
+
 +    @property
 +    def ndisplay(self) -> int:
 +        """The number of dimensions displayed in the canvas."""
@@ -334,13 +334,13 @@ index 67187ad6..3e75994f 100644
 --- a/napari/_qt/layer_controls/qt_layer_controls_container.py
 +++ b/napari/_qt/layer_controls/qt_layer_controls_container.py
 @@ -46,7 +46,7 @@ def create_qt_layer_controls(layer):
- 
+
      Parameters
      ----------
 -    layer : napari.layers._base_layer.Layer
 +    layer : napari.layers.Layer
          Layer that needs its controls widget created.
- 
+
      Returns
 @@ -109,6 +109,19 @@ class QtLayerControlsContainer(QStackedWidget):
          self.viewer.layers.events.inserted.connect(self._add)
@@ -359,7 +359,7 @@ index 67187ad6..3e75994f 100644
 +        for widget in self.widgets.values():
 +            if widget is not self.empty_widget:
 +                widget.ndisplay = event.value
- 
+
      def _display(self, event):
          """Change the displayed controls to be those of the target layer.
 @@ -116,7 +129,7 @@ class QtLayerControlsContainer(QStackedWidget):
@@ -378,7 +378,7 @@ index 67187ad6..3e75994f 100644
 +        controls.ndisplay = 3
          self.addWidget(controls)
          self.widgets[layer] = controls
- 
+
 @@ -149,7 +163,6 @@ class QtLayerControlsContainer(QStackedWidget):
          layer = event.value
          controls = self.widgets[layer]
@@ -394,10 +394,10 @@ index 5cd4a69e..92d1463c 100644
 @@ -45,7 +45,7 @@ class QtVectorsControls(QtLayerControls):
          Spin box widget controlling edge line width of vectors.
      """
- 
+
 -    layer: 'napari.layers.Tracks'
 +    layer: 'napari.layers.Vectors'
- 
+
      def __init__(self, layer):
          super().__init__(layer)
 diff --git a/napari/layers/base/base.py b/napari/layers/base/base.py
@@ -415,10 +415,10 @@ index 1520fa3f..1b22b067 100644
 @@ -941,14 +940,10 @@ class Layer(KeymapProvider, MousemapProvider, ABC):
          if self._slice_input == slice_input:
              return
- 
+
 -        old_ndisplay = self._slice_input.ndisplay
          self._slice_input = slice_input
- 
+
 -        if old_ndisplay != ndisplay:
 -            self.events._ndisplay()
 -
@@ -426,7 +426,7 @@ index 1520fa3f..1b22b067 100644
 -        self._update_dims()
 +        self.refresh()
          self._set_editable()
- 
+
      @abstractmethod
--- 
+--
 2.34.1

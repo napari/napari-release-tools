@@ -20,18 +20,18 @@ index 460fed88..27a8ffbd 100644
  import sys
  from functools import partial
 @@ -5,13 +6,11 @@ from typing import Callable, Optional
- 
+
  import appdirs
- 
+
 -from napari._version import __version_tuple__
 +sha_short = f"{os.path.basename(sys.prefix)}_{hashlib.sha1(sys.prefix.encode()).hexdigest()}"
- 
+
  _appname = 'napari'
  _appauthor = False
- 
+
 -version_string = '.'.join(str(x) for x in __version_tuple__[:3])
 -
- 
+
  # all of these also take an optional "version" argument ... but if we want
  # to be able to update napari while using data (e.g. plugins, settings) from
 @@ -21,10 +20,10 @@ user_data_dir: Callable[[], str] = partial(
@@ -54,12 +54,12 @@ index f7a82c76..47dc9e40 100644
 @@ -5,10 +5,10 @@ This is used by the translation loader as the settings models require using
  the translator before the settings manager is created.
  """
- 
+
 -from appdirs import user_config_dir
 +import os
 +
 +from napari.utils._appdirs import user_config_dir
- 
+
  _FILENAME = "settings.yaml"
 -_APPNAME = "Napari"
 -_APPAUTHOR = "Napari"
@@ -73,7 +73,7 @@ index 091a863c..38b33685 100644
 @@ -154,6 +154,16 @@ def sys_info(as_html=False):
      except Exception as e:
          text += f"  - failed to load screen information {e}"
- 
+
 +    text += "<br><b>Settings path:</b><br>"
 +    try:
 +        from napari.settings import get_settings
@@ -87,5 +87,5 @@ index 091a863c..38b33685 100644
      if not as_html:
          text = (
              text.replace("<br>", "\n").replace("<b>", "").replace("</b>", "")
--- 
+--
 2.34.1

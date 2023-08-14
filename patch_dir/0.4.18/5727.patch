@@ -72,7 +72,7 @@ index 50534610..abac0416 100644
 -          pip install -r resources/requirements_mypy.txt
 -          SETUPTOOLS_ENABLE_FEATURES="legacy-editable" pip install -e .[all]
 +          pip install tox
- 
+
        - name: Run mypy on typed modules
 -        run: make typecheck
 +        run: tox -e mypy
@@ -86,7 +86,7 @@ index 82945d96..7bddca90 100644
  typecheck:
 -	mypy napari/settings napari/types.py napari/plugins
 +	tox -e mypy
- 
+
  check-manifest:
  	pip install -U check-manifest
 diff --git a/napari/_vendor/qt_json_builder/qt_jsonschema_form/widgets.py b/napari/_vendor/qt_json_builder/qt_jsonschema_form/widgets.py
@@ -94,7 +94,7 @@ index ce933524..4e245901 100644
 --- a/napari/_vendor/qt_json_builder/qt_jsonschema_form/widgets.py
 +++ b/napari/_vendor/qt_json_builder/qt_jsonschema_form/widgets.py
 @@ -760,6 +760,7 @@ class EnumSchemaWidget(SchemaWidgetMixin, QtWidgets.QComboBox):
- 
+
      @state.setter
      def state(self, value):
 +        value = str(value)
@@ -107,7 +107,7 @@ index 8865a357..6a9b01f9 100644
 +++ b/napari/plugins/_npe2.py
 @@ -1,5 +1,6 @@
  from __future__ import annotations
- 
+
 +from collections import defaultdict
  from typing import (
      TYPE_CHECKING,
@@ -119,18 +119,18 @@ index 8865a357..6a9b01f9 100644
 -    Union,
      cast,
  )
- 
+
 @@ -26,7 +26,7 @@ if TYPE_CHECKING:
      from npe2.manifest.contributions import WriterContribution
      from npe2.plugin_manager import PluginName
      from npe2.types import LayerData, SampleDataCreator, WidgetCreator
 -    from qtpy.QtWidgets import QMenu
 +    from qtpy.QtWidgets import QMenu  # type: ignore [attr-defined]
- 
+
      from napari.layers import Layer
      from napari.types import SampleDict
 @@ -241,7 +241,7 @@ def iter_manifests(
- 
+
  def widget_iterator() -> Iterator[Tuple[str, Tuple[str, Sequence[str]]]]:
      # eg ('dock', ('my_plugin', ('My widget', MyWidget)))
 -    wdgs: DefaultDict[str, List[str]] = DefaultDict(list)
@@ -139,7 +139,7 @@ index 8865a357..6a9b01f9 100644
          wdgs[wdg_contrib.plugin_name].append(wdg_contrib.display_name)
      return (('dock', x) for x in wdgs.items())
 @@ -392,7 +392,7 @@ def _npe2_manifest_to_actions(
- 
+
  def _when_group_order(
      menu_item: contributions.MenuItem,
 -) -> dict[str, Union[str, float, None]]:
@@ -155,13 +155,13 @@ index 147a2994..acee9087 100644
 +# mypy: disable-error-code=empty-body
  """
  All napari hook specifications for pluggable functionality are defined here.
- 
+
 diff --git a/napari/settings/_appearance.py b/napari/settings/_appearance.py
 index fec05d02..2d5674ee 100644
 --- a/napari/settings/_appearance.py
 +++ b/napari/settings/_appearance.py
 @@ -8,7 +8,7 @@ from napari.utils.translations import trans
- 
+
  class AppearanceSettings(EventedModel):
      theme: Theme = Field(
 -        "dark",
@@ -219,14 +219,14 @@ index 1775201c..c6f2a574 100644
          description=trans._("Experimental settings."),
 +        allow_mutation=False,
      )
- 
+
      # private attributes and ClassVars will not appear in the schema
 @@ -72,7 +76,6 @@ class NapariSettings(EventedConfigFileSettings):
          # all of these fields are evented models, so we don't want to break
          # connections by setting the top-level field itself
          # (you can still mutate attributes in the subfields)
 -        allow_mutation = False
- 
+
          @classmethod
          def _config_file_settings_source(cls, settings) -> dict:
 diff --git a/napari/types.py b/napari/types.py
@@ -239,17 +239,17 @@ index 775fec2f..a5682f28 100644
      from magicgui.widgets import FunctionGui
 -    from qtpy.QtWidgets import QWidget
 +    from qtpy.QtWidgets import QWidget  # type: ignore [attr-defined]
- 
- 
+
+
  # This is a WOEFULLY inadequate stub for a duck-array type.
 @@ -76,16 +76,16 @@ class SampleDict(TypedDict):
  # while their names should not change (without deprecation), their typing
  # implementations may... or may be rolled over to napari/image-types
- 
+
 -ArrayBase = np.ndarray
 +ArrayBase: Type[np.ndarray] = np.ndarray
- 
- 
+
+
 -ImageData = NewType("ImageData", ArrayBase)
 -LabelsData = NewType("LabelsData", ArrayBase)
 -PointsData = NewType("PointsData", ArrayBase)
@@ -268,9 +268,9 @@ index 775fec2f..a5682f28 100644
      ImageData,
      LabelsData,
 @@ -135,13 +135,13 @@ def _register_types_with_magicgui():
- 
+
      from napari.utils import _magicgui as _mgui
- 
+
 -    for _type in (LayerDataTuple, List[LayerDataTuple]):
 +    for type_ in (LayerDataTuple, List[LayerDataTuple]):
          register_type(
@@ -282,7 +282,7 @@ index 775fec2f..a5682f28 100644
 -            future_type = Future[_type]  # type: ignore
 +            future_type = Future[type_]  # type: ignore [valid-type]
              register_type(future_type, return_callback=_mgui.add_future_data)
- 
+
      for data_type in get_args(_LayerData):
 @@ -152,20 +152,20 @@ def _register_types_with_magicgui():
          )
@@ -389,5 +389,5 @@ index 7a3e1c2c..13d9ed6d 100644
 +commands =
 +    mypy napari/settings napari/types.py napari/plugins  --check-untyped-defs
 +package = editable-legacy
--- 
+--
 2.34.1

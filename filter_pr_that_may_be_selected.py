@@ -14,7 +14,6 @@ from release_utils import (
     get_repo,
     get_split_date,
     iter_pull_request,
-    pr_num_pattern,
     setup_cache,
     short_cache,
 )

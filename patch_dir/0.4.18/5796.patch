@@ -28,14 +28,14 @@ index dbb4a892..8e9e03ce 100644
 +            if len(self.viewer.layers) != len(model.layers):
 +                continue
              model.dims.current_step = event.value
- 
+
      def _order_update(self):
 @@ -457,4 +459,6 @@ if __name__ == "__main__":
      view.window.add_dock_widget(dock_widget, name="Sample")
      view.window.add_dock_widget(cross, name="Cross", area="left")
- 
+
 +    view.open_sample('napari', 'cells3d')
 +
      napari.run()
--- 
+--
 2.34.1

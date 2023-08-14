@@ -843,7 +843,7 @@ index 778e38dc..47c885c4 100644
 @@ -109,6 +110,28 @@
  html_sourcelink_suffix = ''
  html_title = 'napari'
- 
+
 +favicons = [
 +    {
 +        # the SVG is the "best" and contains code to detect OS light/dark mode

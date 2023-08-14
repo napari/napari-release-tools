@@ -45,13 +45,13 @@ index 0112d644..8a798e5c 100644
 -environment with `conda install -n base -c conda-forge mamba` and use its faster solver
 -by replacing `conda` for `mamba` in the above instructions.
 +1. Overriding your default channels to use only `conda-forge` by adding
-+`--override-channels` and specifying the napari and Python versions explicitly. 
++`--override-channels` and specifying the napari and Python versions explicitly.
 +For example, use {{ python_version_code }} to get Python {{ python_version }} and
-+{{ napari_conda_version }} to specify the napari version as {{ napari_version }}, 
++{{ napari_conda_version }} to specify the napari version as {{ napari_version }},
 +the current release.
 +
-+2. Switching to the new, faster [`libmamba` solver](https://conda.github.io/conda-libmamba-solver/libmamba-vs-classic/), 
-+by updating your `conda` (>22.11), if needed, and then installing and activating 
++2. Switching to the new, faster [`libmamba` solver](https://conda.github.io/conda-libmamba-solver/libmamba-vs-classic/),
++by updating your `conda` (>22.11), if needed, and then installing and activating
 +the solver, as follows:
 +```
 +conda update -n base conda
@@ -59,12 +59,10 @@ index 0112d644..8a798e5c 100644
 +conda config --set solver libmamba
 +```
 +3. Alternately, consider installing [`mamba`](https://github.com/mamba-org/mamba)
-+in your base environment with `conda install -n base -c conda-forge mamba`. 
++in your base environment with `conda install -n base -c conda-forge mamba`.
 +Then you can use `mamba` by replacing `conda` with `mamba` in the installation instructions, for example:
 +```
 +mamba install napari
 +```
 +
  ````
- 
- 

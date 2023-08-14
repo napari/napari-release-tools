@@ -22,7 +22,7 @@ index 4425dc26..d41db739 100644
 @@ -302,4 +302,90 @@ def change_style():
  get_settings().appearance.events.theme.connect(change_style)
  change_style()
- 
+
 -```
 \ No newline at end of file
 +```
@@ -44,7 +44,7 @@ index 4425dc26..d41db739 100644
 +README.md
 +```
 +
-+However, if your project structure is already following a different scheme, 
++However, if your project structure is already following a different scheme,
 +the testing logic might live outside your package, as a top-level directory:
 +
 +```bash
@@ -60,12 +60,12 @@ index 4425dc26..d41db739 100644
 +```
 +
 +Under these circumstances, your build backend (usually `setuptools`) might include `tests` as a
-+separate package that will be installed next to `my_package`! 
++separate package that will be installed next to `my_package`!
 +Most of the time, this is not wanted; e.g. do you want to do `import tests`? Probably not!
 +Additionally, this unwanted behavior might cause installation issues with other projects.
 +
 +Ideally, you could change your project structure to follow the recommended skeleton followed in
-+the cookiecutter template. Howevever, if that's unfeasible, you can fix this in the project metadata files. 
++the cookiecutter template. Howevever, if that's unfeasible, you can fix this in the project metadata files.
 +
 +You need to explicitly _exclude_ the top-level `tests` directory from the packaged contents:
 +
@@ -90,7 +90,7 @@ index 4425dc26..d41db739 100644
 +
 +Note this also applies to other top-level directories, like `test`, `_tests`, `testing`, etc.
 +
-+You can find more information in the 
++You can find more information in the
 +[package discovery documentation for `setuptools`](https://setuptools.pypa.io/en/latest/userguide/package_discovery.html).
 +
 +
@@ -104,7 +104,7 @@ index 4425dc26..d41db739 100644
 +
 +This constitutes an act of source code redistribution, which is usually covered by many licensing schemes.
 +Most of the time, this means you need to explicitly include the vendored project license in the source.
-+This is the case for Apache, BSD and MIT-style licenses. 
++This is the case for Apache, BSD and MIT-style licenses.
 +Do note that some projects might NOT allow redistribution without explicit approval.
 +Others will prevent it entirely... Be mindful and check the requirements before distributing your package!
 +

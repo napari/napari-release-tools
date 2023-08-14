@@ -11,7 +11,6 @@ the missing entries based on GitHub data.
 """
 
 import argparse
-from pathlib import Path
 
 from tqdm import tqdm
 from yaml import safe_load
@@ -26,8 +25,6 @@ from release_utils import (
     iter_pull_request,
     setup_cache,
 )
-
-
 
 
 def main():

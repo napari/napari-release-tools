@@ -21,14 +21,14 @@ index c595123b..9a286c4e 100644
  4. Reloading code during plugin development.
  5. Isolating issues from napari.
  6. Logging and debug messages.
-+7. Debugging segfaults/memory violation errors 
- 
++7. Debugging segfaults/memory violation errors
+
  ## Debugging plugin start-up issues
- 
+
 @@ -287,4 +288,24 @@ DEBUG: 20/09/2022 05:59:23 PM The input string was (logging): fast
  'You entered fast!'
  ```
- 
+
 -The full code changes and new files after applying the changes to the plugin in each step of the examples are [here](https://github.com/seankmartin/napari-plugin-debug/tree/full_code/napari-simple-reload).
 \ No newline at end of file
 +
@@ -38,7 +38,7 @@ index c595123b..9a286c4e 100644
 +
 +If napari crashes with a segfault or memory violation error when using your plugin
 +it may be connected with setting some viewer/layers properties outside main thread.
-+Because of the limitations of the Qt library, such interactions with napari may lead to a crash. 
++Because of the limitations of the Qt library, such interactions with napari may lead to a crash.
 +
 +To test if this is the case, you can use the `NAPARI_ENSURE_PLUGIN_MAIN_THREAD` environment variable to help debug the issue.
 +
@@ -48,9 +48,9 @@ index c595123b..9a286c4e 100644
 +NAPARI_ENSURE_PLUGIN_MAIN_THREAD=1 napari
 +```
 +
-+Next, start using your plugin and observe if 
++Next, start using your plugin and observe if
 +`RuntimeError("Setting attributes on a napari object is only allowed from the main Qt thread.")`
-+occurred. If so, then you need to make sure that all of your plugin code that interacts with napari structures is executed 
++occurred. If so, then you need to make sure that all of your plugin code that interacts with napari structures is executed
 +in the main thread. For more details you could read the [multithreading](https://napari.org/stable/guides/threading.html) section of the documentation.
 \ No newline at end of file
 diff --git a/docs/plugins/test_deploy.md b/docs/plugins/test_deploy.md
@@ -60,20 +60,20 @@ index a94a66fc..a7a397e3 100644
 @@ -12,11 +12,11 @@ We recommend using
  [pytest](https://docs.pytest.org/en/6.2.x/getting-started.html) for testing your
  plugin. Aim for [100% test coverage](./best_practices.md#how-to-check-test-coverage)!
- 
+
 -### The `make_napari_viewer` fixture
 +### The `make_napari_viewer_proxy` fixture
- 
+
  Testing a napari `Viewer` requires some setup and teardown each time.  We have
  created a [pytest fixture](https://docs.pytest.org/en/6.2.x/fixture.html) called
 -`make_napari_viewer` that you can use (this requires that you have napari
 +`make_napari_viewer_proxy` that you can use (this requires that you have napari
  installed in your environment).
- 
+
  To use a fixture in pytest, you simply include the name of the fixture in the
 @@ -24,11 +24,14 @@ test parameters (oddly enough, you don't need to import it!).  For example, to
  create a napari viewer for testing:
- 
+
  ```
 -def test_something_with_a_viewer(make_napari_viewer):
 -    viewer = make_napari_viewer()
@@ -81,10 +81,10 @@ index a94a66fc..a7a397e3 100644
 +    viewer = make_napari_viewer_proxy()
      ...  # carry on with your test
  ```
- 
+
 +If you embed the viewer in your own application and need to access private attributes,
 +you can use the `make_napari_viewer` fixture.
 +
  ### Prefer smaller unit tests when possible
- 
+
  The most common issue people run into when designing tests for napari plugins is
