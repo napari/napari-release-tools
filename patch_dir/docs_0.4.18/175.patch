@@ -1,0 +1,52 @@
+From 11cb46f35c0b85cf77aa0764f6b31f5ecfbb8e08 Mon Sep 17 00:00:00 2001
+From: Grzegorz Bokota <bokota+github@gmail.com>
+Date: Fri, 9 Jun 2023 01:36:23 +0200
+Subject: [PATCH] Pin npe2 version to match installed one (#175)
+
+# Description
+
+The https://github.com/napari/npe2/pull/294 breaks the docs building as
+we use the most recent npe2 repository, not matching npe2 version. In
+this PR I add `git checkout call` to have the npe2 repository cloned in
+a version matching the installed npe2 version.
+
+## Type of change
+- [x] Fixes or improves existing content
+
+
+---------
+
+Co-authored-by: Ashley Anderson <aganders3@gmail.com>
+---
+ docs/_scripts/prep_docs.py | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/docs/_scripts/prep_docs.py b/docs/_scripts/prep_docs.py
+index 3d401e2c..2f652289 100644
+--- a/docs/_scripts/prep_docs.py
++++ b/docs/_scripts/prep_docs.py
+@@ -5,16 +5,25 @@
+ """
+ import sys
+ from pathlib import Path
++from importlib.metadata import version
++
++from packaging.version import parse
+
+ DOCS = Path(__file__).parent.parent.absolute()
+ NPE = DOCS.parent.absolute() / 'npe2'
+
+ def prep_npe2():
+     #   some plugin docs live in npe2 for testing purposes
++    if NPE.exists():
++        return
+     from subprocess import check_call
+
++    npe2_version = version("npe2")
++
+     check_call(f"rm -rf {NPE}".split())
+     check_call(f"git clone https://github.com/napari/npe2 {NPE}".split())
++    if not parse(npe2_version).is_devrelease:
++        check_call(f"git checkout tags/v{npe2_version}".split(), cwd=NPE)
+     check_call([sys.executable, f"{NPE}/_docs/render.py", DOCS / 'plugins'])
+     check_call(f"rm -rf {NPE}".split())

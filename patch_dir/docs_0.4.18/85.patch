@@ -1,0 +1,70 @@
+From b5147ded203f52a18455f36d58c6273cc2ab8226 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Melissa=20Weber=20Mendon=C3=A7a?=
+ <melissawm.github@gmail.com>
+Date: Thu, 12 Jan 2023 00:17:33 -0300
+Subject: [PATCH] Fixes gallery ToC (#85)
+
+* Fixes gallery ToC
+
+- Orders gallery by example title
+- Restores left sidebar for individual example pages
+
+* Removes individual gallery examples from left sidebar
+---
+ docs/conf.py    |  5 +++++
+ docs/gallery.md | 11 ++++++++++-
+ 2 files changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/docs/conf.py b/docs/conf.py
+index b2682a55..58412fd7 100644
+--- a/docs/conf.py
++++ b/docs/conf.py
+@@ -193,6 +193,7 @@
+     '.jupyter_cache',
+     'jupyter_execute',
+     'plugins/_*.md',
++    'gallery/index.rst',
+ ]
+
+ napoleon_custom_sections = [('Events', 'params_style')]
+@@ -199,7 +200,9 @@ def reset_napari_theme(gallery_conf, fname):
+     settings.appearance.theme = 'dark'
+     qtgallery.reset_qapp(gallery_conf, fname)
+
+
++from sphinx_gallery.sorting import ExampleTitleSortKey
++
+ sphinx_gallery_conf = {
+     'examples_dirs': '../examples',  # path to your example scripts
+     'gallery_dirs': 'gallery',  # path to where to save gallery generated output
+@@ -221,6 +225,7 @@ def reset_napari_theme(gallery_conf, fname):
+     'image_scrapers': (qtgallery.qtscraper,),
+     'reset_modules': (reset_napari_theme,),
+     'reference_url': {'napari': None},
++    'within_subsection_order': ExampleTitleSortKey,
+ }
+
+
+diff --git a/docs/gallery.md b/docs/gallery.md
+index bfa4344d..fa0b1fef 100644
+--- a/docs/gallery.md
++++ b/docs/gallery.md
+@@ -1,6 +1,16 @@
++(gallery)=
+ # Gallery
+
++Examples of napari usage.
++
++```{toctree}
++:maxdepth: 1
++
++_tags/tagsindex
++```
++
+ ```{eval-rst}
+ .. include:: gallery/index.rst
+     :start-after: :orphan:
+-```
+\ No newline at end of file
++    :end-before: .. toctree::
++```

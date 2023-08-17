@@ -1,0 +1,24 @@
+From 1990e31ed147e018604253f1eb6900d6e7b1e114 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Melissa=20Weber=20Mendon=C3=A7a?=
+ <melissawm.github@gmail.com>
+Date: Mon, 28 Nov 2022 19:00:17 -0300
+Subject: [PATCH] Fix magicgui objects.inv url for intersphinx (#58)
+
+---
+ docs/conf.py | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/docs/conf.py b/docs/conf.py
+index 47c885c4..6db13afc 100644
+--- a/docs/conf.py
++++ b/docs/conf.py
+@@ -144,8 +144,8 @@
+         'https://napari-plugin-engine.readthedocs.io/en/latest/objects.inv',
+     ],
+     'magicgui': [
+-        'https://napari.org/magicgui/',
+-        'https://napari.org/magicgui/objects.inv',
++        'https://pyapp-kit.github.io/magicgui/',
++        'https://pyapp-kit.github.io/magicgui/objects.inv',
+     ],
+ }

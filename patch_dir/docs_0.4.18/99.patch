@@ -1,0 +1,46 @@
+From 506e476f9b89d0485e6ee13e08d7978f2765bb52 Mon Sep 17 00:00:00 2001
+From: Peter Sobolewski <76622105+psobolewskiPhD@users.noreply.github.com>
+Date: Mon, 13 Feb 2023 14:58:01 +0100
+Subject: [PATCH] Update deploy_docs.yml to use metadata to use proper napari
+ version substitution (#99)
+
+# Description
+
+See https://github.com/napari/napari/issues/5509#issuecomment-1406238725
+The docs live on napari.org don't match PR action downloaded docs when
+doing napari version substitution
+(https://github.com/napari/docs/pull/51)
+
+This PR updates the deploy action with `fetch-depth: 0` that was added
+to the PR `build_docs` action. This should make the version metadata be
+correct (see https://github.com/pypa/setuptools_scm/issues/480)
+
+## Type of change
+<!-- Please delete options that are not relevant. -->
+- [x] Fixes or improves existing content
+- [ ] Adds new content page(s)
+- [ ] Fixes or improves workflow, documentation build or deployment
+
+# References
+Adresses issue noted here
+https://github.com/napari/napari/issues/5509#issuecomment-1406238725
+
+## Final checklist:
+- [x] My PR is the minimum possible work for the desired functionality
+---
+ .github/workflows/deploy_docs.yml | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/.github/workflows/deploy_docs.yml b/.github/workflows/deploy_docs.yml
+index 0ac9e65a..4a1fd790 100644
+--- a/.github/workflows/deploy_docs.yml
++++ b/.github/workflows/deploy_docs.yml
+@@ -30,6 +30,8 @@ jobs:
+           path: napari-repo
+           ref: main
+           repository: napari/napari
++          # ensure version metadata is proper
++          fetch-depth: 0
+
+       - name: Copy examples to docs folder
+         run: |

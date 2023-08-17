@@ -1,0 +1,499 @@
+From a2dfb0b4a8449e2ece5f72dd4cc33d2204ddb3fb Mon Sep 17 00:00:00 2001
+From: Nadalyn-CZI <113559244+Nadalyn-CZI@users.noreply.github.com>
+Date: Wed, 21 Jun 2023 14:26:25 -0500
+Subject: [PATCH] Add documentation on using virtual environments for testing
+ in napari based on 2022-01 workshop by Talley Lambert (#50)
+
+# Description
+Adding content on virtual environments from the Talley youtube tutorial on plugins.
+
+## Type of change
+- [x] This change required adding documentation
+
+## Final checklist:
+- [x] My PR is the minimum possible work for the desired functionality
+
+---------
+
+Co-authored-by: Draga Doncila Pop <17995243+DragaDoncila@users.noreply.github.com>
+Co-authored-by: Peter Sobolewski <76622105+psobolewskiPhD@users.noreply.github.com>
+---
+ docs/_toc.yml                                 |   8 ++
+ .../1-virtual-environments.md                 |  67 ++++++++++
+ .../2-deploying-your-plugin.md                | 114 ++++++++++++++++++
+ .../3-version-management.md                   |  46 +++++++
+ .../4-developer-tools.md                      |  76 ++++++++++++
+ .../virtual_environment_docs/5-survey.md      |  97 +++++++++++++++
+ .../plugins/virtual_environment_docs/index.md |   9 ++
+ 7 files changed, 417 insertions(+)
+ create mode 100644 docs/plugins/virtual_environment_docs/1-virtual-environments.md
+ create mode 100644 docs/plugins/virtual_environment_docs/2-deploying-your-plugin.md
+ create mode 100644 docs/plugins/virtual_environment_docs/3-version-management.md
+ create mode 100644 docs/plugins/virtual_environment_docs/4-developer-tools.md
+ create mode 100644 docs/plugins/virtual_environment_docs/5-survey.md
+ create mode 100644 docs/plugins/virtual_environment_docs/index.md
+
+diff --git a/docs/_toc.yml b/docs/_toc.yml
+index e5c7e695..c51a3836 100644
+--- a/docs/_toc.yml
++++ b/docs/_toc.yml
+@@ -93,6 +93,14 @@ subtrees:
+           - file: plugins/testing_workshop_docs/3-readers-and-fixtures
+           - file: plugins/testing_workshop_docs/4-test-coverage
+           - file: plugins/testing_workshop_docs/testing-resources
++      - file: plugins/virtual_environment_docs/index
++        subtrees:
++        - entries:
++          - file: plugins/virtual_environment_docs/1-virtual-environments
++          - file: plugins/virtual_environment_docs/2-deploying-your-plugin
++          - file: plugins/virtual_environment_docs/3-version-management
++          - file: plugins/virtual_environment_docs/4-developer-tools
++          - file: plugins/virtual_environment_docs/5-survey
+   - file: community/index
+     subtrees:
+     - titlesonly: True
+diff --git a/docs/plugins/virtual_environment_docs/1-virtual-environments.md b/docs/plugins/virtual_environment_docs/1-virtual-environments.md
+new file mode 100644
+index 00000000..720485fb
+--- /dev/null
++++ b/docs/plugins/virtual_environment_docs/1-virtual-environments.md
+@@ -0,0 +1,67 @@
++# Virtual environments
++
++This guide explains the value of using virtual environments and how to create and remove them.
++
++## This guide covers:
++* [The importance of virtual environments](#overview)
++* [Creating environments](#creating-environments)
++* [Removing environments](#removing-environments)
++
++## Overview
++A virtual environment is an isolated collection of packages, settings, and an associated Python interpreter, that allows multiple different collections to exist on the same system. They are created on top of an existing Python installation, known as the virtual environment's “base” python, and may optionally be isolated from the packages in the base environment, so only those explicitly installed in the virtual environment are available.
++
++ More information on why virtual environments are created and how they can help you can be found on the [python website](https://docs.python.org/3/library/venv.html#creating-virtual-environments) and in [this introductory workshop](https://hackmd.io/@talley/SJB_lObBi#What-is-a-virtual-environment).
++
++Virtual environments are super important! They allow you to isolate your project from other Python projects. They allow you to experiment with various packages and versions without fear of breaking your entire system (and needing to reinstall everything). As you install packages over time, you will inevitably install something that doesn’t “play well” with something else that is already installed. In some cases this can be hard to recover from. With virtual environments, you can just create a fresh environment and start again – without needing to do major surgery on your system.
++
++There are several tools available for creating and managing virtual environments.  One of the most popular, comprehensive tools is Conda. Wikipedia explains that [Conda is an open-source, cross-platform, language-agnostic package manager and environment management system.](https://en.wikipedia.org/wiki/Conda_(package_manager)) It was originally developed to solve difficult package management challenges faced by Python data scientists. The Conda package and environment manager is included in all versions of **Anaconda**, **Miniconda**, and **Anaconda Repository**.
++
++## Install and Config
++Install [miniconda](https://docs.conda.io/en/latest/miniconda.html) or [mini forge](https://github.com/conda-forge/miniforge) (comes pre-configured with `conda-forge`) in the home directory.
++
++Adding the `conda-forge` channel to the conda config makes packages in `conda-forge` visible to the conda installer. Setting `channel_priority` to strict ensures packages in high priority channels are always installed over packages of the same name in lower priority channels. See [this guide](https://conda.io/projects/conda/en/latest/user-guide/tasks/manage-channels.html) for more details.
++
++Make sure the `conda-forge` channel is in your config by using the following commands:
++```console
++    $conda config --add channels conda-forge
++    $conda config --set channel_priority strict
++```
++
++**Note:** The default anaconda channel has some very outdated packages, e.g. [old version of Qt](https://forum.image.sc/t/napari-issues-on-bigsur/52630/10).
++
++## Creating environments
++
++Create environments liberally!
++
++To create an environment, use the following commands at the command prompt (terminal):
++
++```console
++    $ conda create -n name-of-env python
++    $ conda activate name-of-env
++    $ pip/conda install <whatever>
++```
++
++Virtual environments are made to be ephemeral.
++
++## Removing environments
++Consider your environment to be disposable.
++If you are ever having weird problems, nuke your environment and start over using the following commands:
++
++```console
++    $ conda activate base
++    $ conda remove -n name-of-env --all -y
++    $ conda create -n name-of-env python
++    $ conda activate name-of-env
++    $ pip/conda install <whatever>
++```
++
++Encourage your users to do the same. You can waste a lot of time trying to debug something that someone unknowingly did when installing a variety of things into their environment. If they can provide a repeatable example (starting from environment creation), then it's worth debugging.
++
++## Other topics in this series:
++
++* [Deploying your plugin](./2-deploying-your-plugin.md)
++* [Version management](./3-version-management.md)
++* [Developer tools](./4-developer-tools.md)
++* [Survey/Q&A](./5-survey.md)
++
++The next topic in this series is [Deploying your plugin](./2-deploying-your-plugin.md).
+diff --git a/docs/plugins/virtual_environment_docs/2-deploying-your-plugin.md b/docs/plugins/virtual_environment_docs/2-deploying-your-plugin.md
+new file mode 100644
+index 00000000..fa3d8d42
+--- /dev/null
++++ b/docs/plugins/virtual_environment_docs/2-deploying-your-plugin.md
+@@ -0,0 +1,114 @@
++# Deploying your plugin
++
++This guide explains some of the techniques you can use to deploy your plugin.
++
++## This guide covers:
++* [Overview of PyPI and Anaconda](#overview-of-pypi-and-anaconda)
++* [Building your package](#building-your-package)
++* [Deploying plugins to PyPI](#deploying-plugins-to-pypi)
++    - [Manually via twine](#manually-via-twine)
++    - [Automatically via GitHub actions](#automatically-via-github-actions)
++* [Deploying plugins to Anaconda](#deploying-to-anaconda)
++
++
++## Overview of PyPI and Anaconda
++PyPI and Anaconda are two options for how you distribute your package and allow your users to more easily find and install it.  Try to deploy to both! But for now, try to at least use PyPI. You can always also provide your users with manual installation instructions (e.g. if you want them to use `conda` or have specific dependencies).
++
++### Building your package
++`sdist` means source distribution. An `sdist` includes all of the files that are required to *build* your package. An `sdist` may require specific additional software (e.g. compilers) to actually build.
++
++`wheel` is a prebuilt package, ready to drop into your `site-packages` directory. It includes compiled OS-specific extensions (if applicable).
++
++You are *strongly* encouraged to ship both! If the `wheel` is not present, `pip` will try to build it from the `sdist` before installation, and that may fail depending on the package. To see if a given package ships a `wheel`, check here: https://pypi.org/project/napari/#files
++
++**Note:** This goes for dependencies too! Check all your dependencies for wheel availability.
++
++**[build](https://pypa-build.readthedocs.io/en/latest/ )** is the recommended package builder that bundles your source code into `sdist` or `wheel` distributions. Install `build` into your local environment and then run it at the root of your package to build your package, as shown below:
++
++```console
++   pip install build
++   python -m build .
++```
++
++## Deploying plugins to PyPI
++
++### Manually via **twine**.
++[twine](https://twine.readthedocs.io/en/latest/ ) is a command line client you can use to upload your distribution to PyPI. Note that you will need to set up a PyPI account and authenticate yourself when uploading. See [this great guide](https://packaging.python.org/en/latest/tutorials/packaging-projects/) for a detailed tutorial to building and sharing your first Python packages.
++
++```console
++
++    # twine is a PyPI Client
++    # build is a PEP 517 package builder
++    $ pip install twine build
++
++    # create a wheel and an sdist
++    $ python -m build
++
++    # (Optional) upload to test PyPI
++    $ twine upload -r testpypi dist/*
++
++    # Upload to PyPI
++    $ twine upload dist/*
++
++```
++**Note:** `python -m build` is the modern alternative to `setuptools`' `python setup.py sdist bdist_wheel`. It calls `setuptools` behind the scenes.
++
++### Automatically via GitHub actions
++This requires either:
++* Running `twine` as above in a workflow after setting up Python and installing it
++or
++* Using a pre-made [GitHub action](https://github.com/pypa/gh-action-pypi-publish)
++
++Here is an example workflow that manually deploys using `twine` when tests pass and you push a tagged commit.
++
++```yaml
++#your-repo/.github/workflows/deploy.yaml
++jobs:
++    deploy:
++      name: Deploy
++      runs on: ubuntu-latest
++      if: “success() && startsWith(github.ref, ‘refs/tags/’)”
++      steps:
++    - uses: actions/checkout@v2
++
++    -     name: Set up Python
++           uses: actions/setup-python@v2
++     -     with:
++           python-version “3.x”
++
++     -     name: install
++           run:
++               pip install -U pip
++               pip install -U build twine
++               python -m build
++
++    -     name: Build and publish
++          run:  twine upload dist/*
++          env:
++             TWINE_USERNAME: __token__
++             TWINE_PASSWORD: ${{ secrets.TWINE_API_KEY }}
++
++```
++
++  **Note:** Gate this action on some criterion, e.g. a git tag as above, or [some other criterion](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows).
++
++## Deploying to Anaconda
++This is only a brief guide to deploying to `conda-forge`. More information can be found in the [conda-forge docs](https://conda-forge.org/docs/maintainer/adding_pkgs.html).
++
++1. Fork https://github.com/conda-forge/staged-recipes
++2. Create a new branch
++3. Create a new folder in recipes directory (copy the existing example)
++4. Update the **meta.yaml** file to include your package's build and run requirements
++5. Commit and open a PR to https://github.com/conda-forge/staged-recipes
++
++Once your recipe is approved and merged, the rest happens *automagically*, and your package will appear on the anaconda cloud.
++
++This is **far** easier if you already have an `sdist` published to PyPI.
++
++## Other topics in this series:
++* [Virtual environments](./1-virtual-environments.md)
++* [Version management](./3-version-management.md)
++* [Developer tools](./4-developer-tools.md)
++* [Survey/Q&A](./5-survey.md)
++
++The next topic in this series is [Version management](./3-version-management.md).
+diff --git a/docs/plugins/virtual_environment_docs/3-version-management.md b/docs/plugins/virtual_environment_docs/3-version-management.md
+new file mode 100644
+index 00000000..bea5d577
+--- /dev/null
++++ b/docs/plugins/virtual_environment_docs/3-version-management.md
+@@ -0,0 +1,46 @@
++# Version management
++
++This guide covers the methods of updating your version string everywhere.
++
++## This guide covers:
++* [Using git tags](#using-git-tags)
++* [Using a local script to edit files](#using-a-local-script-to-edit-files)
++* [Manually](#manually)
++
++Your goal is to make sure that you bump your version string everywhere it may appear, in unison, prior to publishing your package.  A version number can be in `init.py`, `setup.cfg`, etc.
++
++In increasing order of work, but decreasing order of magic, the methods of bumping your version string are listed below.
++
++## Using git tags:
++You can use [setuptools_scm](https://github.com/pypa/setuptools_scm) to automatically generate version numbers for your package based on tagged commits.
++
++   ```console
++   # configure in pyproject.toml, then…
++   $ git tag -a v0.1.0 -m v0.1.0
++  ```
++
++  The next time you run `python -m build`, either locally or in GitHub actions, your package version will be based on the latest git tag.
++
++## Using a local script to edit files:
++One tool for doing this is [bump2version](https://github.com/c4urself/bump2version). For example:
++```console
++   $ pip install bump2version
++   # configure all the places you use your version, then, to update:
++   $ bump2version --current-version 0.5.1 minor
++```
++
++## Manually
++Updating the version number manually involves going through everywhere your version is declared and changing the version number before building your distribution. This is ***not*** recommended, you *will* eventually make mistakes and have mismatched version/metadata somewhere. In some cases this will lead to your build process failing, but it can fail silently too.
++
++## Tips:
++* The "best" versioning and deployment workflow is the one you will actually use!
++* Get comfortable with at least one workflow for versioning and deploying your package *otherwise, you won't do it.*
++
++The next topic in this series is [Developer tools](./4-developer-tools.md).
++
++## Other topics in this series:
++
++* [Virtual environments](./1-virtual-environments)
++* [Deploying your plugin](./2-deploying-your-plugin.md)
++* [Developer tools](./4-developer-tools.md)
++* [Survey](./5-survey.md)
+diff --git a/docs/plugins/virtual_environment_docs/4-developer-tools.md b/docs/plugins/virtual_environment_docs/4-developer-tools.md
+new file mode 100644
+index 00000000..0a0da33d
+--- /dev/null
++++ b/docs/plugins/virtual_environment_docs/4-developer-tools.md
+@@ -0,0 +1,76 @@
++# Developer tools
++
++This guide explains the different types of tools that can help you develop and test your code.
++
++## This guide covers:
++* [General tools](#general-tools)
++    - [Linting tools](#linting-tools)
++    - [Formatting tools](#formatting-tools)
++    - [Pre-commit tools](#pre-commit-tools)
++* [napari plugin-specific tools](#napari-plugin-specific-tools)
++
++## General tools
++All of these are *optional*.
++Many are very helpful, but they do take a little time to learn. The more time you spend coding, the greater the return-on-investment for using them. It's a personal decision on whether the time saved by using these outweighs the time required to understand the tools.
++
++### Linting tools
++These _check_ your code.
++* [flake8](https://flake8.pycqa.org/) - checks various code style conventions, unused variables, line spacings, etc…
++* [mypy](https://github.com/python/mypy)
++    - Static type checker: enforces proper usage of types.
++    - Super useful once you get the hang of it, but definitely an intermediate-advanced tool.
++    - Along with high test coverage, probably the best time-saver and project robustness tool.
++
++### Formatting tools
++These _auto-modify_ your code.
++* [black](https://github.com/psf/black)
++  Forces code to follow specific style, indentations, etc...
++* [autoflake](https://github.com/myint/autoflake)
++  Auto-fixes some flake8 failures.
++* [isort](https://github.com/PyCQA/isort)
++  Auto-sorts and formats your imports.
++* [setup-cfg-fmt](https://github.com/asottile/setup-cfg-fmt)
++  Sorts and enforces conventions in setup.cfg.
++
++### Pre-commit tools
++* [pre-commit](https://pre-commit.com/), runs all your checks each time you run git commit, preventing bad code from ever getting checked in.
++```console
++     $ pip install pre-commit
++     # install the pre-commit "hook"
++     $ pre-commit install
++     # then configure in .pre-commit-config.yaml
++     # (optionally) Run hooks on demand
++     $ pre-commit run --all-files
++```
++
++* [pre-commit-ci](https://pre-commit.ci/)
++    - Runs all your pre-commit hooks on CI (Continuous Integration).
++    - Useful even if contributors don't install and run your pre-commit hooks locally before they open a PR.
++
++## Napari plugin-specific tools
++
++* [Static plugin checks](https://github.com/tlambert03/napari-plugin-checks)
++    - This is a *pre-commit hook*. It is intended to be added to your
++    `.pre-commit-config.yaml` file.
++    - It *statically* (without importing) checks various best practices about your plugin:
++```yaml
++    repo: https://github.com/tlambert03/napari-plugin-action
++    rev: v0.2.0
++    hooks: id: napari-plugin-checks
++```
++
++* [Plugin check GitHub action](https://github.com/tlambert03/napari-plugin-action)  (work in progress)
++    - It is intended to be added to your GitHub workflow.
++    - It (currently) checks that your plugin is installable, and performs a few sanity checks about Qt backends and dock widgets.
++```yaml
++     uses: tlambert03/napari-plugin-action@main
++     with: package_name:  <your-package-name>
++```
++
++The next topic in this series is the [Survey/Q&A](./5-survey.md).
++
++## Other topics in this series:
++* [Virtual environments](./1-virtual-environments)
++* [Deploying your plugin](./2-deploying-your-plugin.md)
++* [Version management](./3-version-management.md)
++* [Survey/Q&A](./5-survey.md)
+diff --git a/docs/plugins/virtual_environment_docs/5-survey.md b/docs/plugins/virtual_environment_docs/5-survey.md
+new file mode 100644
+index 00000000..48f14f9f
+--- /dev/null
++++ b/docs/plugins/virtual_environment_docs/5-survey.md
+@@ -0,0 +1,97 @@
++# Survey/Q&A
++
++This guide contains questions that were submitted to our survey on testing.
++
++## This guide covers:
++- [What are the best practices to test a plugin with multiple sequential steps?](#what-are-the-best-practices-to-test-a-plugin-with-multiple-sequential-steps)
++- [How do you test widgets, the napari viewer, graphical user interfaces, and Qt in general?](#how-do-you-test-widgets-the-napari-viewer-graphical-user-interfaces-and-qt-in-general)
++- [How to find the different signals or slots?](#how-to-find-the-different-signals-or-slots)
++- [How do you avoid github tests failing?](#how-do-you-avoid-github-tests-failing)
++- [How do you make a process cancellable](#how-do-you-make-a-process-cancellable)
++- [Are there testing environments in napari?](#are-there-testing-environments-in-napari)
++- [Introduction to npe2? Migrating to new plug-in architecture?](#introduction-to-npe2-migrating-to-new-plugin-architecture)
++- [What is the optimal setup to quickly iterate in widget development?](#what-is-the-optimal-setup-to-quickly-iterate-in-widget-development)
++
++## What are the best practices to test a plugin with multiple sequential steps?
++e.g. Is it ok to rely on the "results" of a test to run the next test or should they all be fully independent?
++
++Answer:
++* Ideally, aim for unit testing.
++* Tests should not pass/fail together.
++* Use [fixtures](https://docs.pytest.org/en/6.2.x/fixture.html) to provide a test with inputs, even if you have to make them up.
++* Use [mocks (mock-ups)](https://docs.python.org/3/library/unittest.mock.html) to assert that specific calls are made, without necessarily caring about what happens after that call is made.
++
++*This is definitely an art form. It takes time. Be patient.*
++
++## How do you test widgets, the napari viewer, graphical user interfaces, and Qt in general?
++Answer:
++* Try not to!
++* You should generally trust that a button click (for example) will call your callback and focus on testing that your callback does what it's supposed to do given that it gets called following some UI interaction.
++* However: If you have a scenario where you are actually creating a complicated widget directly in Qt, see `pytest-qt` for lots of tips, specifically `qtbot`.
++    - [pytest-qt](https://pytest-qt.readthedocs.io/en/latest/intro.html)
++    - [qtbot](https://pytest-qt.readthedocs.io/en/latest/reference.html?highlight=qtbot#module-pytestqt.qtbot)
++* Oftentimes, this comes down to knowing and/or learning the Qt API really well.
++* Please see also the [In-depth guide to plugin testing](../testing_workshop_docs/index.md).
++## How to find the different signals or slots?
++Question: How can we find the different signals/slots we can connect callbacks to as the user interacts with the core napari interface e.g. creating/editing/deleting a `points` or `shapes` layer?
++
++Answer:
++[https://napari.org/guides/stable/events_reference.html](https://napari.org/stable/guides/events_reference.html)
++
++Granted, this is a work in progress.
++
++For example, these events are emitted when the user interacts with the layer list:
++```console
++    Viewer.layers.events.inserted
++    Viewer.layers.events.removed
++    Viewer.layers.events.moved
++    Viewer.layers.events.changed
++    Viewer.layers.events.reordered
++```
++
++Getting an event when the user is editing the data inside a `points` or `shapes` layer (outside of the GUI interface) is complicated, because the user will be directly editing the native array object.
++
++## How do you avoid github tests failing?
++Answer:
++* First make sure all your tests are passing locally.
++* After that, it's complicated. More background or context is needed to answer this question.
++
++## How do you make a process cancellable?
++Question: How do you make a process cancellable to interrupt a method that is running in a for loop, for example?
++
++Answer:
++* In single-threaded python, use `Ctrl-C`
++* In multithreaded python, there are many different patterns. Consider using a [generator-based thread worker](https://napari.org/stable/guides/threading.html#generators-for-the-win).
++
++## Are there testing environments in napari?
++Answer: Napari does not create or otherwise manage environments.
++
++## Introduction to npe2? Migrating to new plugin architecture?
++Answer:
++* The primary difference is in how plugins are discovered:
++    - npe1 used decorators, requiring module import.
++    - npe2 uses static manifests (`napari.yaml`), describing contributions without requiring import.
++    - See also the [Your First Plugin tutorial](https://napari.org/stable/plugins/first_plugin.html)
++
++Additional resources:
++* [Contributions Reference](https://napari.org/stable/plugins/contributions.html)
++* [Guides for each type of contribution](https://napari.org/stable/plugins/guides.html)
++* [Migration guide](https://napari.org/stable/plugins/npe2_migration_guide.html)
++
++## What is the optimal setup to quickly iterate in widget development?
++Answer:
++* Create a script that will start napari and load your widget without any UI interaction.
++* Don't test as a plugin. Start by directly calling `viewer.window.add_dock_widget` with a manually created widget.
++* Familiarize yourself with the [IPython auto-reload features](https://ipython.readthedocs.io/en/stable/config/extensions/autoreload.html).
++* Consider using `watchmedo` from [watchdog](https://github.com/gorakhargosh/watchdog).
++  This will monitor a file/directory for changes, and re-run a command each time (which is why step #1 is also useful).
++
++
++## Other guides in this series:
++
++* [Virtual environments](./1-virtual-environments.md)
++* [Deploying your plugin](./2-deploying-your-plugin.md)
++* [Version management](./3-version-management.md)
++* [Developer tools](./4-developer-tools.md)
++
++This is the last guide in this series.
+diff --git a/docs/plugins/virtual_environment_docs/index.md b/docs/plugins/virtual_environment_docs/index.md
+new file mode 100644
+index 00000000..89b1c29c
+--- /dev/null
++++ b/docs/plugins/virtual_environment_docs/index.md
+@@ -0,0 +1,9 @@
++# Tools and tips when building napari plugins or: firehose of stuff I wish I knew earlier
++
++These guides will be more valuable if you are familiar with the Python programming language and the napari software. They are taken from the [January 2022 Testing workshop](https://www.youtube.com/watch?v=IsHYnI8Tbfw&list=PLilvrWT8aLuYID3YZ7KddS5ky2SaH4DKK) video. These guides stand on their own and are summaries of the information in the video. They are listed here in the order they were presented but they do not necessarily build on each other.
++
++* 1: [Virtual environments](./1-virtual-environments) Starts at about minute 49:08.
++* 2: [Deploying your plugin](./2-deploying-your-plugin.md) Starts at about minute 54:00.
++* 3: [Version management](./3-version-management.md) Starts at about timestamp 1:01:00.
++* 4: [Developer tools](./4-developer-tools.md) Starts at about timestamp 1:04:12.
++* 5: [Survey/Q&A](./5-survey.md) Starts at about timestamp 1:15:27.

@@ -1,0 +1,40 @@
+From 6e7b431a416ada7b0b2f86c21eeaacba9e163e17 Mon Sep 17 00:00:00 2001
+From: Peter Sobolewski <76622105+psobolewskiPhD@users.noreply.github.com>
+Date: Mon, 19 Dec 2022 16:17:16 +0100
+Subject: [PATCH] Feature: add `copy` button for code blocks using
+ `sphinx-copybutton` (#76)
+
+* add 'sphinx_copybutton'
+
+* update requirements.txt
+---
+ docs/conf.py | 1 +
+ setup.cfg    | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/docs/conf.py b/docs/conf.py
+index 0ab8f4a3..d4840071 100644
+--- a/docs/conf.py
++++ b/docs/conf.py
+@@ -59,6 +59,7 @@ extensions = [
+     "sphinx_panels",
+     "sphinx.ext.viewcode",
+     "sphinx-favicon",
++    "sphinx_copybutton",
+     "sphinx_gallery.gen_gallery",
+     "sphinx_tags",
+ ]
+diff --git a/setup.cfg b/setup.cfg
+index 4702e4a2..b994639d 100644
+--- a/setup.cfg
++++ b/setup.cfg
+@@ -152,6 +152,7 @@ docs =
+     sphinx-tags
+     sphinx-panels
+     sphinx-external-toc
++    sphinx-copybutton
+     sphinx-gallery
+     sphinx_autodoc_typehints==1.12.0
+     myst-nb
+--
+2.34.1

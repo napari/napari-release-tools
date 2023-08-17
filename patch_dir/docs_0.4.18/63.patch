@@ -1,0 +1,266 @@
+From 18aa092e2e385b56c216b4f36f0d3ea63f9af122 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Melissa=20Weber=20Mendon=C3=A7a?= <melissawm@gmail.com>
+Date: Thu, 5 Jan 2023 00:03:30 -0300
+Subject: [PATCH] Add sphinx-design cards to Usage landing page (#63)
+
+This PR does some basic reorganization of some items in the Usage
+section of the docs, to bring more visibility to the Layers how-to
+guides and the napari workshop materials.
+
+This also adds a mention of the new napari-workshop-template repository.
+
+Included in this change is the move from sphinx-tabs/sphinx-panels to
+sphinx-design, as the first two packages are being deprecated in favor
+of the latter.
+---
+ docs/_toc.yml                              |  4 +-
+ docs/conf.py                               |  3 +-
+ docs/further-resources/napari-workshops.md | 14 +++++
+ docs/guides/index.md                       |  1 +
+ docs/howtos/index.md                       |  1 +
+ docs/howtos/layers/index.md                |  1 +
+ docs/plugins/first_plugin.md               | 12 +++--
+ docs/requirements.txt                      |  6 ++-
+ docs/tutorials/fundamentals/quick_start.md |  2 +-
+ docs/tutorials/index.md                    |  1 +
+ docs/usage.md                              | 60 ++++++++++++++++++++--
+ requirements.txt                           |  3 +-
+ 12 files changed, 90 insertions(+), 18 deletions(-)
+
+diff --git a/docs/_toc.yml b/docs/_toc.yml
+index 3b81ff13..86ce42eb 100644
+--- a/docs/_toc.yml
++++ b/docs/_toc.yml
+@@ -33,8 +33,6 @@ subtrees:
+             subtrees:
+             - entries:
+               - file: tutorials/tracking/cell_tracking
+-      - file: further-resources/napari-workshops
+-      - file: further-resources/sample_data
+       - file: howtos/index
+         subtrees:
+         - titlesonly: True
+@@ -71,6 +69,8 @@ subtrees:
+           - file: guides/app_model
+           - file: guides/events_reference
+       - file: further-resources/glossary
++      - file: further-resources/napari-workshops
++      - file: further-resources/sample_data
+       - file: gallery
+   - file: plugins/index
+     subtrees:
+diff --git a/docs/conf.py b/docs/conf.py
+index 55991dbe..f1300a30 100644
+--- a/docs/conf.py
++++ b/docs/conf.py
+@@ -57,10 +57,9 @@
+     "sphinx.ext.autosummary",
+     "sphinx.ext.intersphinx",
+     "sphinx_external_toc",
+-    "sphinx_tabs.tabs",
++    "sphinx_design",
+     'myst_nb',
+     #    "sphinx_comments",
+-    "sphinx_panels",
+     "sphinx.ext.viewcode",
+     "sphinx-favicon",
+     "sphinx_copybutton",
+diff --git a/docs/further-resources/napari-workshops.md b/docs/further-resources/napari-workshops.md
+index 331a437f..23be94b2 100644
+--- a/docs/further-resources/napari-workshops.md
++++ b/docs/further-resources/napari-workshops.md
+@@ -1,3 +1,4 @@
++(napari-workshops)=
+ # napari workshops
+
+ There have been many workshops and tutorials given about napari.
+@@ -51,3 +52,16 @@ You can find more videos of talks, tutorials and demos on the
+ * June 2020, [NEUBIAS Academy@Home workshop](http://eubias.org/NEUBIAS/training-schools/neubias-academy-home/neubias-academy-archive-spring2020/)
+   * [Watch it here](https://www.youtube.com/watch?v=VgvDSq5aCDQ) (1 hour and 30 minute video)
+   * [Workshop materials available here](https://github.com/sofroniewn/napari-training-course)
++
++### Add your own workshop to this list
++
++If you have organized a napari workshop and would like to see it featured here
++in this page, you can
++[send a Pull Request to the napari/docs repository](../developers/documentation/index.md)
++or contact the core developers on [zulip chat](https://napari.zulipchat.com/login/).
++
++### napari workshop template
++
++If you are looking to create your own workshop, you can use the
++[napari workshop template](https://github.com/napari/napari-workshop-template)
++as a starting point.
+diff --git a/docs/guides/index.md b/docs/guides/index.md
+index ae4d4e0a..dd7063b4 100644
+--- a/docs/guides/index.md
++++ b/docs/guides/index.md
+@@ -1,3 +1,4 @@
++(explanations)=
+ # In-depth explanations
+
+ ```{note}
+diff --git a/docs/howtos/index.md b/docs/howtos/index.md
+index 33dea374..81ccddd4 100644
+--- a/docs/howtos/index.md
++++ b/docs/howtos/index.md
+@@ -1,3 +1,4 @@
++(how-tos)=
+ # How-to guides
+
+ These guides show you how to complete tasks with napari. They assume you have
+diff --git a/docs/howtos/layers/index.md b/docs/howtos/layers/index.md
+index 95fcac39..98cdfbed 100644
+--- a/docs/howtos/layers/index.md
++++ b/docs/howtos/layers/index.md
+@@ -1,3 +1,4 @@
++(using-layers)=
+ # Using layers
+
+ [Layers](napari.layers) are the viewable objects that can be added to a viewer.
+diff --git a/docs/plugins/first_plugin.md b/docs/plugins/first_plugin.md
+index 89ae8aae..5a6296fe 100644
+--- a/docs/plugins/first_plugin.md
++++ b/docs/plugins/first_plugin.md
+@@ -54,14 +54,16 @@ cd napari-hello
+ In your root `napari-hello` folder, create a `pyproject.toml` and `setup.cfg` file,
+ then create a `napari_hello` directory with a single `__init__.py` file inside of it.
+
+-````{tabbed} macOS / Linux
++::::{tab-set}
++
++:::{tab-item} macOS / Linux
+ ```sh
+ mkdir napari_hello
+ touch napari_hello/__init__.py napari_hello/napari.yaml pyproject.toml setup.cfg
+ ```
+-````
++:::
+
+-````{tabbed} Windows
++:::{tab-item} Windows
+ ```bat
+ mkdir napari_hello
+ copy /b napari_hello\__init__.py +,,
+@@ -69,7 +71,9 @@ copy /b napari_hello\napari.yaml +,,
+ copy /b pyproject.toml +,,
+ copy /b setup.cfg +,,
+ ```
+-````
++:::
++
++::::
+
+ Your project should now look like this:
+
+diff --git a/docs/requirements.txt b/docs/requirements.txt
+index f735e869..6c112435 100644
+--- a/docs/requirements.txt
++++ b/docs/requirements.txt
+@@ -1,7 +1,8 @@
+ sphinx<5
+-sphinx-tabs
+-sphinx-panels
++sphinx-tags
++sphinx-design
+ sphinx-external-toc
++sphinx-favicon
+ sphinx-gallery
+ sphinx_autodoc_typehints==1.12.0
+ myst-nb
+@@ -9,3 +10,4 @@ napari-sphinx-theme
+ matplotlib
+ qtgallery
+ lxml
++imageio-ffmpeg
+diff --git a/docs/tutorials/fundamentals/quick_start.md b/docs/tutorials/fundamentals/quick_start.md
+index 8e779ead..3a3165c8 100644
+--- a/docs/tutorials/fundamentals/quick_start.md
++++ b/docs/tutorials/fundamentals/quick_start.md
+@@ -11,7 +11,7 @@ kernelspec:
+   language: python
+   name: python3
+ ---
+-
++(napari-quick-start)=
+ # napari quick start
+
+ +++
+diff --git a/docs/tutorials/index.md b/docs/tutorials/index.md
+index 7c1ffea6..64d23c1a 100644
+--- a/docs/tutorials/index.md
++++ b/docs/tutorials/index.md
+@@ -1,3 +1,4 @@
++(napari-tutorials)=
+ # napari tutorials
+
+ These tutorials will help you explore the main usage modes and methods of
+diff --git a/docs/usage.md b/docs/usage.md
+index 1c881143..42bebd5a 100644
+--- a/docs/usage.md
++++ b/docs/usage.md
+@@ -3,9 +3,59 @@
+ napari leverages the power of Python to enable fast and interactive browsing,
+ annotation and analysis of large multi-dimensional images.
+
+-The tutorials and guides to your left are meant to help you understand how to use
+-napari, as well as learn about its features and use cases. The
+-*In-depth explanations* are aimed at those looking for best practices and more
+-information on how napari works.
++::::{grid}
++:::{grid-item-card} napari quick start
++:link: napari-quick-start
++:link-type: ref
+
+-If you are new to napari, check out the [napari quickstart tutorial](tutorials/fundamentals/quick_start).
++If you are new to napari, check out the **napari quickstart tutorial**.
++:::
++
++:::{grid-item-card} Tutorials
++:link: napari-tutorials
++:link-type: ref
++
++The tutorials are meant to help you understand how to use
++napari, as well as learn about its features and use cases.
++:::
++::::
++
++::::{grid}
++:::{grid-item-card} Using layers
++:link: using-layers
++:link-type: ref
++
++**Layers** are the viewable objects that can be added to a viewer.
++Check these guides on how to use the layers currently supported by napari.
++:::
++
++:::{grid-item-card} How-to guides
++:link: how-tos
++:link-type: ref
++
++Guides on completing specific tasks with napari.
++::::
++
++::::{grid}
++:::{grid-item-card} In-depth explanations
++:link: explanations
++:link-type: ref
++
++These guides are aimed at those looking for best practices and more
++information on how napari works internally.
++:::
++
++:::{grid-item-card} Gallery
++:link: gallery
++:link-type: ref
++
++Examples of napari usage, to be downloaded as Python scripts or Jupyter notebooks.
++:::
++
++:::{grid-item-card} napari workshops
++:link: napari-workshops
++:link-type: ref
++
++A list of information and materials for workshops given about napari.
++:::
++::::

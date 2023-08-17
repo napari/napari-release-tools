@@ -1,0 +1,355 @@
+From d5e71844e8e92ecd37083c5538f5f21e09269a10 Mon Sep 17 00:00:00 2001
+From: Curtis Rueden <ctrueden@wisc.edu>
+Date: Tue, 7 Mar 2023 17:57:13 -0600
+Subject: [PATCH] Replace non-breaking spaces with regular spaces (#118)
+
+# Description
+
+The `&nbsp;` character causes various difficulties and confusion, such
+as the `docs/howtos/docker.md` document's "For development" header not
+being rendered as a header by Markdown renderers.
+
+## Type of change
+
+- [x] Fixes or improves existing content
+
+## Final checklist:
+
+- [x] My PR is the minimum possible work for the desired functionality
+---
+ EULA.md                              | 16 +++++-----
+ docs/howtos/docker.md                |  2 +-
+ docs/naps/2-conda-based-packaging.md |  2 +-
+ docs/release/release_0_4_11.md       | 40 ++++++++++++------------
+ docs/release/release_0_4_13.md       | 12 ++++----
+ docs/release/release_0_4_8.md        |  6 ++--
+ docs/release/release_0_4_9.md        | 46 ++++++++++++++--------------
+ 7 files changed, 62 insertions(+), 62 deletions(-)
+
+diff --git a/EULA.md b/EULA.md
+index a5f15eca..378366f7 100644
+--- a/EULA.md
++++ b/EULA.md
+@@ -528,7 +528,7 @@ copy and install the Utilities you receive with the software on to other third p
+ programs and databases you have developed with the software.  You must delete all the Utilities installed onto a third party machine within the earlier of (i)
+ when you have finished debugging or deploying your programs; or (ii) thirty (30) days after installation of the Utilities onto that machine. We may add
+ additional files to this list from time to time.
+-        c. Build Services and Enterprise Build Servers.  You may install and use any number of copies of the software onto your build machines or servers,
++        c. Build Services and Enterprise Build Servers.  You may install and use any number of copies of the software onto your build machines or servers,
+ solely for the purpose of:
+             i. Compiling, building, verifying and archiving your programs;
+             ii. Creating and configuring build systems internal to your organization to support your internal build environment; or
+@@ -631,14 +631,14 @@ using these features, you consent to the transmission of this information. Micro
+ Internet protocol address, the type of operating system, browser, and name and version of the software you are using, and the language code of the device
+ where you installed the software. Microsoft uses this information to make the Internet-based services available to you.
+                 • Software Use and Performance.  This software collects info about your hardware and how you use the software and automatically sends error
+-reports to Microsoft.  These reports include information about problems that occur in the software.  Reports might unintentionally contain personal
++reports to Microsoft.  These reports include information about problems that occur in the software.  Reports might unintentionally contain personal
+ information. For example, a report that contains a snapshot of computer memory might include your name. Part of a document you were working on could be
+ included as well, but this information in reports or any info collected about hardware or your software use will not be used to identify or contact you.
+                 • Digital Certificates. The software uses digital certificates. These digital certificates confirm the identity of Internet users sending
+ X.509 standard encryption information. They also can be used to digitally sign files and macros to verify the integrity and origin of the file contents. The
+ software retrieves certificates and updates certificate revocation lists using the Internet, when available.
+                 • Windows Application Certification Kit. To ensure you have the latest certification tests, when launched this software periodically checks a
+-Windows Application Certification Kit file on download.microsft.com to see if an update is available.  If an update is found, you are prompted and provided a
++Windows Application Certification Kit file on download.microsft.com to see if an update is available.  If an update is found, you are prompted and provided a
+ link to a web site where you can download the update. You may use the Windows Application Certification Kit solely to test your programs before you submit
+ them for a potential Microsoft Windows Certification and for inclusion on the Microsoft Windows Store. The results you receive are for informational purposes
+ only. Microsoft has no obligation to either (i) provide you with a Windows Certification for your programs and/or ii) include your program in the Microsoft
+@@ -678,10 +678,10 @@ law; and
+             iv. maintain and comply with a written statement available to your customers that describes your privacy practices regarding data and information
+ you collect, use and that you share with any third parties.
+         c. Location Framework. The software may contain a location framework component or APIs that enable support of location services in programs.
+-Programs that receive device location must comply with the requirements related to the Location Service APIs as described in the Microsoft Store Policies
++Programs that receive device location must comply with the requirements related to the Location Service APIs as described in the Microsoft Store Policies
+ (https://docs.microsoft.com/en-us/legal/windows/agreements/store-policies).   If you choose to collect device location data outside of the control of Windows
+-system settings, you must obtain legally sufficient consent for your data practices, and such practices must comply with all other applicable laws and
+-regulations. 
++system settings, you must obtain legally sufficient consent for your data practices, and such practices must comply with all other applicable laws and
++regulations.
+         d. Security.  If your application or service collects, stores or transmits personal information, it must do so securely, by using modern cryptography
+ methods.
+     4. BACKUP COPY. You may make one backup copy of the software. You may use it only to reinstall the software.
+@@ -786,10 +786,10 @@ IF YOU COMPLY WITH THESE LICENSE TERMS, YOU HAVE THE RIGHTS BELOW.
+         the associated installation directory, those license terms
+         control.
+
+-    -   THIRD PARTY COMPONENTS.  The software may include third party
++    -   THIRD PARTY COMPONENTS.  The software may include third party
+         components with separate legal notices or governed by other
+         agreements, as may be described in the ThirdPartyNotices file(s)
+-        accompanying the software. 
++        accompanying the software.
+
+ -   SCOPE OF LICENSE. The software is licensed, not sold. This agreement
+     only gives you some rights to use the software. Microsoft reserves
+diff --git a/docs/howtos/docker.md b/docs/howtos/docker.md
+index 3cee7f79..6fea186f 100644
+--- a/docs/howtos/docker.md
++++ b/docs/howtos/docker.md
+@@ -57,7 +57,7 @@ This image features a series of environment variables you can use to customize i
+ * `XPRA_EXIT_WITH_CLIENT="yes"`: By default, Xpra will exit if you close the browser tab
+ * `XPRA_XVFB_SCREEN="1920x1080x24+32"`: The resolution and bit depth of the virtual display created by Xvfb
+
+-## For development
++## For development
+
+ The Docker images are also useful for developers who need to debug issues on Linux.
+ The images include the latest napari version published on PyPI by default, but you can also install your own local version of napari if needed.
+diff --git a/docs/naps/2-conda-based-packaging.md b/docs/naps/2-conda-based-packaging.md
+index be47a8de..01c8fd09 100644
+--- a/docs/naps/2-conda-based-packaging.md
++++ b/docs/naps/2-conda-based-packaging.md
+@@ -388,7 +388,7 @@ non-compliant licensing schemes or bad packaging practices.
+ #### Tasks
+
+ * [ ] Add documentation about conda-forge in the release guide
+-* [ ] Add documentation about conda-forge in the plugin developer guide
++* [ ] Add documentation about conda-forge in the plugin developer guide
+ * [ ] Ensure the cookiecutter template has some notion of conda packaging
+ * [ ] Decide which packages need to be governed by the _napari pinnings_ metapackage
+
+diff --git a/docs/release/release_0_4_11.md b/docs/release/release_0_4_11.md
+index 6ebb55c0..e18d4a49 100644
+--- a/docs/release/release_0_4_11.md
++++ b/docs/release/release_0_4_11.md
+@@ -47,7 +47,7 @@ more! Thanks to our incredible user and contributor community.
+ - Add autoscale modes to image layer model, and buttons to GUI (#3022)
+ - Arbitrary plane rendering prototype (#3023)
+ - Add projections to layer context menu, allow grouping and nesting of menu items (#3028)
+-- Add napari_experimental_provide_theme hook specification (#3034)
++- Add napari_experimental_provide_theme hook specification (#3034)
+ - Add view ray and labels selection in 3D (#3037)
+ - Add `add_<shape_type>` method for each shape type (#3076)
+ - Grid mode popup (#3084)
+@@ -106,7 +106,7 @@ more! Thanks to our incredible user and contributor community.
+ - Move `get_color` call to after `all_vals` have been cleared (#3173)
+ - Prevent highlight widget from emitting constant signals (#3175)
+ - Refactor preferences dialog to take advantage of evented settings methods (#3178)
+-- Set gl_FragDepth in volume visual isosurface rendering (#3181)
++- Set gl_FragDepth in volume visual isosurface rendering (#3181)
+ - Use QElidingLabel from superqt (#3188)
+ - Move dock widgets in menu (#3190)
+ - Use `QLargeIntSpinBox` from superqt, remove internal one (#3191)
+@@ -114,9 +114,9 @@ more! Thanks to our incredible user and contributor community.
+ - Add checkbox to handle global plugin enable/disabled state (#3194)
+ - Print warning if error formatting in the console fails instead of ignoring errors. (#3201)
+ - Ensure we save a copy of existing value for undo (#3203)
+-- Pull main window menu creation off of Window (#3204)
+-- Remove extra box on plugin dialog (#3235)
+-- Add instant hover tooltips (#3242)
++- Pull main window menu creation off of Window (#3204)
++- Remove extra box on plugin dialog (#3235)
++- Add instant hover tooltips (#3242)
+ - Clipping planes, generalized (#3252)
+ - Improve behavior when holding "shift" while editing shapes (#3259)
+ - Mesh depth (#3265)
+@@ -166,18 +166,18 @@ more! Thanks to our incredible user and contributor community.
+ - Fix incorrect use of dims_order when 3D painting (#3202)
+ - Fix plugin settings restore and schema_version validation error in preferences dialog (#3215)
+ - Fix memory leak in napari (#3217)
+-- Disable space bar on layer list (#3234)
+-- Close napari window on Ctrl+C without geting window focus (#3239)
++- Disable space bar on layer list (#3234)
++- Close napari window on Ctrl+C without geting window focus (#3239)
+ - Skip labeled sliders for <5.14 (#3243)
+-- Don't pass interpolation when creating a new projection layer (#3247)
++- Don't pass interpolation when creating a new projection layer (#3247)
+ - Prevent greedy dask array calculation when creating an Image layer (#3248)
+-- Fix plane normal inconsistency (#3264)
++- Fix plane normal inconsistency (#3264)
+ - Remove accidental print statement (#3269)
+ - Only change `labels` color mode in `color` setter if new `colors` are not default (#3275)
+ - Fix updating of plugins (#3288)
+-- Fix theme color setting on startup (#3293)
+-- Fix incorrect theme registration (#3299)
+-- Fix issubclass error in update_docs (#3305)
++- Fix theme color setting on startup (#3293)
++- Fix incorrect theme registration (#3299)
++- Fix issubclass error in update_docs (#3305)
+ - Fix some divide-by-zeros (#3320)
+ - Fix connect_setattr to handle single arguments better (#3324)
+ - Fix objectName being an empty string (#3326)
+@@ -227,15 +227,15 @@ more! Thanks to our incredible user and contributor community.
+ - Add napari_write_tracks to hook spec reference (#3209)
+ - Add 3d interactivity docs (#3210)
+ - Fix docs build again (#3211)
+-- Fix CI typing tests (#3212)
+-- Fix typo, add proper note markdown (#3216)
++- Fix CI typing tests (#3212)
++- Fix typo, add proper note markdown (#3216)
+ - Pooch bugfix (#3218)
+-- Update team.md (#3237)
+-- Add binder to repository and badge on README (#3244)
++- Update team.md (#3237)
++- Add binder to repository and badge on README (#3244)
+ - Add extras_require for bundle deps (#3255)
+-- Pin support pkg revision macos (#3266)
+-- Exclude vispy 0.8.0 (#3276)
+-- Revert sys.exit(0) debugging (#3277)
++- Pin support pkg revision macos (#3266)
++- Exclude vispy 0.8.0 (#3276)
++- Revert sys.exit(0) debugging (#3277)
+ - Bundle: export ARCH on Linux (#3280)
+ - DOC: misc edits/fixes in the developer guide (#3296)
+ - Update napari console dependency (#3297)
+@@ -243,7 +243,7 @@ more! Thanks to our incredible user and contributor community.
+ - Bundle: add arch suffix to zip name (#3302)
+ - Fix headless test failure (#3311)
+ - Pin furo version (#3315)
+-- Update the affine parameter description in several classes (#3319)
++- Update the affine parameter description in several classes (#3319)
+
+
+ ## 21 authors added to this release (alphabetical)
+diff --git a/docs/release/release_0_4_13.md b/docs/release/release_0_4_13.md
+index 46ea0347..716dc279 100644
+--- a/docs/release/release_0_4_13.md
++++ b/docs/release/release_0_4_13.md
+@@ -128,11 +128,11 @@ Complete list of changes below:
+ - Replace timeout in test by duration assertion. (#3887)
+ - Do not leak QtViewer between tests. (#3890)
+ - `_track_colors`  cleanup (#3891)
+-- Add error message if local file doesn't exist. (#3900)
++- Add error message if local file doesn't exist. (#3900)
+ - Better error message on failed window import (#3901)
+ - Update typing test on CI (#3903)
+ - Features implementation refactor (#3904)
+-- Add npe2 to install requires (#3906)
++- Add npe2 to install requires (#3906)
+ - Rename feature manager attribute to table (#3931)
+ - Better Notification __str__ method (#3933)
+ - Fix ndisplay button highlight (#3935)
+@@ -174,9 +174,9 @@ Complete list of changes below:
+ - Fix cleaning of resources in function contextmanagers (#3918)
+ - Fix magicgui layer combobox not populated when adding to viewer (#3938)
+ - Fix setting attribute to None for single slices of image stacks on stack creation (#3941)
+-- Fix too many entries in available plugins list (#3943)
+-- Block some duplications in Plugins menu (#3957)
+-- Fix close_progress_bar with no current_pbar (#3961)
++- Fix too many entries in available plugins list (#3943)
++- Block some duplications in Plugins menu (#3957)
++- Fix close_progress_bar with no current_pbar (#3961)
+ - Switch append to concat (#3963)
+ - Update plugin docs index (#3964)
+
+@@ -189,7 +189,7 @@ Complete list of changes below:
+ - Deprecate `qt_viewer.screenshot` & `clipboard` (#3765)
+ - Restrict PublicOnlyProxy to napari namespace, allow napari-internal private usage (#3777)
+ - Change PublicOnlyProxy deprecation expiry to 0.5.0 (#3788)
+-- Remove deprecation of sceenshot in qt_viewer (#3937)
++- Remove deprecation of sceenshot in qt_viewer (#3937)
+
+
+ ## Build Tools and Docs
+diff --git a/docs/release/release_0_4_8.md b/docs/release/release_0_4_8.md
+index 29679e92..47304bbf 100644
+--- a/docs/release/release_0_4_8.md
++++ b/docs/release/release_0_4_8.md
+@@ -108,7 +108,7 @@ and
+ - Add events to plugin manager (#2663)
+ - Add napari module to console namespace (#2687)
+ - Change deprecation warnings to future warnings (#2707)
+-- Add strict_qt and block_plugin_discovery parameters to make_napari_viewer (#2715)
++- Add strict_qt and block_plugin_discovery parameters to make_napari_viewer (#2715)
+
+ ## Bug Fixes
+
+@@ -148,8 +148,8 @@ and
+ - Fix tracks icons, and visibility icons (#2708)
+ - Patch horizontalAdvance for older Qt versions (#2711)
+ - Fix segfaults in test (#2716)
+-- Fix napari_provide_sample_data documentation typo (#2718)
+-- Fix mpl colormaps (#2719)
++- Fix napari_provide_sample_data documentation typo (#2718)
++- Fix mpl colormaps (#2719)
+ - Fix active layer keybindings (#2722)
+ - Fix labels with large maximum value (#2723)
+ - Fix progressbar and notifications segfaults in test (#2726)
+diff --git a/docs/release/release_0_4_9.md b/docs/release/release_0_4_9.md
+index 094e69fd..d00482da 100644
+--- a/docs/release/release_0_4_9.md
++++ b/docs/release/release_0_4_9.md
+@@ -25,11 +25,11 @@ It also contains a variety of bug fixes and improvements.
+
+ ## Improvements
+ - Global plugin setting (#2565)
+-- Provide interface for progress bars in @thread_workers (#2655)
++- Provide interface for progress bars in @thread_workers (#2655)
+ - Delay all imports in `napari.__init__` behind module level `napari.__getattr__` (#2662)
+ - Add `block` to viewer.show (#2669)
+ - New type stubs PR, and simpler `napari.view_layers` module (#2675)
+-- Extend the action manager to work with layer. (#2677)
++- Extend the action manager to work with layer. (#2677)
+ - Add `MultiScaleData` wrapper to give multiscale data a consistent API (#2683)
+ - Revert "add `MultiScaleData` wrapper to give multiscale data a consistent API (#2683)" (#2807)
+ - Add repr-html to nbscreenshot (#2740)
+@@ -40,22 +40,22 @@ It also contains a variety of bug fixes and improvements.
+ - Improve colormap error message, when using display names or wrong colormap names (#2769)
+ - Add parent to console and dockwidgets in a separate private attribute. (#2773)
+ - Improve error message when legacy Qt installed from conda over pip (#2776)
+-- Add octree and async to preferences (#2783)
++- Add octree and async to preferences (#2783)
+ - Change remove to uninstall in plugin dialog (#2787)
+-- Update typing and checks with mypy for settings module (#2795)
++- Update typing and checks with mypy for settings module (#2795)
+ - Do not write settings loaded from environment values (#2797)
+-- Update settings descriptions (#2812)
++- Update settings descriptions (#2812)
+ - Extend the action manager to support multiple shortcuts (#2830)
+-- Adds notes about multiscale only being 2D to docs (#2833)
+-- Set upper limit of Vectors spinboxes to infinity (#2842)
+-- Plugin dock widgets menu (#2843)
+-- Update to openGL max texture size (#2845)
+-- Followup to #2485 to add opengl context (#2846)
+-- Do not store default values in preference files (#2848)
++- Adds notes about multiscale only being 2D to docs (#2833)
++- Set upper limit of Vectors spinboxes to infinity (#2842)
++- Plugin dock widgets menu (#2843)
++- Update to openGL max texture size (#2845)
++- Followup to #2485 to add opengl context (#2846)
++- Do not store default values in preference files (#2848)
+
+
+ ## Bug Fixes
+-- Fix Labels and Points properties set (#2657)
++- Fix Labels and Points properties set (#2657)
+ - Fixing `add_dock_widget` compatibility with `magicgui v0.2` (#2734)
+ - Shortcuts: Render properly shortcuts with minus and space. (#2735)
+ - Fix runtime error when running doc tests on napari site (#2738)
+@@ -71,16 +71,16 @@ It also contains a variety of bug fixes and improvements.
+ - Add fix for large labels in new slices (#2804)
+ - Fix zoom for non square image (#2805)
+ - Implement lazy module importing for all public submodules (#2816)
+-- Coerce surface vertex data to float32 (#2820)
+-- Vendor shading filter from vispy (#2821)
+-- Small doc fixes (#2822)
+-- Fix key bindings display dialog (#2824)
+-- Work around numpy's string casting deprecation (#2825)
+-- Update translation strings (#2827)
+-- Fix keypress skipping layers in layerlist (#2837)
+-- Fix octree imports (#2838)
+-- Remove opacity from plugin sorter widget (#2840)
+-- Fix Labels.fill for tensorstore data (#2856)
++- Coerce surface vertex data to float32 (#2820)
++- Vendor shading filter from vispy (#2821)
++- Small doc fixes (#2822)
++- Fix key bindings display dialog (#2824)
++- Work around numpy's string casting deprecation (#2825)
++- Update translation strings (#2827)
++- Fix keypress skipping layers in layerlist (#2837)
++- Fix octree imports (#2838)
++- Remove opacity from plugin sorter widget (#2840)
++- Fix Labels.fill for tensorstore data (#2856)
+ - Be more robust for non-existant keybindings in settings (#2861)
+ - trans NameError bugfix (#2865)
+
+@@ -93,7 +93,7 @@ It also contains a variety of bug fixes and improvements.
+ - Add PR labeler and update templates (#2775)
+ - Add pytest-order and move threading tests to the top of the suite (#2779)
+ - Auto assign PR to author (#2794)
+-- Typo in PR template (#2831)
++- Typo in PR template (#2831)
+
+
+ ## 12 authors added to this release (alphabetical)

@@ -1,3 +1,9 @@
+issue.md
+github_cache.sqlite
+napari_repo
+project_repo
+.python-version
+
 # Created by https://www.toptal.com/developers/gitignore/api/python,pycharm+all,vim,visualstudiocode,c,jupyternotebooks
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,pycharm+all,vim,visualstudiocode,c,jupyternotebooks
 

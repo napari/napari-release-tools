@@ -1,0 +1,299 @@
+From f91d9e36c4fafc4843dbe327b3e57fe98136d8fe Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Melissa=20Weber=20Mendon=C3=A7a?= <melissawm@gmail.com>
+Date: Sat, 28 Jan 2023 16:27:03 -0300
+Subject: [PATCH] Fix broken links (#59)
+
+# Description
+
+Fixes a number of broken links ~and adds a link check step to CI.~
+
+There are a few broken links still (see
+https://github.com/napari/docs/pull/59#issuecomment-1407044657) but
+these can be fixed in a follow up. Pending is also a link check step to
+CI.
+---
+ EULA.md                                              | 2 +-
+ docs/community/team.md                               | 2 +-
+ docs/conf.py                                         | 6 +++++-
+ docs/further-resources/glossary.md                   | 4 ++--
+ docs/guides/magicgui.md                              | 4 ++--
+ docs/naps/0-nap-process.md                           | 4 ++--
+ docs/naps/4-async-slicing.md                         | 2 +-
+ docs/release/release_0_3_0.md                        | 6 +++---
+ docs/release/release_0_3_6.md                        | 2 +-
+ docs/release/release_0_4_13.md                       | 2 +-
+ docs/release/release_0_4_3.md                        | 4 ++--
+ docs/release/release_0_4_8.md                        | 4 ++--
+ docs/roadmaps/0_3.md                                 | 2 +-
+ docs/roadmaps/0_3_retrospective.md                   | 2 +-
+ docs/roadmaps/0_4.md                                 | 2 +-
+ docs/tutorials/segmentation/annotate_segmentation.md | 4 ++--
+ docs/tutorials/tracking/cell_tracking.md             | 2 +-
+ 17 files changed, 29 insertions(+), 25 deletions(-)
+
+diff --git a/docs/community/team.md b/docs/community/team.md
+index 3fb244c9..72f7483b 100644
+--- a/docs/community/team.md
++++ b/docs/community/team.md
+@@ -48,7 +48,7 @@ Read more about napari’s [mission and values](https://napari.org/community/mis
+     - The napari project and community have been generously supported by the [CZI Science Imaging Program.](https://chanzuckerberg.com/science/programs-resources/imaging/)
+     - Since late 2018, Juan Nunez-Iglesias has been supported by a CZI Imaging Software Fellowship.
+     - The CZI Imaging Tech Team, under the leadership of Nicholas Sofroniew and engineering management of Justine Larsen, has been making direct engineering and design contributions to improve and expand napari.
+-    - The CZI Imaging Tech Team has supported [Quansight Labs](https://www.quansight.com/labs) and independent contractors to improve and expand napari.
++    - The CZI Imaging Tech Team has supported [Quansight Labs](https://labs.quansight.org) and independent contractors to improve and expand napari.
+     - The CZI Imaging Tech Team, through an effort led by Justin Kiggins, has created [napari-hub.org](https://www.napari-hub.org/), a site to make discovering and sharing napari plugins easier.
+     - CZI has launched a [grant program](https://chanzuckerberg.com/rfa/napari-plugin-grants/) to help accelerate the napari plugin developer community.
+
+diff --git a/docs/conf.py b/docs/conf.py
+index 58412fd7..77d3caa4 100644
+--- a/docs/conf.py
++++ b/docs/conf.py
+@@ -262,7 +262,11 @@ def get_attributes(item, obj, modulename):
+
+ linkcheck_anchors_ignore = [r'^!', r'L\d+-L\d+', r'r\d+', r'issuecomment-\d+']
+
+-linkcheck_ignore = ['https://napari.zulipchat.com/']
++linkcheck_ignore = [
++    'https://napari.zulipchat.com/',
++    '../_tags',
++    'https://en.wikipedia.org/wiki/Napari#/media/File:Tabuaeran_Kiribati.jpg',
++    ]
+
+
+ def rewrite_github_anchor(app, uri: str):
+diff --git a/docs/further-resources/glossary.md b/docs/further-resources/glossary.md
+index c1d0801f..561615b6 100644
+--- a/docs/further-resources/glossary.md
++++ b/docs/further-resources/glossary.md
+@@ -10,12 +10,12 @@
+ | hook specification | A function signature that defines the application programming interface (API) that a plugin developer must adhere to when writing the function that napari promises to call somewhere in the napari codebase. See also [napari hook specifications](https://napari.org/stable/plugins/npe1.html#hook-specification-reference).                                                                                                                                                                                                                                                                             |                                                                             |
+ | keybinding         | The specific key or key combination that when pressed causes some function to occur. For example, command/control + C triggers "copy" in many operating systems. You can make your own custom keybindings, see this page on [hooking up your own events](https://napari.org/stable/howtos/connecting_events.html).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | keyboard short cut                                                          |
+ | mousebinding       | The specific mouse move, click, or drag event that causes some function to occur. You can make your own custom mousebindings, see this page on [hooking up your own events](https://napari.org/stable/howtos/connecting_events.html).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | mouse short cut                                                             |
+-| layer              | Layers are the viewable objects that can be added to napari viewer. Currently napari supports the following layers: [image](https://napari.org/stable/howtos/layers/image.html), [labels](https://napari.org/stable/howtos/layers/labels.html), [points](https://napari.org/stable/howtos/layers/points.html), [shapes](https://napari.org/stable/howtos/layers/shapes.html), [surface](https://napari.org/stable/howtos/layers/surface.html), [tracks](https://napari.org/stable/tutorials/fundamentals/tracks.html), [vectors](https://napari.org/stable/howtos/layers/vectors.html). |                                                                             |
++| layer              | Layers are the viewable objects that can be added to napari viewer. Currently napari supports the following layers: [image](https://napari.org/stable/howtos/layers/image.html), [labels](https://napari.org/stable/howtos/layers/labels.html), [points](https://napari.org/stable/howtos/layers/points.html), [shapes](https://napari.org/stable/howtos/layers/shapes.html), [surface](https://napari.org/stable/howtos/layers/surface.html), [tracks](https://napari.org/stable/howtos/layers/tracks.html), [vectors](https://napari.org/stable/howtos/layers/vectors.html). |                                                                             |
+ | label              | A label is a region of an integer image where the pixels are the same unique value. It is implemented in napari in the [labels layer](https://napari.org/stable/howtos/layers/labels.html) where each label represents a unique object, feature or classification.                                                                                                                                                                                                                                                                                                                         |                                                                             |
+ | point              | A point is defined by the coordinate in space. The [points layer](https://napari.org/stable/howtos/layers/points.html)  allows you to display an NxD array of N points in D coordinates.                                                                                                                                                                                                                                                                                                                                                                                                       |                                                                             |
+ | shape              | Shapes are visual representations of N points in D coordinates. Shapes can be used as a visualization tool to indicate region of interest (ROI) or for downstream operations. In napari, the [shapes layer](https://napari.org/stable/howtos/layers/shapes.html) is a viewable object that permits visualization of the following supported shapes: rectangle, ellipses, polygons, paths, and lines.                                                                                                                                                                                                                 | [area selection tools in ImageJ](https://imagej.nih.gov/ij/docs/tools.html) |
+ | surface            | A surface comprises a set of triangles (typically in three dimensions) that are connected by their common edges or corners to form the mesh. See [napari surface layer tutorial](https://napari.org/stable/howtos/layers/surface.html) for current implementation and [this wiki page](https://en.wikipedia.org/wiki/Surface_triangulation) for additional information.                                                                                                                                                                                                                    |                                                                             |
+-| track              | A track describes object trajectories along the time dimension. The [tracks layer](https://napari.org/stable/tutorials/fundamentals/tracks.html) defines a track by the list containing object coordinates and the time point, with each track assigned a unique track ID.                                                                                                                                                                                                                                                                                                                              |                                                                             |
++| track              | A track describes object trajectories along the time dimension. The [tracks layer](https://napari.org/stable/howtos/layers/tracks.html) defines a track by the list containing object coordinates and the time point, with each track assigned a unique track ID.                                                                                                                                                                                                                                                                                                                              |                                                                             |
+ | vector             | A vector is a line defined by its start and end positions in space. The [vectors layer](https://napari.org/stable/howtos/layers/vectors.html) renders lines onto the canvas, with input data format as Nx2xD numpy array representing N vectors in D dimensions.                                                                                                                                                                                                                                                                                                                               |                                                                             |
+ | widget             | A small, composable graphical user interface component that can extend user's ability to interact with layers and other napari functions. A widget could be a simple one parameter/control (e.g. a button) or a collection of multiple controls with data output.                                                                                                                                                                                                                                                                                                                                                                                                              | [dialog in ImageJ](https://imagej.net/scripting/generic-dialog)             |
+ | dock widget        | A widget that can be attached (docked) to the main napari viewer at a specified position.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |                                                                             |
+diff --git a/docs/guides/magicgui.md b/docs/guides/magicgui.md
+index 4b902ce5..b5172702 100644
+--- a/docs/guides/magicgui.md
++++ b/docs/guides/magicgui.md
+@@ -51,7 +51,7 @@ widget_demo.show()
+ *Add caption here*
+
+ For more information on the features and usage of `magicgui`, see the [magicgui
+-documentation](https://napari.org/magicgui).  `magicgui` does not require
++documentation](https://pyapp-kit.github.io/magicgui/). `magicgui` does not require
+ napari, but napari *does* provide support for using magicgui within napari. The
+ purpose of this page is to document some of the conveniences provided by napari
+ when using `magicgui` with napari-specific type annotations.
+@@ -64,7 +64,7 @@ context-dependent action for the object returned from the function (in the
+ absence of a type hint, the type of the default value will be used).  Third
+ party packages (like `napari` in this case) may provide support for their types
+ using
+-[`magicgui.register_type`](https://napari.org/magicgui/usage/types_widgets.html#register-type).
++[`magicgui.register_type`](https://pyapp-kit.github.io/magicgui/usage/types_widgets.html#register-type).
+ This is how using the type annotations described below leads to widgets and/or
+ "actions" in napari.
+
+diff --git a/docs/naps/0-nap-process.md b/docs/naps/0-nap-process.md
+index 072d2bb6..6bd84b80 100644
+--- a/docs/naps/0-nap-process.md
++++ b/docs/naps/0-nap-process.md
+@@ -125,7 +125,7 @@ is suitable for a NAP. Posting to the napari [issues list] is the best
+ way to do this.
+
+ The proposal should be submitted as a draft NAP via a [GitHub pull
+-request][github pull request] to the `docs/source/naps` directory with the
++request][github pull request] to the `docs/naps` directory of the `napari/docs` repo with the
+ name `nap-<n>-<short-title>.md` where `<n>` is an appropriately assigned
+ number (typically sequential) and `<short-title>` is a one or two word title
+ for the idea (e.g., `nap-35-lazy-slicing.md`). The draft must use the
+@@ -320,7 +320,7 @@ on a separate line.
+
+ [^id3]: This historical record is available by the normal git commands
+     for retrieving older revisions, and can also be browsed on
+-    [GitHub](https://github.com/napari/napari/tree/main/docs/naps).
++    [GitHub](https://github.com/napari/docs/tree/main/docs/naps).
+
+ [^id4]: The URL for viewing NAPs on the web is
+     <https://napari.org/naps/>
+diff --git a/docs/naps/4-async-slicing.md b/docs/naps/4-async-slicing.md
+index d2aef140..e1ad32f5 100644
+--- a/docs/naps/4-async-slicing.md
++++ b/docs/naps/4-async-slicing.md
+@@ -744,7 +744,7 @@ which might cause issues with things like selection that may depend on that stat
+         - `screenshot` is only called a few times in `napari-animation`, so wouldn't require large changes if asynchronous slicing was the default.
+     - Decision: always have some way to force synchronous slicing.
+         - But no need to support synchronous slicing by default, which is harder to implement.
+-- [What should `Viewer.screenshot` do when the canvas is not fully rendered?](https://github.com/napari/napari/pull/5052#discussion_r966718006)
++- [What should `Viewer.screenshot` do when the canvas is not fully rendered?](https://github.com/napari/napari/pull/5052)
+     - Initial consensus is that it should wait for pending slicing tasks and for the associated pushes to vispy.
+         - There are some ideas of how to implement that, though it is not straightforward.
+     - In the API, may want a keyword argument to control behavior. In the GUI, could have a dialog if there are pending tasks.
+diff --git a/docs/release/release_0_3_0.md b/docs/release/release_0_3_0.md
+index 7c64aed6..8909ed36 100644
+--- a/docs/release/release_0_3_0.md
++++ b/docs/release/release_0_3_0.md
+@@ -59,11 +59,11 @@ supported by imageio, and zarr).  However, we can now *write* to all these
+ formats, and read and write point and shape annotations in .csv format.
+ Additionally, we have made it possible for anyone to create packages for napari
+ to read and write in any other formats through plugins. You can read about our
+-plugin architecture [here](https://napari.org/plugins/stable/index.html).
++plugin architecture [here](https://napari.org/plugins/index.html).
+
+ Want to drag and drop your favorite file format into napari and have it load
+ automatically? See [this
+-guide](https://napari.org/plugins/stable/for_plugin_developers.html) to
++guide](https://github.com/napari/napari/blob/v0.3.0/docs/source/plugins/for_plugin_developers.rst) to
+ understand how to write your own plugin, see Jackson Brown's
+ [napari-aicsimageio](https://github.com/AllenCellModeling/napari-aicsimageio)
+ for an exemplar plugin, and get started with Talley's [cookiecutter napari
+@@ -82,7 +82,7 @@ Even better, we have released a side package called
+ [magicgui](https://github.com/napari/magicgui) to allow you to create your own
+ dockable widgets with which to interact with napari without writing GUI code.
+ We are still working on standard models of interaction here (see our
+-[roadmap](https://napari.org/docs/developers/ROADMAP_0_3.html)), but you should
++[roadmap](https://napari.org/roadmaps/0_3.html)), but you should
+ be able to get started creating useful user interfaces right now. [This
+ image.sc
+ post](https://forum.image.sc/t/integration-of-napari-module-subclass-plugin/36018/2)
+diff --git a/docs/release/release_0_3_6.md b/docs/release/release_0_3_6.md
+index 73d2426b..9abed934 100644
+--- a/docs/release/release_0_3_6.md
++++ b/docs/release/release_0_3_6.md
+@@ -13,7 +13,7 @@ https://github.com/napari/napari
+ ## Highlights
+ This release contains the long awaited addition of text to both the points and
+ shapes layers (#1374). Checkout our `examples/*_with_text.py` for simple usage
+-and this [segmentation annotation tutorial](https://napari.org/tutorials/applications/annotate_segmentation)
++and this [segmentation annotation tutorial](https://napari.org/tutorials/segmentation/annotate_segmentation)
+ for a more real-world use case.
+
+ We've added support for a circular paintbrush for easier labels painting,
+diff --git a/docs/release/release_0_4_13.md b/docs/release/release_0_4_13.md
+index ab6d66cf..46ea0347 100644
+--- a/docs/release/release_0_4_13.md
++++ b/docs/release/release_0_4_13.md
+@@ -22,7 +22,7 @@ This is the first release supporting npe2, the second iteration of napari
+ plugin engine, which will soon enable more powerful actions from plugins.
+ New plugin authors should start using npe2, while existing authors can migrate
+ their plugins using our
+-[migration guide](https://napari.org/plugins/stable/npe2_migration_guide.html).
++[migration guide](https://napari.org/plugins/npe2_migration_guide.html).
+
+ For more information, examples, and documentation, please visit our website:
+ https://github.com/napari/napari
+diff --git a/docs/release/release_0_4_3.md b/docs/release/release_0_4_3.md
+index f45203d3..69eac697 100644
+--- a/docs/release/release_0_4_3.md
++++ b/docs/release/release_0_4_3.md
+@@ -11,7 +11,7 @@ For more information, examples, and documentation, please visit our website:
+ https://github.com/napari/napari
+
+ ## Highlights
+-In this release we've added two new analysis and GUI focused [hook specifications](https://napari.org/docs/dev/plugins/hook_specifications.html) for our plugin developers (#2080).
++In this release we've added two new analysis and GUI focused [hook specifications](https://github.com/napari/napari/blob/87961d0554b2bb1574553e23bf2231a9a5117568/docs/source/plugins/hook_specifications.rst) for our plugin developers (#2080).
+
+ The first one `napari_experimental_provide_function_widget` allows you to provide a function or list of functions that we
+ will turn into a GUI element using using [magicgui](https://napari.org/magicgui/). This hook spec leverages the newly added and the `viewer.window.add_function_widget` method (#1856) and the newly recently released `0.2` series of magicgui which seperates out an abstract function and widget API from its Qt backend. These functions can take in and return napari layer, allowing you to
+@@ -23,7 +23,7 @@ Both of these hook specs are marked as `experimental` as we're likely to evolve
+
+ In this release we also seperate out more of the Qt functionality from napari making it easier to run headless (#2039, #2055). We also added a `napari.run` method as an alternative to using the `napari.gui_qt` context manager (#2056).
+
+-We've also made good progress on our `experimental` support for an octree system for rendering large 2D multiscale images. You can try this functionality setting `NAPARI_OCTREE=1` as an environment variable. See our [asynchronous rendering guide](https://napari.org/guides/stable/rendering.html) for more details on how to use the octree and its current limitations.
++We've also made good progress on our `experimental` support for an octree system for rendering large 2D multiscale images. You can try this functionality setting `NAPARI_OCTREE=1` as an environment variable. See our [asynchronous rendering guide](https://napari.org/guides/rendering.html) for more details on how to use the octree and its current limitations.
+
+ Finally we've added our [0.4 series roadmap](https://napari.org/roadmaps/0_4.html) and a [retrospective on our 0.3 roadmap](https://napari.org/roadmaps/0_3_retrospective.html)!
+
+diff --git a/docs/release/release_0_4_8.md b/docs/release/release_0_4_8.md
+index 5ca59a5f..29679e92 100644
+--- a/docs/release/release_0_4_8.md
++++ b/docs/release/release_0_4_8.md
+@@ -34,9 +34,9 @@ Use it with `viewer.open_sample(plugin_name, sample_name)`, for example,
+ `viewer.open_sample('scikit-image', 'camera')`. Or you can use the File
+ menu at File -> Open Sample. For more on how to provide your own sample
+ datasets to napari, see [how to write a
+-plugin](https://napari.org/plugins/stable/for_plugin_developers.html) and the
++plugin](https://github.com/napari/napari/blob/v0.4.8/docs/plugins/for_plugin_developers.rst) and the
+ [sample data
+-specification](https://napari.org/plugins/stable/hook_specifications.html#napari.plugins.hook_specifications.napari_provide_sample_data).
++specification](https://github.com/napari/napari/blob/v0.4.8/napari/plugins/hook_specifications.py#L57).
+
+ The scale bar now has rudimentary support for physical units 📏 (#2617). To use
+ it, set your scale numerically as before, then use `viewer.scale_bar.unit =
+diff --git a/docs/roadmaps/0_3.md b/docs/roadmaps/0_3.md
+index 15f82ee2..d6b18c36 100644
+--- a/docs/roadmaps/0_3.md
++++ b/docs/roadmaps/0_3.md
+@@ -18,7 +18,7 @@ Once the above goals are met, we will develop napari's capabilities for image pr
+
+ - **Better support for viewing big datasets**. Currently, napari is fast when viewing on-disk datasets that can be naturally sliced along one axis (e.g. a time series) *and where loading one slice is fast*. However, when the loading is slow, the napari UI itself becomes slow, sometimes to the point of being unusable. We aim to improve this by making views and interactions non-blocking ([#845](https://github.com/napari/napari/issues/845)), and improving caching ([#718](https://github.com/napari/napari/issues/718)). We will also ensure that napari can be used `headless` without the GUI.
+
+-- **Improving the performance of operations on in-memory data**. Even when data is loaded in memory, some operations, such as label and shape painting, slicing along large numbers of points, or adjusting contrast and gamma, can be slow. We will continue developing our [benchmark suite](https://github.com/napari/napari/blob/main/docs/developers/benchmarks.md) and work to integrate it into our development process. See the [`performance` label](https://github.com/napari/napari/labels/performance) for a current list of issues related to performance.
++- **Improving the performance of operations on in-memory data**. Even when data is loaded in memory, some operations, such as label and shape painting, slicing along large numbers of points, or adjusting contrast and gamma, can be slow. We will continue developing our [benchmark suite](https://github.com/napari/docs/blob/main/docs/developers/benchmarks.md) and work to integrate it into our development process. See the [`performance` label](https://github.com/napari/napari/labels/performance) for a current list of issues related to performance.
+
+ - Add a unified **world coordinate system**. Scientists need to measure data that comes from a real space with physical dimensions. Currently, napari has no concept of the space in which data lives: everything is unitless. Further, it is unclear at various parts in the UI whether a coordinate has been transformed. And finally, some data are acquired with distortions, such as skew in data collected on stage-scanning lightsheet microscopes, and napari should be able to account for those distortions by chaining together transforms - including affine and ultimately deformable transforms. We are tracking progress in this area in the [World Coordinates project board](https://github.com/napari/napari/projects/10).
+
+diff --git a/docs/roadmaps/0_3_retrospective.md b/docs/roadmaps/0_3_retrospective.md
+index da5763a3..63415054 100644
+--- a/docs/roadmaps/0_3_retrospective.md
++++ b/docs/roadmaps/0_3_retrospective.md
+@@ -27,7 +27,7 @@ Once the above goals are met, we will develop napari's capabilities for image pr
+     > We've made good progress towards `asynchronous` loading of data in our [async](https://github.com/napari/napari/labels/async) work, but we still have much more to do. The async functionality can be enabled right now in an opt in fashion but is still considered experimental as we develop it further. We're also working on an octree which will enable better multiscale rendering, see this [rendering explanation note](rendering-explanation), which has become available during our initial 0.4 series of releases.
+
+
+-- **Improving the performance of operations on in-memory data**. Even when data is loaded in memory, some operations, such as label and shape painting, slicing along large numbers of points, or adjusting contrast and gamma, can be slow. We will continue developing our [benchmark suite](https://github.com/napari/napari/blob/main/docs/developers/benchmarks.md) and work to integrate it into our development process. See the [`performance` label](https://github.com/napari/napari/labels/performance) for a current list of issues related to performance.
++- **Improving the performance of operations on in-memory data**. Even when data is loaded in memory, some operations, such as label and shape painting, slicing along large numbers of points, or adjusting contrast and gamma, can be slow. We will continue developing our [benchmark suite](https://napari.org/stable/developers/benchmarks.html) and work to integrate it into our development process. See the [`performance` label](https://github.com/napari/napari/labels/performance) for a current list of issues related to performance.
+
+     > We've improved some perfomance issues, such as adjusting gamma and contrast limits, which now happen on the shader, but still have more to go. Painting in labels remains slow for large datasets and still needs to be improved. We added an [explantory note on perfomance](napari-performance) to detail how we're thinking about perfomance in napari and ensuring it stays high. We've also added some [perfomance monitoring tooling](perfmon) that will help us during this process. We successful used this functionality to improve performance of the Shapes Layer and will continue this work during the 0.4 series of releases.
+
+diff --git a/docs/roadmaps/0_4.md b/docs/roadmaps/0_4.md
+index 9177b35f..0639bf66 100644
+--- a/docs/roadmaps/0_4.md
++++ b/docs/roadmaps/0_4.md
+@@ -46,7 +46,7 @@ goal in mind, and specifically by tackling the following:
+   releases, we aim to bring this functionality out of experimental status, as
+   well as extend it to other layer types and multiscale 3D data.
+
+-- **Improving the performance of operations on in-memory data**. Even when data is loaded in memory, some operations, such as label and shape painting or slicing along large numbers of points can be slow. We will continue developing our [benchmark suite](https://github.com/napari/napari/blob/main/docs/developers/benchmarks.md) and work to integrate it into our development process. See the [`performance` label](https://github.com/napari/napari/labels/performance) for a current list of issues related to performance.
++- **Improving the performance of operations on in-memory data**. Even when data is loaded in memory, some operations, such as label and shape painting or slicing along large numbers of points can be slow. We will continue developing our [benchmark suite](../developers/benchmarks.md) and work to integrate it into our development process. See the [`performance` label](https://github.com/napari/napari/labels/performance) for a current list of issues related to performance.
+
+ - Add **physical coordinates**. We now have a world coordinate system and transforms that can move between data coordinates, world coordinates, and the canvas where things are rendered; however, we still don't have a concept of phyiscal units. See [#1701](https://github.com/napari/napari/issues/1701) for additional discussion.
+
+diff --git a/docs/tutorials/segmentation/annotate_segmentation.md b/docs/tutorials/segmentation/annotate_segmentation.md
+index f3f3e3cc..b19ede86 100644
+--- a/docs/tutorials/segmentation/annotate_segmentation.md
++++ b/docs/tutorials/segmentation/annotate_segmentation.md
+@@ -1,10 +1,10 @@
+ # Annotating segmentation with text and bounding boxes
+
+-In this tutorial, we will use napari to view and annotate a segmentation with bounding boxes and text labels. Here we perform a segmentation by setting an intensity threshold with Otsu's method, but this same approach could also be used to visualize the results of other image processing algorithms such as [object detection with neural networks](https://www.tensorflow.org/lite/models/object_detection/overview).
++In this tutorial, we will use napari to view and annotate a segmentation with bounding boxes and text labels. Here we perform a segmentation by setting an intensity threshold with Otsu's method, but this same approach could also be used to visualize the results of other image processing algorithms such as [object detection with neural networks](https://www.tensorflow.org/lite/examples/object_detection/overview).
+
+ ![napari viewer showing eight roughly circular shapes. The shapes are classified according to circularity and have bounding boxes automatically generated around them showing a circularity parameter and an integer for a label.](../assets/tutorials/annotated_bbox.png)
+
+-The completed code is shown below and also can be found in the napari examples directory ([`annotate_segmentation_with_text.py`](https://github.com/napari/napari/blob/master/examples/annotate_segmentation_with_text.py)).
++The completed code is shown below and also can be found in the napari examples directory ([`annotate_segmentation_with_text.py`](https://github.com/napari/napari/blob/main/examples/annotate_segmentation_with_text.py)).
+
+ ```python
+ """
+diff --git a/docs/tutorials/tracking/cell_tracking.md b/docs/tutorials/tracking/cell_tracking.md
+index 60d42873..497c83e4 100644
+--- a/docs/tutorials/tracking/cell_tracking.md
++++ b/docs/tutorials/tracking/cell_tracking.md
+@@ -188,7 +188,7 @@ The `btrack` library can be used for cell tracking. It provides a convenient `to
+ import btrack
+ ```
+
+-We start by loading a file containing the centroids of all the found cells in each frame of the source movie. Note that this file only contains the locations of cells in the movie, there are no tracks yet. We can use the `btrack` library to load this file as a list of `objects` that contain information about each found cell, including the TZYX position.  The example dataset can be downloaded [here](https://raw.githubusercontent.com/quantumjot/BayesianTracker/master/examples/napari_example.csv).
++We start by loading a file containing the centroids of all the found cells in each frame of the source movie. Note that this file only contains the locations of cells in the movie, there are no tracks yet. We can use the `btrack` library to load this file as a list of `objects` that contain information about each found cell, including the TZYX position.  The example dataset can be downloaded [here](https://github.com/quantumjot/BayesianTracker/blob/0f8bbd937535193bde20e3ebe91a323f6bb915e9/examples/napari_example.csv).
+
+ ```python
+ objects = btrack.dataio.import_CSV('napari_example.csv')

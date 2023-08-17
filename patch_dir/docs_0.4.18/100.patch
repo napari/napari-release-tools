@@ -1,0 +1,871 @@
+From 18bc4676ca9d6f316492ee412fa3c9bfe81ff041 Mon Sep 17 00:00:00 2001
+From: David Stansby <dstansby@gmail.com>
+Date: Thu, 2 Feb 2023 11:40:03 +0000
+Subject: [PATCH] Replace pip with python -m pip (#100)
+
+This is best practice, to make sure the pip being picked up matches the current python executable.
+
+Co-authored-by: Peter Sobolewski <76622105+psobolewskiPhD@users.noreply.github.com>
+---
+ docs/developers/benchmarks.md               | 12 ++++----
+ docs/developers/contributing.md             |  6 ++--
+ docs/developers/profiling.md                | 16 +++++-----
+ docs/developers/release.md                  | 14 ++++-----
+ docs/developers/testing.md                  |  2 +-
+ docs/howtos/docker.md                       |  2 +-
+ docs/index.md                               | 14 ++++-----
+ docs/plugins/best_practices.md              | 34 ++++++++++-----------
+ docs/plugins/debug_plugins.md               | 18 +++++------
+ docs/plugins/first_plugin.md                | 10 +++---
+ docs/plugins/npe1.md                        |  8 ++---
+ docs/plugins/npe2_migration_guide.md        | 12 ++++----
+ docs/plugins/test_deploy.md                 |  5 ++-
+ docs/release/generate_release_notes.py      |  2 +-
+ docs/tutorials/fundamentals/installation.md | 32 +++++++++----------
+ docs/tutorials/fundamentals/quick_start.md  | 20 ++++++------
+ 16 files changed, 103 insertions(+), 104 deletions(-)
+
+diff --git a/docs/developers/benchmarks.md b/docs/developers/benchmarks.md
+index 99146669..e40f00b8 100644
+--- a/docs/developers/benchmarks.md
++++ b/docs/developers/benchmarks.md
+@@ -16,7 +16,7 @@ development environment, then if using ``venv`` you may install the requirement
+
+ ```bash
+ source napari-dev/bin/activate
+-pip install asv
++python -m pip install asv
+ ```
+
+ If you are using conda, then the command:
+@@ -162,14 +162,14 @@ Note that we in both these cases we have sent the output of the profiling to [sn
+ which you can pip install with
+
+ ```bash
+-pip install snakeviz
++python -m pip install snakeviz
+ ```
+
+ and we use `--python=same` to profile against our current python environment.
+
+ ## Running benchmarks on CI
+
+-Benchmarking on CI has two main parts - the Benchmark Action and the Benchmark Reporting Action.
++Benchmarking on CI has two main parts - the Benchmark Action and the Benchmark Reporting Action.
+
+ ### The Benchmark Action
+
+@@ -178,11 +178,11 @@ The benchmarks are set to run:
+ * On PRs with the `run-benchmark` label
+ * On workflow dispatch (manual trigger)
+
+-If the benchmarks fail during the scheduled run, an issue is opened in the repo to flag the occurrence.
+-If an issue has already been opened, it will add to the existing issue.
++If the benchmarks fail during the scheduled run, an issue is opened in the repo to flag the occurrence.
++If an issue has already been opened, it will add to the existing issue.
+
+ The contender SHA is a Github PR merge commit - a fake commit not available to users.
+-Every time you want the benchmark CI to run in a PR, you'll need to remove and re-add the `run-benchmark` label.
++Every time you want the benchmark CI to run in a PR, you'll need to remove and re-add the `run-benchmark` label.
+
+
+ ### Benchmark Reporting Action
+diff --git a/docs/developers/contributing.md b/docs/developers/contributing.md
+index 5d37a9ae..bd1ff815 100644
+--- a/docs/developers/contributing.md
++++ b/docs/developers/contributing.md
+@@ -28,17 +28,17 @@ We recommend starting with a fresh Python virtual environment, using an environm
+ [conda](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html) or [venv](https://docs.python.org/3/library/venv.html). Then, install the napari package
+ in editable mode and all of the developer tools, along with a supported Qt backend. For example, for PyQt5, the default, you would use the following:
+ ```sh
+-pip install -e ".[pyqt,dev]"  # (quotes only needed for zsh shell)
++python -m pip install -e ".[pyqt,dev]"  # (quotes only needed for zsh shell)
+ ```
+
+ If you want to use PySide2 instead, you would use:
+ ```sh
+-pip install -e ".[pyside,dev]"  # (quotes only needed for zsh shell)
++python -m pip install -e ".[pyside,dev]"  # (quotes only needed for zsh shell)
+ ```
+
+ Finally, if you already have a Qt backend installed or want to use an experimental one like Qt6 use:
+ ```sh
+-pip install -e ".[dev]"  # (quotes only needed for zsh shell)
++python -m pip install -e ".[dev]"  # (quotes only needed for zsh shell)
+ ```
+
+
+diff --git a/docs/developers/profiling.md b/docs/developers/profiling.md
+index 4fd4618e..ca727a2a 100644
+--- a/docs/developers/profiling.md
++++ b/docs/developers/profiling.md
+@@ -48,7 +48,7 @@ python -m cProfile -o result.pstat path_to_script.py
+ Once the file is saved, you can investigate using free tools. Some options include:
+
+ 1.  The Stat object.
+-
++
+     You can parse the profile output using the `Stats` object from the `pstats` built-in library. For example:
+     ```python
+     from pstats import Stats
+@@ -58,13 +58,13 @@ Once the file is saved, you can investigate using free tools. Some options inclu
+     You can find more documentation about the Stats object in the Python documentation [here](https://docs.python.org/3/library/profile.html#the-stats-class).
+
+ 2.  Snakeviz.
+-
++
+     Snakeviz is a third party library designed to visualize profiling output interactively.
+-    You can install it with pip like any other Python library using `pip install snakeviz`.
++    You can install it with pip like any other Python library using `python -m pip install snakeviz`.
+     This will provide the `snakeviz` command, which you can call to create an in-browser
+     visualization of your profiling data. Use the command:
+     ```bash
+-    snakeviz path/to/result.pstat
++    snakeviz path/to/result.pstat
+     ```
+     This should cause a new page to open in your browser with your profiling information.
+     You can read more about how to interpret this visualization on the
+@@ -75,7 +75,7 @@ Once the file is saved, you can investigate using free tools. Some options inclu
+     You can visualize the call graph with [`graphviz`](https://www.graphviz.org/),
+     a third party graph visualization library.
+     You can install graphviz with system package managers:
+-
++
+     * Ubuntu: `sudo apt install graphviz`
+     * MacOS with brew: `brew install graphviz`
+     * Windows with choco `choco install graphviz`
+@@ -87,9 +87,9 @@ Once the file is saved, you can investigate using free tools. Some options inclu
+     $ python -m gprof2dot -f pstats  -n 5  result.pstat -o result.dot
+     $ dot -Tpng -o result.png result.dot
+     ```
+-
++
+     If your shell supports piping, this can all be combined into one command:
+-
++
+     ```bash
+     $ python -m gprof2dot -f pstats  -n 5  result.pstat -o | dot -Tpng -o result.png
+     ```
+@@ -129,6 +129,6 @@ viewer.window.add_dock_widget(testing_btn)
+ In addition to cProfile, third-party profilers are available in Python:
+
+ *  `yappi` with support for multithreading
+-*  `vmprof`
++*  `vmprof`
+
+ Both can be installed with `pip`.
+diff --git a/docs/developers/release.md b/docs/developers/release.md
+index ef5e8d9c..855e9e79 100644
+--- a/docs/developers/release.md
++++ b/docs/developers/release.md
+@@ -7,26 +7,26 @@ it will include generating release notes, documentation, etc.
+ # Timeline
+ New versions of `napari` will be released every two months. The first release candidate will be available one week prior to release for testing purposes. Multiple release candidates may become available during the week prior to release. Upcoming releases can be found in our public calendar.
+
+-The latest release candidate can be installed with
++The latest release candidate can be installed with
+
+-`pip install --pre napari`
++`python -m pip install --pre napari`
+
+ # Release management
+ The release will be coordinated by a release manager whose responsibilities include...
+
+ ## Two weeks before release (one week before release candidate)
+-- Look through currently open PRs and get a sense of what would be good to merge before the first release candidate
++- Look through currently open PRs and get a sense of what would be good to merge before the first release candidate
+ - Create a zulip thread in the release channel letting people know the release candidate is coming and pointing out PRs that would be nice to merge before release
+
+ At this stage, bug fixes and features that are close to landing should be prioritized. The release manager will follow up with PR authors, reviewing and merging as needed.
+-
++
+ ## Nine days before release (two days before release candidate)
+ - Generate release notes with the script in the release folder
+ - Fill in the release highlights and make a PR with the release notes
+
+ At this point the release manager should ideally be the only person merging PRs on the repo for the next week.
+
+-## One week before release
++## One week before release
+ - Add any recently merged PRs to release notes
+ - Merge release notes
+ - Make the release candidate
+@@ -44,7 +44,7 @@ At this stage PRs merged should focus mainly on regressions and bug fixes. New f
+
+ # Release process
+
+-Additional `release` dependencies (`pip install -e .[release]`) are required to complete the release process.
++Additional `release` dependencies (`python -m pip install -e .[release]`) are required to complete the release process.
+
+ > [`MANIFEST.in`](https://github.com/napari/napari/blob/main/MANIFEST.in) determines which non-Python files are included.
+ > Make sure to check that all necessary ones are listed before beginning the release process.
+@@ -147,7 +147,7 @@ git push upstream --tags
+ The release candidate can then be tested with
+
+ ```bash
+-pip install --pre napari
++python -m pip install --pre napari
+ ```
+
+ It is recommended that the release candidate is tested in a virtual environment in order to isolate dependencies.
+diff --git a/docs/developers/testing.md b/docs/developers/testing.md
+index 1a9e63c8..9aa506ac 100644
+--- a/docs/developers/testing.md
++++ b/docs/developers/testing.md
+@@ -43,7 +43,7 @@ of tests.
+ ## Running tests
+
+ To run our test suite locally, run `pytest` on the command line.  If, for some reason
+-you don't already have the test requirements in your environment, run `pip install -e .[testing]`.
++you don't already have the test requirements in your environment, run `python -m pip install -e .[testing]`.
+
+ There are a very small number of tests (<5) that require showing GUI elements, (such
+ as testing screenshots). By default, these are only run during continuous integration.
+diff --git a/docs/howtos/docker.md b/docs/howtos/docker.md
+index fed71c21..3cee7f79 100644
+--- a/docs/howtos/docker.md
++++ b/docs/howtos/docker.md
+@@ -7,7 +7,7 @@ Builds are available in the [GitHub Container Registry](https://github.com/orgs/
+ A dockerfile is added to napari root to allow build of a docker image using official napari release.
+ It contains two targets built on top of Ubuntu 20.04:
+
+-* `napari`: The result of `pip install napari[all] scikit-image` for Python 3.8, including all the system libraries required by PyQt.
++* `napari`: The result of `python -m pip install napari[all] scikit-image` for Python 3.8, including all the system libraries required by PyQt.
+ * `napari-xpra`: Same as above, plus a preconfigured Xpra server.
+
+ Note that napari in Docker is still in alpha stage and not working universally. Feedback and contributions are welcomed!
+diff --git a/docs/index.md b/docs/index.md
+index 9f8783a4..2e87232f 100644
+--- a/docs/index.md
++++ b/docs/index.md
+@@ -98,7 +98,7 @@ napari can be installed on macOS (with older Intel x86 chips), Linux, and Window
+ with Python {{ python_version_range }} using pip:
+
+ ```sh
+-pip install "napari[all]"
++python -m pip install "napari[all]"
+ ```
+
+ _(See `Specifying a GUI Backend` below for an explanation of the `[all]` notation.)_
+@@ -107,7 +107,7 @@ _(See `Specifying a GUI Backend` below for an explanation of the `[all]` notatio
+ While not strictly required, it is *highly* recommended to install
+ napari into a clean virtual environment using an environment manager like
+ [conda](https://docs.conda.io/en/latest/miniconda.html) or
+-[venv](https://docs.python.org/3/library/venv.html).
++[venv](https://docs.python.org/3/library/venv.html).
+ This should be set up before you install napari. For example, setting with
+ up a Python {{ python_version }} environment with `conda`:
+
+@@ -130,7 +130,7 @@ To install the current `main` branch on github (which will usually be ahead
+ of the latest release on pypi)
+
+ ```sh
+-pip install "git+https://github.com/napari/napari.git#egg=napari[all]"
++python -m pip install "git+https://github.com/napari/napari.git#egg=napari[all]"
+ ```
+
+ For more information or troubleshooting see our [installation
+@@ -143,22 +143,22 @@ napari needs a library called [Qt](https://www.qt.io/) to run its user interface
+ (UI). In Python, there are two alternative libraries to run this, called
+ [PyQt5](https://www.riverbankcomputing.com/software/pyqt/download5) and
+ [PySide2](https://doc.qt.io/qtforpython/). By default, we don't choose for you,
+-and simply running `pip install napari` will not install either. You *might*
++and simply running `python -m pip install napari` will not install either. You *might*
+ already have one of them installed in your environment, thanks to other
+ scientific packages such as Spyder or matplotlib. If neither is available,
+ running napari will result in an error message asking you to install one of
+ them.
+
+-Running `pip install "napari[all]"` will install the default framework--currently
++Running `python -m pip install "napari[all]"` will install the default framework – currently
+ PyQt5, but this could change in the future.
+
+ To install napari with a specific framework, you can use:
+
+ ```sh
+-pip install "napari[pyqt5]"    # for PyQt5
++python -m pip install "napari[pyqt5]"    # for PyQt5
+
+ # OR
+-pip install "napari[pyside2]"  # for PySide2
++python -m pip install "napari[pyside2]"  # for PySide2
+ ```
+ ````
+
+diff --git a/docs/plugins/best_practices.md b/docs/plugins/best_practices.md
+index d41db739..091fd61c 100644
+--- a/docs/plugins/best_practices.md
++++ b/docs/plugins/best_practices.md
+@@ -60,7 +60,7 @@ by distributing "[wheels](https://realpython.com/python-wheels/)" on
+ Other packages simply distribute the source code (as an "sdist") and expect the
+ end-user to compile it on their own computer.  Compiling C code requires
+ software that is not always installed on every computer. (If you've ever tried
+-to `pip install` a package and had it fail with a big wall of red text saying
++to `python -m pip install` a package and had it fail with a big wall of red text saying
+ something about `gcc`, then you've run into a package that doesn't distribute
+ wheels, and you didn't have the software required to compile it).
+ ````
+@@ -103,7 +103,7 @@ reliable way, the built-in napari plugin installer doesn't currently work with
+ conda.  If your dependency is only available on conda, but does not offer
+ wheels,you *may* guide your users in using conda to install your package or one
+ of your dependencies.  Just know that it may not work with the built-in plugin
+-installer.
++installer.
+ ````
+
+
+@@ -115,7 +115,7 @@ This point will be less relevant when we move to the second generation
+ declaration](https://github.com/napari/napari/issues/3115), but it's still a
+ good idea to delay importing your plugin-specific dependencies and modules until
+ *after* your hookspec has been called.  This helps napari stay quick and
+-responsive at startup.
++responsive at startup.
+ ````
+
+
+@@ -218,7 +218,7 @@ template](https://github.com/napari/cookiecutter-napari-plugin) is already set
+ up to report test coverage, but you can test locally as well, using
+ [pytest-cov](https://github.com/pytest-dev/pytest-cov)
+
+-1. `pip install pytest-cov`
++1. `python -m pip install pytest-cov`
+ 2. Run your tests with `pytest --cov=<your_package> --cov-report=html`
+ 3. Open the resulting report in your browser: `open htmlcov/index.html`
+ 4. The report will show line-by-line what is being tested, and what is being
+@@ -233,7 +233,7 @@ up to report test coverage, but you can test locally as well, using
+ ## Set style for additional windows in your plugin
+
+ In napari plugins we strongly advise additional widgets be docked in the main napari viewer,
+-but sometimes a separate window is required.
++but sometimes a separate window is required.
+ The best practice is to use [`QDialog`](https://doc.qt.io/qt-5/qdialog.html)
+ based windows with parent set to widget
+ already docked in the viewer.
+@@ -248,35 +248,35 @@ class MyInputDialog(QDialog):
+         self.number = QSpinBox()
+         self.ok_btn = QPushButton("OK")
+         self.cancel_btn = QPushButton("Cancel")
+-
++
+         layout = QGridLayout()
+         layout.addWidget(QLabel("Number:"), 0, 0)
+         layout.addWidget(self.number, 0, 1)
+         layout.addWidget(self.ok_btn, 1, 0)
+         layout.addWidget(self.cancel_btn, 1, 1)
+         self.setLayout(layout)
+-
++
+         self.ok_btn.clicked.connect(self.accept)
+         self.cancel_btn.clicked.connect(self.reject)
+-
++
+ class MyWidget(QWidget):
+     def __init__(self, viewer: "napari.Viewer"):
+         super().__init__()
+         self.viewer = viewer
+         self.open_dialog = QPushButton("Open dialog")
+         self.open_dialog.clicked.connect(self.open_dialog_clicked)
+-
++
+     def open_dialog_clicked(self):
+-        # setting parent to self allows the dialog to inherit its
++        # setting parent to self allows the dialog to inherit its
+         # style from the viewer by pass self as argument
+-        dialog = MyInputDialog(self)
++        dialog = MyInputDialog(self)
+         dialog.exec_()
+         if dialog.result() == QDialog.Accepted:
+             print(dialog.number.value())
+ ```
+
+ If there is a particular reason that you need to use a separate window that
+-inherits from `QWidget`, not `QDialog`, then you could use the `get_current_stylesheet`
++inherits from `QWidget`, not `QDialog`, then you could use the `get_current_stylesheet`
+ and {func}`get_stylesheet <napari.qt.get_stylesheet>` functions from the
+ {mod}`napari.qt <napari.qt>` module.
+
+@@ -321,7 +321,7 @@ pyproject.toml
+ README.md
+ ```
+
+-However, if your project structure is already following a different scheme,
++However, if your project structure is already following a different scheme,
+ the testing logic might live outside your package, as a top-level directory:
+
+ ```bash
+@@ -337,12 +337,12 @@ README.md
+ ```
+
+ Under these circumstances, your build backend (usually `setuptools`) might include `tests` as a
+-separate package that will be installed next to `my_package`!
++separate package that will be installed next to `my_package`!
+ Most of the time, this is not wanted; e.g. do you want to do `import tests`? Probably not!
+ Additionally, this unwanted behavior might cause installation issues with other projects.
+
+ Ideally, you could change your project structure to follow the recommended skeleton followed in
+-the cookiecutter template. Howevever, if that's unfeasible, you can fix this in the project metadata files.
++the cookiecutter template. Howevever, if that's unfeasible, you can fix this in the project metadata files.
+
+ You need to explicitly _exclude_ the top-level `tests` directory from the packaged contents:
+
+@@ -367,7 +367,7 @@ setup(
+
+ Note this also applies to other top-level directories, like `test`, `_tests`, `testing`, etc.
+
+-You can find more information in the
++You can find more information in the
+ [package discovery documentation for `setuptools`](https://setuptools.pypa.io/en/latest/userguide/package_discovery.html).
+
+
+@@ -381,7 +381,7 @@ Some other times, a whole project will be included entirely (vendoring).
+
+ This constitutes an act of source code redistribution, which is usually covered by many licensing schemes.
+ Most of the time, this means you need to explicitly include the vendored project license in the source.
+-This is the case for Apache, BSD and MIT-style licenses.
++This is the case for Apache, BSD and MIT-style licenses.
+ Do note that some projects might NOT allow redistribution without explicit approval.
+ Others will prevent it entirely... Be mindful and check the requirements before distributing your package!
+
+diff --git a/docs/plugins/debug_plugins.md b/docs/plugins/debug_plugins.md
+index 9a286c4e..a84fdbf3 100644
+--- a/docs/plugins/debug_plugins.md
++++ b/docs/plugins/debug_plugins.md
+@@ -8,11 +8,11 @@ When developing plugins in napari, you may encounter mistakes or bugs in your co
+ 4. Reloading code during plugin development.
+ 5. Isolating issues from napari.
+ 6. Logging and debug messages.
+-7. Debugging segfaults/memory violation errors
++7. Debugging segfaults/memory violation errors
+
+ ## Debugging plugin start-up issues
+
+-It is possible that after installing your plugin, napari will fail to launch - or your plugin won't show up.
++It is possible that after installing your plugin, napari will fail to launch - or your plugin won't show up.
+ The following commands will report any issues napari detects with your plugin that may prevent napari from launching or prevent napari from discovering your plugin:
+
+ * `napari --plugin-info -v` prints installed napari plugins, what they provide, and any issues related to these plugins.
+@@ -40,7 +40,7 @@ Dropping into the debugger will open the built in [python debugger](https://docs
+ You can also configure napari not to catch error messages, or force napari to exit on error via the following environment variables, respectively:
+
+ ```sh
+-NAPARI_CATCH_ERRORS=0
++NAPARI_CATCH_ERRORS=0
+ NAPARI_EXIT_ON_ERROR=1
+ ```
+
+@@ -66,7 +66,7 @@ Firstly, clone the code with `git clone https://github.com/seankmartin/napari-pl
+
+ ```bash
+ cd napari-plugin-debug/napari-simple-reload
+-pip install -e .
++python -m pip install -e .
+ ```
+
+ ### Plugin project structure
+@@ -184,7 +184,7 @@ def test_false_inputs():
+         wdg = example_factory(input_string={"value": str(value)})
+         result = wdg()
+         assert result == f"You entered {value}!"
+-
++
+ if __name__ == "__main__":
+     test_false_inputs()
+ ```
+@@ -295,7 +295,7 @@ The full code changes and new files after applying the changes to the plugin in
+
+ If napari crashes with a segfault or memory violation error when using your plugin
+ it may be connected with setting some viewer/layers properties outside main thread.
+-Because of the limitations of the Qt library, such interactions with napari may lead to a crash.
++Because of the limitations of the Qt library, such interactions with napari may lead to a crash.
+
+ To test if this is the case, you can use the `NAPARI_ENSURE_PLUGIN_MAIN_THREAD` environment variable to help debug the issue.
+
+@@ -305,7 +305,7 @@ Set the environement variable: `NAPARI_ENSURE_PLUGIN_MAIN_THREAD=1`, then start
+ NAPARI_ENSURE_PLUGIN_MAIN_THREAD=1 napari
+ ```
+
+-Next, start using your plugin and observe if
++Next, start using your plugin and observe if
+ `RuntimeError("Setting attributes on a napari object is only allowed from the main Qt thread.")`
+-occurred. If so, then you need to make sure that all of your plugin code that interacts with napari structures is executed
+-in the main thread. For more details you could read the [multithreading](https://napari.org/stable/guides/threading.html) section of the documentation.
+\ No newline at end of file
++occurred. If so, then you need to make sure that all of your plugin code that interacts with napari structures is executed
++in the main thread. For more details you could read the [multithreading](https://napari.org/stable/guides/threading.html) section of the documentation.
+diff --git a/docs/plugins/first_plugin.md b/docs/plugins/first_plugin.md
+index 5a6296fe..adc5ed61 100644
+--- a/docs/plugins/first_plugin.md
++++ b/docs/plugins/first_plugin.md
+@@ -96,7 +96,7 @@ single top-level module, called `napari_hello`.
+
+ You would *install* this package with
+ ```sh
+-pip install napari-hello
++python -m pip install napari-hello
+ ```
+
+ ... and *import* it with ...
+@@ -259,13 +259,13 @@ napari.manifest =
+ ## 4. Install your plugin and try it out!
+
+ With that, we're ready to go.  Let's install our package in the environment
+-and then run napari.  Note: we're using `pip install -e .` here to install our
++and then run napari.  Note: we're using `python -m pip install -e .` here to install our
+ package (in the current working directory) in ["editable" mode][editable_mode].
+ This means that changes we make to our package during development will be
+-detected when we re-run napari, without having to run `pip install` again.
++detected when we re-run napari, without having to run `python -m pip install` again.
+
+ ```sh
+-pip install -e .
++python -m pip install -e .
+ napari
+ ```
+
+@@ -285,7 +285,7 @@ includes conveniences like testing, continuous integration, version
+ management, and deployment hooks.
+
+ ```sh
+-pip install cookiecutter
++python -m pip install cookiecutter
+ cookiecutter https://github.com/napari/cookiecutter-napari-plugin
+ ```
+
+diff --git a/docs/plugins/npe1.md b/docs/plugins/npe1.md
+index f431fe53..c8423e84 100644
+--- a/docs/plugins/npe1.md
++++ b/docs/plugins/npe1.md
+@@ -1,14 +1,14 @@
+ (napari-plugin-engine)=
+ # 1st Gen Plugin Guide (*Deprecated*)
+
+-```{Admonition} DEPRECATED
++```{Admonition} DEPRECATED
+ :class: warning
+ We introduced a new plugin engine ([`npe2`][npe2]) in December 2021.
+
+ Plugins targeting the first generation `napari-plugin-engine`
+ (described on this page) will continue to work for at least the
+ first half of 2022, but we recommend that new plugins use `npe2` and
+-existing plugins consider migrating soon. See the
++existing plugins consider migrating soon. See the
+ [npe2 migration guide](npe2-migration-guide) for details.
+
+ The content below describes the original
+@@ -203,7 +203,7 @@ A user would then be able to use `napari`, extended with your package's
+ functionality by simply installing your package along with napari:
+
+ ```sh
+-   pip install napari mypackage
++   python -m pip install napari mypackage
+ ```
+
+ (plugin-sharing)=
+@@ -227,7 +227,7 @@ plugin.
+ Install cookiecutter and use the template as follows:
+
+ ```sh
+-pip install cookiecutter
++python -m pip install cookiecutter
+ cookiecutter https://github.com/napari/cookiecutter-napari-plugin
+ ```
+
+diff --git a/docs/plugins/npe2_migration_guide.md b/docs/plugins/npe2_migration_guide.md
+index 471f0b6f..7cb2b38f 100644
+--- a/docs/plugins/npe2_migration_guide.md
++++ b/docs/plugins/npe2_migration_guide.md
+@@ -3,7 +3,7 @@
+ # `npe2` migration guide
+
+ This document details how to convert a plugin using the first generation
+-`napari-plugin-engine`, to the new `npe2` format.
++`napari-plugin-engine`, to the new `npe2` format.
+
+ The primary difference between the first generation and second generation plugin
+ system relates to how napari *discovers* plugin functionality. In the first
+@@ -20,7 +20,7 @@ file](./manifest).
+ ### 1. Install `npe2`
+
+ ```sh
+-pip install npe2
++python -m pip install npe2
+ ```
+
+ The `npe2` command line tool provides a few commands to help you develop your
+@@ -58,7 +58,7 @@ Typically this will look something like:
+ ```
+ conda activate your-env
+ cd path/to/your/plugin/repository
+-pip install -e .
++python -m pip install -e .
+ ```
+
+ If `npe2 convert` cannot import your plugin, you will likely get an error
+@@ -78,7 +78,7 @@ The `npe2 convert` command will:
+
+ 1. Inspect your plugin for hook implementations, and generate an npe2-compatible
+    [manifest file](./manifest), called `napari.yaml`.
+-2. **Modify** your `setup.cfg` to use the new `napari.manifest` entry point, and
++2. **Modify** your `setup.cfg` to use the new `napari.manifest` entry point, and
+    include the manifest file in your package data.
+
+ Use the `npe2 convert` command, passing a path to a plugin
+@@ -104,14 +104,14 @@ plugin.  Notable cases include:
+ - *locally* scoped functions returned from `napari_experimental_provide_function`.
+   All [command contributions](contributions-commands)
+   must have global `python_paths`.
+-
++
+ Feel free to contact us on zulip or github if you need help converting!.
+ ```
+
+ Now, update the local package metadata by repeating:
+
+ ```
+-> pip install -e .
++> python -m pip install -e .
+ ```
+
+ The next time napari is run, your plugin should be discovered as an
+diff --git a/docs/plugins/test_deploy.md b/docs/plugins/test_deploy.md
+index a7a397e3..3ce7a5d8 100644
+--- a/docs/plugins/test_deploy.md
++++ b/docs/plugins/test_deploy.md
+@@ -126,12 +126,12 @@ guide][hub-guide-custom-viz].
+
+ Finally, once you have curated your package metadata and description, you can
+ preview your metadata, and check any missing fields using the
+-napari hub preview page service. Check out [this guide](https://github.com/chanzuckerberg/napari-hub/blob/main/docs/setting-up-preview.md) for instructions on how to set it up.
++napari hub preview page service. Check out [this guide](https://github.com/chanzuckerberg/napari-hub/blob/main/docs/setting-up-preview.md) for instructions on how to set it up.
+
+ ## Deployment
+
+ When you are ready to share your plugin, [upload the Python package to
+-PyPI][pypi-upload] after which it will be installable using `pip install
++PyPI][pypi-upload] after which it will be installable using `python -m pip install
+ <yourpackage>`, or (assuming you added the `Framework :: napari` classifier)
+ in the builtin plugin installer dialog.
+
+@@ -159,4 +159,3 @@ forum](https://forum.image.sc/tag/napari).
+ [hub-guide-custom-viz]: https://github.com/chanzuckerberg/napari-hub/wiki/Customizing-your-plugin's-listing#visibility
+ [hub-guide-preview]: https://github.com/chanzuckerberg/napari-hub/blob/main/docs/setting-up-preview.md
+ [autodeploy]: https://github.com/napari/cookiecutter-napari-plugin#set-up-automatic-deployments
+-
+diff --git a/docs/release/generate_release_notes.py b/docs/release/generate_release_notes.py
+index 63c3a608..339080aa 100644
+--- a/docs/release/generate_release_notes.py
++++ b/docs/release/generate_release_notes.py
+@@ -17,7 +17,7 @@
+ ```
+ You'll require PyGitHub and tqdm, which you can install with:
+ ```
+-pip install -e ".[release]"
++python -m pip install -e ".[release]"
+ ```
+ References
+ https://github.com/scikit-image/scikit-image/blob/main/tools/generate_release_notes.py
+diff --git a/docs/tutorials/fundamentals/installation.md b/docs/tutorials/fundamentals/installation.md
+index 2c96cdd4..3554687c 100644
+--- a/docs/tutorials/fundamentals/installation.md
++++ b/docs/tutorials/fundamentals/installation.md
+@@ -21,7 +21,7 @@ Welcome to the **napari** installation guide!
+
+ This guide will teach you how to do a clean install of **napari** and launch the viewer.
+
+-```{note}
++```{note}
+ If you want to contribute code back into napari, you should follow the [development installation instructions in the contributing guide](https://napari.org/developers/contributing.html) instead.
+ ```
+
+@@ -29,8 +29,8 @@ If you want to contribute code back into napari, you should follow the [developm
+
+ Prerequisites differ depending on how you want to install napari.
+
+-### Prerequisites for installing napari as a Python package
+-This installation method allows you to use napari from Python to programmatically
++### Prerequisites for installing napari as a Python package
++This installation method allows you to use napari from Python to programmatically
+ interact with the app. It is the best way to install napari and make full use of
+ all its features.
+
+@@ -44,11 +44,11 @@ You may also want:
+
+ ### Prerequisites for installing napari as a bundled app
+ This is the easiest way to install napari if you only wish to use it as a standalone GUI app.
+-This installation method does not have any prerequisites.
++This installation method does not have any prerequisites.
+
+ ```{important}
+ Note that the bundled app is still
+-in active development, and may not be very stable. We strongly recommend
++in active development, and may not be very stable. We strongly recommend
+ [installing as a Python package instead](#install-as-python-package-recommended).
+ ```
+
+@@ -105,7 +105,7 @@ conda-forge channel. We also recommend this path for users of arm64 macOS machin
+ conda install -c conda-forge napari
+ ```
+
+-You can then upgrade to a new version of napari using
++You can then upgrade to a new version of napari using
+
+ ```sh
+ conda update napari
+@@ -115,16 +115,16 @@ If you want to install napari with PySide2 as the backend you need to install it
+
+ ```sh
+ conda install -c conda-forge "napari=*=*pyside2"
+-```
++```
+ ````
+
+ ````{note}
+ In some cases, `conda`'s default solver can struggle to find out which packages need to be
+-installed for napari. If it takes too long or you get the wrong version of napari
++installed for napari. If it takes too long or you get the wrong version of napari
+ (see below), consider:
+ 1. Overriding your default channels to use only `conda-forge` by adding `--override-channels`
+ and specifying the napari and Python versions explicitly. For example, use {{ python_version_code }}
+-to get Python {{ python_version }} and {{ napari_conda_version }} to specify the napari version as
++to get Python {{ python_version }} and {{ napari_conda_version }} to specify the napari version as
+ {{ napari_version }}, the current release.
+
+ 2. You can try installing [`mamba`](https://github.com/mamba-org/mamba) in your base
+@@ -167,23 +167,23 @@ napari needs a library called [Qt](https://www.qt.io/) to run its user interface
+ (UI). In Python, there are two alternative libraries to run this, called
+ [PyQt5](https://www.riverbankcomputing.com/software/pyqt/download5) and
+ [PySide2](https://doc.qt.io/qtforpython/). By default, we don't choose for you,
+-and simply running `pip install napari` will not install either. You *might*
++and simply running `python -m pip install napari` will not install either. You *might*
+ already have one of them installed in your environment, thanks to other
+ scientific packages such as Spyder or matplotlib. If neither is available,
+ running napari will result in an error message asking you to install one of
+ them.
+
+-Running `pip install "napari[all]"` will install the default Qt framework, which is currently
++Running `python -m pip install "napari[all]"` will install the default framework, which is currently
+ PyQt5--but this could change in the future. However, if you have a Mac with the newer arm64
+ architecture (Apple Silicon), this will not work--see {ref}`note-m1`.
+
+ To install napari with a specific framework, you can use:
+
+ ```sh
+-pip install "napari[pyqt5]"    # for PyQt5
++python -m pip install "napari[pyqt5]"    # for PyQt5
+
+ # OR
+-pip install "napari[pyside2]"  # for PySide2
++python -m pip install "napari[pyside2]"  # for PySide2
+ ```
+
+ ```{note}
+@@ -216,7 +216,7 @@ To access the cross platform bundles you can visit our [release
+ page](https://github.com/napari/napari/releases) and scroll to the release you
+ are interested in. For example, the bundles for napari {{ napari_version }} can be
+ accessed {{ '[here](https://github.com/napari/napari/releases/tag/vNAPARI_VER)'.replace('NAPARI_VER', napari_version) }}.
+-To get to the download link, just scroll all the way to bottom of the page and
++To get to the download link, just scroll all the way to bottom of the page and
+ expand the `Assets` section to get a view that looks like this:
+
+ ![Cropped screenshot from GitHub with the Assets section (or "tab") expanded, containing links to download the app in the form of zip files for Linux, macOS, Windows, in addition to other links.](../assets/tutorials/installation/bundle_assets.png)
+@@ -285,7 +285,7 @@ When you launch the bundled napari app on Windows, first you'll see an empty
+ command terminal appear (do not close this window - you can ignore it). The
+ command terminal will be followed by a napari splash screen, and then the main
+ napari user interface window will appear a few seconds later. Note that errors
+-which might occur during your napari session will appear on the command terminal -
++which might occur during your napari session will appear on the command terminal -
+ so if something is not working, it might pay to take a look at the terminal!
+
+ ![Windows command terminal on napari launch.](../assets/tutorials/installation/windows_bundle_command_terminal.png)
+@@ -312,7 +312,7 @@ contributing to napari please check our [contributing
+ guidelines](../../developers/contributing.md)
+ - if you are running into issues or bugs, please open a new issue on our [issue
+ tracker](https://github.com/napari/napari/issues)
+-    - include the output of `napari -info`
++    - include the output of `napari -info`
+     (or go to `Help>Info` in the viewer and copy paste the information)
+ - if you want help using napari, we are a community partner on the [imagesc
+ forum](https://forum.image.sc/tags/napari) and all usage support requests should
+diff --git a/docs/tutorials/fundamentals/quick_start.md b/docs/tutorials/fundamentals/quick_start.md
+index 12e15d06..123a1d9b 100644
+--- a/docs/tutorials/fundamentals/quick_start.md
++++ b/docs/tutorials/fundamentals/quick_start.md
+@@ -18,9 +18,9 @@ kernelspec:
+
+ ## About napari
+
+-napari is a fast, interactive, multi-dimensional image viewer, with [a vibrant plugin ecosystem](https://www.napari-hub.org/) that expands its capability to tackle various domain-specific visualization and analysis needs. It is built on Qt (for the GUI), [vispy](https://vispy.org/) (for performant GPU-based rendering), and the scientific Python stack (numpy, scipy, and scikit-image).
++napari is a fast, interactive, multi-dimensional image viewer, with [a vibrant plugin ecosystem](https://www.napari-hub.org/) that expands its capability to tackle various domain-specific visualization and analysis needs. It is built on Qt (for the GUI), [vispy](https://vispy.org/) (for performant GPU-based rendering), and the scientific Python stack (numpy, scipy, and scikit-image).
+
+-napari is an open source project on [GitHub](https://github.com/napari/napari) to facilitate transparency, reuse, and extensibility.
++napari is an open source project on [GitHub](https://github.com/napari/napari) to facilitate transparency, reuse, and extensibility.
+
+ At its core, it provides critical viewer features out-of-the-box, such as support for [large multi-dimensional data](../processing/dask); [“layers”](..//start_index) to simultaneously visualize images, models, and analysis results; and easy manual, interactive annotation in 3D.
+
+@@ -32,7 +32,7 @@ This tutorial uses napari 0.4.14. <br>
+
+ This tutorial is for napari first-timers to give them a quick glance of what napari does, and give it a try right away. We will cover:
+
+-- Installation
++- Installation
+ - Open napari
+ - Open an image
+ - Image display adjustment
+@@ -49,7 +49,7 @@ You will also see some examples of plugins. The core napari viewer focuses on do
+ ### Installation
+
+ - Download the napari {{ napari_version }} bundled app for simple installation:
+-
++
+     {{ '[Linux installation](https://github.com/napari/napari/releases/download/vNAPARI_VER/napari-NAPARI_VER-Linux-x86_64.zip)'.replace('NAPARI_VER', napari_version) }}<br>
+     {{ '[macOS installation](https://github.com/napari/napari/releases/download/vNAPARI_VER/napari-NAPARI_VER-macOS-x86_64.zip)'.replace('NAPARI_VER', napari_version) }}<br>
+     {{ '[Windows installation](https://github.com/napari/napari/releases/download/vNAPARI_VER/napari-NAPARI_VER-Windows-x86_64.zip)'.replace('NAPARI_VER', napari_version) }}<br>
+@@ -67,7 +67,7 @@ You will also see some examples of plugins. The core napari viewer focuses on do
+     Once in napari-env,
+
+     ```python
+-    pip install 'napari[all]'
++    python -m pip install 'napari[all]'
+     ```
+
+
+@@ -81,7 +81,7 @@ napari can be opened in one of [multiple ways](./getting_started), depending on
+
+ Here we will be mainly focused on the GUI application.
+
+-- From command line:
++- From command line:
+
+     Once installed, simply run
+ ```python
+@@ -100,11 +100,11 @@ napari
+ napari natively supports tiff and many other formats supported by [skimage.io.imread](https://scikit-image.org/docs/dev/api/skimage.io.html) as input image file format.<br>
+ Try with your own images or download [this ome tiff file](https://downloads.openmicroscopy.org/images/OME-TIFF/2016-06/MitoCheck/00001_01.ome.tiff).
+
+-Additional input file formats may be supported [by plugins](https://www.napari-hub.org/).
++Additional input file formats may be supported [by plugins](https://www.napari-hub.org/).
+ Try [napari-aicsimageio](https://www.napari-hub.org/plugins/napari-aicsimageio) if you have czi, lif, or nd2 files.
+
+ Once you have the proper plugin installed, use File > Open Files(s)
+-and select the image file, or simply drag and drop the image into napari.
++and select the image file, or simply drag and drop the image into napari.
+
+ For demo purpose, we will use a sample image that comes with napari.
+
+@@ -154,7 +154,7 @@ nbscreenshot(viewer, alt_text="image of singular cell with yellow tint")
+ To measure the area of the cell, we can use a labels layer and manually "paint" the cell.
+ The labels layer allows you to record the segmentation result by assigning background = 0, and assigning each object with an integer.
+
+-1. Add a new labels layer
++1. Add a new labels layer
+ 1. Click on "paint"
+ 1. Circle the cell
+ 1. Use "fill" bucket to fill it.
+@@ -194,7 +194,7 @@ viewer.close_all()
+
+ ![ndisplay](../../images/ndisplay.png)
+
+-- Test some [examples](https://github.com/napari/napari/tree/main/examples) to see how to add different layer types and add your own widgets to napari.
++- Test some [examples](https://github.com/napari/napari/tree/main/examples) to see how to add different layer types and add your own widgets to napari.
+
+ - Explore other [plugins](https://www.napari-hub.org/). A few fun ones: [napari-clusters-plotter](https://www.napari-hub.org/plugins/napari-clusters-plotter), [napari-pyclesperanto-assistant](https://www.napari-hub.org/plugins/napari-pyclesperanto-assistant), [napari-animation](https://www.napari-hub.org/plugins/napari-animation).

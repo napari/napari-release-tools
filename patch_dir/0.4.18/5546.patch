@@ -1,0 +1,164 @@
+From c9864efe1b10129d4feaf5620156c00fea8631bb Mon Sep 17 00:00:00 2001
+From: Andy Sweet <andrew.d.sweet@gmail.com>
+Date: Mon, 20 Feb 2023 01:04:01 -0800
+Subject: [PATCH] Move layer editable change from slicing to controls (#5546)
+
+---
+ .../_tests/test_qt_layer_controls.py          | 41 +++++++++++++++++++
+ .../qt_layer_controls_container.py            |  2 +-
+ .../_qt/layer_controls/qt_points_controls.py  |  3 ++
+ .../_qt/layer_controls/qt_shapes_controls.py  |  3 ++
+ napari/layers/points/_tests/test_points.py    | 34 ---------------
+ 5 files changed, 48 insertions(+), 35 deletions(-)
+
+diff --git a/napari/_qt/layer_controls/_tests/test_qt_layer_controls.py b/napari/_qt/layer_controls/_tests/test_qt_layer_controls.py
+index 39ed62cb..95886bb1 100644
+--- a/napari/_qt/layer_controls/_tests/test_qt_layer_controls.py
++++ b/napari/_qt/layer_controls/_tests/test_qt_layer_controls.py
+@@ -5,10 +5,12 @@ import pytest
+ from qtpy.QtWidgets import QAbstractButton
+
+ from napari._qt.layer_controls.qt_layer_controls_container import (
++    QtLayerControlsContainer,
+     create_qt_layer_controls,
+     layer_to_controls,
+ )
+ from napari._qt.layer_controls.qt_shapes_controls import QtShapesControls
++from napari.components import ViewerModel
+ from napari.layers import Labels, Points, Shapes
+
+ LayerTypeWithData = namedtuple('LayerTypeWithData', ['type', 'data'])
+@@ -82,6 +84,45 @@ def test_set_text_then_set_visible_updates_checkbox(
+     assert ctrl.textDispCheckBox.isChecked()
+
+
++@pytest.mark.parametrize(('ndim', 'editable_after'), ((2, False), (3, True)))
++def test_set_3d_display_with_points(qtbot, ndim, editable_after):
++    """Interactivity only works for 2D points layers rendered in 2D and not
++    in 3D. Verify that layer.editable is set appropriately upon switching to
++    3D rendering mode.
++
++    See: https://github.com/napari/napari/pull/4184
++    """
++    viewer = ViewerModel()
++    container = QtLayerControlsContainer(viewer)
++    qtbot.addWidget(container)
++    layer = viewer.add_points(np.zeros((0, ndim)), ndim=ndim)
++    assert viewer.dims.ndisplay == 2
++    assert layer.editable
++
++    viewer.dims.ndisplay = 3
++
++    assert layer.editable == editable_after
++
++
++def test_set_3d_display_with_shapes(qtbot):
++    """Interactivity only works for shapes layers rendered in 2D and not
++    in 3D. Verify that layer.editable is set appropriately upon switching to
++    3D rendering mode.
++
++    See: https://github.com/napari/napari/pull/4184
++    """
++    viewer = ViewerModel()
++    container = QtLayerControlsContainer(viewer)
++    qtbot.addWidget(container)
++    layer = viewer.add_shapes(np.zeros((0, 2, 4)))
++    assert viewer.dims.ndisplay == 2
++    assert layer.editable
++
++    viewer.dims.ndisplay = 3
++
++    assert not layer.editable
++
++
+ # The following tests handle changes to the layer's visible and
+ # editable state for layer control types that have controls to edit
+ # the layer. For more context see:
+diff --git a/napari/_qt/layer_controls/qt_layer_controls_container.py b/napari/_qt/layer_controls/qt_layer_controls_container.py
+index 57b49ac4..8c236d27 100644
+--- a/napari/_qt/layer_controls/qt_layer_controls_container.py
++++ b/napari/_qt/layer_controls/qt_layer_controls_container.py
+@@ -148,7 +148,7 @@ class QtLayerControlsContainer(QStackedWidget):
+         """
+         layer = event.value
+         controls = create_qt_layer_controls(layer)
+-        controls.ndisplay = 3
++        controls.ndisplay = self.viewer.dims.ndisplay
+         self.addWidget(controls)
+         self.widgets[layer] = controls
+
+diff --git a/napari/_qt/layer_controls/qt_points_controls.py b/napari/_qt/layer_controls/qt_points_controls.py
+index d2a8d2f8..e36e436d 100644
+--- a/napari/_qt/layer_controls/qt_points_controls.py
++++ b/napari/_qt/layer_controls/qt_points_controls.py
+@@ -339,6 +339,9 @@ class QtPointsControls(QtLayerControls):
+         with qt_signals_blocked(self.edgeColorEdit):
+             self.edgeColorEdit.setColor(self.layer.current_edge_color)
+
++    def _on_ndisplay_changed(self):
++        self.layer.editable = not (self.layer.ndim == 2 and self.ndisplay == 3)
++
+     def _on_editable_or_visible_change(self):
+         """Receive layer model editable/visible change event & enable/disable buttons."""
+         set_widgets_enabled_with_opacity(
+diff --git a/napari/_qt/layer_controls/qt_shapes_controls.py b/napari/_qt/layer_controls/qt_shapes_controls.py
+index c19bdd15..e79907f7 100644
+--- a/napari/_qt/layer_controls/qt_shapes_controls.py
++++ b/napari/_qt/layer_controls/qt_shapes_controls.py
+@@ -431,6 +431,9 @@ class QtShapesControls(QtLayerControls):
+         with qt_signals_blocked(self.faceColorEdit):
+             self.faceColorEdit.setColor(self.layer.current_face_color)
+
++    def _on_ndisplay_changed(self):
++        self.layer.editable = self.ndisplay == 2
++
+     def _on_editable_or_visible_change(self):
+         """Receive layer model editable/visible change event & enable/disable buttons."""
+         set_widgets_enabled_with_opacity(
+diff --git a/napari/layers/points/_tests/test_points.py b/napari/layers/points/_tests/test_points.py
+index db5de951..e3e93c80 100644
+--- a/napari/layers/points/_tests/test_points.py
++++ b/napari/layers/points/_tests/test_points.py
+@@ -2298,40 +2298,6 @@ def test_text_param_and_setter_are_consistent():
+     )
+
+
+-def test_editable_2d_layer_ndisplay_3():
+-    """Interactivity doesn't work for 2D points layers
+-    being rendered in 3D. Verify that layer.editable is set
+-    to False upon switching to 3D rendering mode.
+-
+-    See: https://github.com/napari/napari/pull/4184
+-    """
+-    data = np.random.random((10, 2))
+-    layer = Points(data, size=5)
+-    assert layer.editable is True
+-
+-    # simulate switching to 3D rendering
+-    # layer should no longer b editable
+-    layer._slice_dims([0, 0, 0], ndisplay=3)
+-    assert layer.editable is False
+-
+-
+-def test_editable_3d_layer_ndisplay_3():
+-    """Interactivity works for 3D points layers
+-    being rendered in 3D. Verify that layer.editable remains
+-    True upon switching to 3D rendering mode.
+-
+-    See: https://github.com/napari/napari/pull/4184
+-    """
+-    data = np.random.random((10, 3))
+-    layer = Points(data, size=5)
+-    assert layer.editable is True
+-
+-    # simulate switching to 3D rendering
+-    # layer should no longer b editable
+-    layer._slice_dims([0, 0, 0], ndisplay=3)
+-    assert layer.editable is True
+-
+-
+ def test_shown():
+     """Test setting shown property"""
+     shape = (10, 2)
+--
+2.34.1

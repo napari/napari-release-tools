@@ -1,0 +1,109 @@
+From 1c6cb722d19e1c11216ee0ef5d3b9133013ff03c Mon Sep 17 00:00:00 2001
+From: Matthias Bussonnier <bussonniermatthias@gmail.com>
+Date: Thu, 22 Dec 2022 19:25:46 +0100
+Subject: [PATCH] Maint: Typing and ImportError -> ModuleNotFoundError. (#5431)
+
+Module not found is more specific than Import Error, and allows to
+bubble errors when the issue is not that the module is not installed.
+
+In the same vein it is an anti pattern to use try/except for conditional
+import, as it may hide errors in Python install, using a explicit
+compare with sys.version_info, can allow some tools (like pyupgrade) to
+detect dead branches.
+---
+ napari/utils/_testsupport.py | 2 +-
+ napari/utils/naming.py       | 8 +++++---
+ napari/utils/translations.py | 4 ++--
+ napari_builtins/io/_read.py  | 2 +-
+ 4 files changed, 9 insertions(+), 7 deletions(-)
+
+diff --git a/napari/utils/_testsupport.py b/napari/utils/_testsupport.py
+index 71ed02a4..4a2efeff 100644
+--- a/napari/utils/_testsupport.py
++++ b/napari/utils/_testsupport.py
+@@ -47,7 +47,7 @@ def fail_obj_graph(Klass):
+
+     try:
+         import objgraph
+-    except ImportError:
++    except ModuleNotFoundError:
+         return
+
+     if not len(Klass._instances) == 0:
+diff --git a/napari/utils/naming.py b/napari/utils/naming.py
+index 1acacc4c..6e35674f 100644
+--- a/napari/utils/naming.py
++++ b/napari/utils/naming.py
+@@ -3,6 +3,8 @@
+ import inspect
+ import re
+ from collections import ChainMap
++from types import FrameType
++from typing import Any, Callable, Optional
+
+ from napari.utils.misc import ROOT_DIR, formatdoc
+
+@@ -28,7 +30,7 @@ def _inc_name_count_sub(match):
+
+
+ @formatdoc
+-def inc_name_count(name):
++def inc_name_count(name: str) -> str:
+     """Increase a name's count matching `{numbered_patt}` by ``1``.
+
+     If the name is not already numbered, append '{sep}[{start}]'.
+@@ -82,7 +84,7 @@ class CallerFrame:
+
+     """
+
+-    def __init__(self, skip_predicate):
++    def __init__(self, skip_predicate: Callable[[int, FrameType], bool]):
+         self.predicate = skip_predicate
+         self.namespace = {}
+         self.names = ()
+@@ -132,7 +134,7 @@ class CallerFrame:
+         del self.names
+
+
+-def magic_name(value, *, path_prefix=ROOT_DIR):
++def magic_name(value: Any, *, path_prefix: str = ROOT_DIR) -> Optional[str]:
+     """Fetch the name of the variable with the given value passed to the calling function.
+
+     Parameters
+diff --git a/napari/utils/translations.py b/napari/utils/translations.py
+index f868b2da..d3d395a8 100644
+--- a/napari/utils/translations.py
++++ b/napari/utils/translations.py
+@@ -51,7 +51,7 @@ def _get_display_name(
+         )
+         loc = babel.Locale.parse(locale)
+         dislay_name = loc.get_display_name(display_locale).capitalize()
+-    except ImportError:
++    except ModuleNotFoundError:
+         dislay_name = display_locale.capitalize()
+
+     return dislay_name
+@@ -88,7 +88,7 @@ def _is_valid_locale(locale: str) -> bool:
+
+         babel.Locale.parse(locale)
+         valid = True
+-    except ImportError:
++    except ModuleNotFoundError:
+         valid = True
+     except ValueError:
+         pass
+diff --git a/napari_builtins/io/_read.py b/napari_builtins/io/_read.py
+index b372e9ef..22c8206e 100644
+--- a/napari_builtins/io/_read.py
++++ b/napari_builtins/io/_read.py
+@@ -19,7 +19,7 @@ from napari.utils.translations import trans
+
+ try:
+     import imageio.v2 as imageio
+-except ImportError:
++except ModuleNotFoundError:
+     import imageio  # type: ignore
+
+ IMAGEIO_EXTENSIONS = {x for f in imageio.formats for x in f.extensions}
+--
+2.34.1

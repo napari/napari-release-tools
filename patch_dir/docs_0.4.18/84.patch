@@ -1,0 +1,204 @@
+From e97730ca6289235788e963ba54a4712a516ecf2b Mon Sep 17 00:00:00 2001
+From: Peter Sobolewski <76622105+psobolewskiPhD@users.noreply.github.com>
+Date: Tue, 10 Jan 2023 21:35:23 +0100
+Subject: [PATCH] Feature: implement python version substitution in conf.py
+ (#84)
+
+* implement python version subs per @Czaki
+
+* tweak index.md wording re: conda env
+
+* Add substitution for python version range
+
+* Use substitutions on quick_start docs
+
+* Fix quick_start installation indentation
+
+* fix index conda env and use python_version
+
+* use python_version_range in Prerequisites
+
+* add python_minimum_version subs
+
+* subs napari version in quick_start bundle links
+
+* fix link substitutions
+
+* Fix missed [
+
+* Add a sustituted link to  stable release page
+
+* rename conda substitution to conda_create_env
+---
+ docs/conf.py                                | 10 +++++++-
+ docs/index.md                               | 12 ++++-----
+ docs/tutorials/fundamentals/installation.md | 23 +++++++++---------
+ docs/tutorials/fundamentals/quick_start.md  | 27 ++++++++++-----------
+ 4 files changed, 39 insertions(+), 33 deletions(-)
+
+diff --git a/docs/conf.py b/docs/conf.py
+index f1300a30..b2682a55 100644
+--- a/docs/conf.py
++++ b/docs/conf.py
+@@ -160,11 +160,19 @@
+ myst_heading_anchors = 3
+
+ version_string = '.'.join(str(x) for x in __version_tuple__[:3])
++python_version = '3.9'
++python_version_range = '3.8–3.10'
++python_minimum_version = '3.8'
+
+ myst_substitutions = {
+    "napari_conda_version": f"`napari={version_string}`",
+    "napari_version": version_string,
+- }
++   "python_version": python_version,
++   "python_version_range": python_version_range,
++   "python_minimum_version": python_minimum_version,
++   "python_version_code": f"`python={python_version}`",
++   "conda_create_env": f"```sh\nconda create -y -n napari-env -c conda-forge python={python_version}\nconda activate napari-env\n```",
++}
+
+ nb_output_stderr = 'show'
+
+diff --git a/docs/index.md b/docs/index.md
+index 1a84b4d3..d1f707ab 100644
+--- a/docs/index.md
++++ b/docs/index.md
+@@ -95,7 +95,7 @@ you can install via pip, conda-forge, or from source.
+ ### From pip, with "batteries included"
+
+ napari can be installed on most macOS, Linux, and Windows systems with Python
+-3.8-3.10 using pip:
++{{ python_version_range }} using pip:
+
+ ```sh
+ pip install "napari[all]"
+@@ -107,13 +107,11 @@ _(See `Specifying a GUI Backend` below for an explanation of the `[all]` notatio
+ While not strictly required, it is *highly* recommended to install
+ napari into a clean virtual environment using an environment manager like
+ [conda](https://docs.conda.io/en/latest/miniconda.html) or
+-[venv](https://docs.python.org/3/library/venv.html).  For example, with `conda`:
++[venv](https://docs.python.org/3/library/venv.html).
++This should be set up before you install napari. For example, setting with
++up a Python {{ python_version }} environment with `conda`:
+
+-```sh
+-conda create -y -n napari-env -c conda-forge python=3.9
+-conda activate napari-env
+-pip install "napari[all]"
+-```
++{{ conda_create_env }}
+ ````
+
+ ### From conda
+diff --git a/docs/tutorials/fundamentals/installation.md b/docs/tutorials/fundamentals/installation.md
+index 2af135ba..92a42d01 100644
+--- a/docs/tutorials/fundamentals/installation.md
++++ b/docs/tutorials/fundamentals/installation.md
+@@ -35,7 +35,7 @@ interact with the app. It is the best way to install napari and make full use of
+ all its features.
+
+ It requires:
+-- [Python 3.8 or higher](https://www.python.org/downloads/)
++- [Python >={{ python_minimum_version }}](https://www.python.org/downloads/)
+ - the ability to install python packages via [pip](https://pypi.org/project/pip/) OR [conda-forge](https://conda-forge.org/docs/user/introduction.html)
+
+ You may also want:
+@@ -65,12 +65,10 @@ napari into a clean virtual environment using an environment manager like
+ [conda](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html) or
+ [venv](https://docs.python.org/3/library/venv.html).
+
+-This should be set up *before* you install napari. For example, with `conda`:
++This should be set up *before* you install napari. For example, setting with
++up a Python {{ python_version }} environment with `conda`:
+
+-```sh
+-conda create -y -n napari-env -c conda-forge python=3.9
+-conda activate napari-env
+-```
++{{ conda_create_env }}
+ ````
+
+ Choose one of the options below to install napari as a Python package.
+@@ -79,7 +77,7 @@ Choose one of the options below to install napari as a Python package.
+ :class: dropdown
+
+ napari can be installed on most macOS, Linux, and Windows systems with Python
+-3.7, 3.8, and 3.9 using pip:
++{{ python_version_range }} using pip:
+
+ ```sh
+ python -m pip install "napari[all]"
+@@ -124,9 +122,10 @@ In some cases, `conda`'s default solver can struggle to find out which packages
+ installed for napari. If it takes too long or you get the wrong version of napari
+ (see below), consider:
+ 1. Overriding your default channels to use only `conda-forge` by adding `--override-channels`
+-and specifying the napari and Python versions explicitly. For example, use `python=3.9` to get
+-Python 3.9 and {{ napari_conda_version }} to specify the napari version as
++and specifying the napari and Python versions explicitly. For example, use {{ python_version_code }}
++to get Python {{ python_version }} and {{ napari_conda_version }} to specify the napari version as
+ {{ napari_version }}, the current release.
++
+ 2. You can try installing [`mamba`](https://github.com/mamba-org/mamba) in your base
+ environment with `conda install -n base -c conda-forge mamba` and use its faster solver
+ by replacing `conda` for `mamba` in the above instructions.
+@@ -202,8 +201,10 @@ extended with napari plugins installed directly via the app.
+
+ To access the cross platform bundles you can visit our [release
+ page](https://github.com/napari/napari/releases) and scroll to the release you
+-are interested in and expand the `assets` tab to get a view that looks like
+-this:
++are interested in. For example, the bundles for napari {{ napari_version }} can be
++accessed {{ '[here](https://github.com/napari/napari/releases/tag/vNAPARI_VER)'.replace('NAPARI_VER', napari_version) }}.
++To get to the download link, just scroll all the way to bottom of the page and
++expand the `Assets` section to get a view that looks like this:
+
+ ![Cropped screenshot from GitHub with the Assets section (or "tab") expanded, containing links to download the app in the form of zip files for Linux, macOS, Windows, in addition to other links.](../assets/tutorials/installation/bundle_assets.png)
+
+diff --git a/docs/tutorials/fundamentals/quick_start.md b/docs/tutorials/fundamentals/quick_start.md
+index 3a3165c8..213d049f 100644
+--- a/docs/tutorials/fundamentals/quick_start.md
++++ b/docs/tutorials/fundamentals/quick_start.md
+@@ -48,28 +48,27 @@ You will also see some examples of plugins. The core napari viewer focuses on do
+
+ ### Installation
+
+-- Download the bundled app for simple installation:
++- Download the napari {{ napari_version }} bundled app for simple installation:
++
++    {{ '[Linux installation](https://github.com/napari/napari/releases/download/vNAPARI_VER/napari-NAPARI_VER-Linux-x86_64.zip)'.replace('NAPARI_VER', napari_version) }}<br>
++    {{ '[macOS installation](https://github.com/napari/napari/releases/download/vNAPARI_VER/napari-NAPARI_VER-macOS-x86_64.zip)'.replace('NAPARI_VER', napari_version) }}<br>
++    {{ '[Windows installation](https://github.com/napari/napari/releases/download/vNAPARI_VER/napari-NAPARI_VER-Windows-x86_64.zip)'.replace('NAPARI_VER', napari_version) }}<br>
+
+-    [Linux installation](https://github.com/napari/napari/releases/download/v0.4.16/napari-0.4.16rc7-Linux-x86_64.zip)<br>
+-    [macOS installation](https://github.com/napari/napari/releases/download/v0.4.16/napari-0.4.16rc7-macOS-x86_64.zip)<br>
+-    [Windows installation](https://github.com/napari/napari/releases/download/v0.4.16/napari-0.4.16rc7-Windows-x86_64.zip)<br>
+-
+-    *Note: for the latest release, please visit [here](https://github.com/napari/napari/releases) and look for Assets.*
++    *Note: for all other releases, please visit [here](https://github.com/napari/napari/releases) and look for Assets.*
+
+ - For those familiar with Python:
+
+-    napari can be installed on most macOS, Linux, and Windows systems with Python 3.7, 3.8, and 3.9 using pip.
++    napari can be installed on most macOS, Linux, and Windows systems with Python {{ python_version_range }} using pip.
+
+     First, create a clean virtual environment:
+-```python
+-conda create -y -n napari-env -c conda-forge python=3.9
+-conda activate napari-env
+-```
++
++    {{ conda_create_env }}
++
+     Once in napari-env,
+
+-```python
+-pip install 'napari[all]'
+-```
++    ```python
++    pip install 'napari[all]'
++    ```
+
+
+ If you run into any issues, please visit the more detailed [installation guide](./installation), or [report an issue on GitHub](https://github.com/napari/napari/issues/new/choose)!

@@ -1,0 +1,47 @@
+From 500989f9ba467a7d5fe45f21e5def546a287961e Mon Sep 17 00:00:00 2001
+From: Grzegorz Bokota <bokota+github@gmail.com>
+Date: Wed, 16 Nov 2022 23:29:44 +0100
+Subject: [PATCH] run test when working on release branch (#5277)
+
+---
+ .github/workflows/test_comprehensive.yml | 1 +
+ .github/workflows/test_pull_requests.yml | 5 +++++
+ 2 files changed, 6 insertions(+)
+
+diff --git a/.github/workflows/test_comprehensive.yml b/.github/workflows/test_comprehensive.yml
+index 191b00b2..2647caf3 100644
+--- a/.github/workflows/test_comprehensive.yml
++++ b/.github/workflows/test_comprehensive.yml
+@@ -6,6 +6,7 @@ on:
+   push:
+     branches:
+       - main
++      - "v*x"
+     tags:
+       - "v*" # Push events to matching v*, i.e. v1.0, v20.15.10
+   # Allows you to run this workflow manually from the Actions tab
+diff --git a/.github/workflows/test_pull_requests.yml b/.github/workflows/test_pull_requests.yml
+index 252c2fb4..6361f153 100644
+--- a/.github/workflows/test_pull_requests.yml
++++ b/.github/workflows/test_pull_requests.yml
+@@ -5,6 +5,7 @@ on:
+   pull_request:
+     branches:
+       - main
++      - "v*x"
+     paths-ignore:
+       - 'docs/**'
+
+@@ -80,6 +81,10 @@ jobs:
+           - python: 3.9
+             platform: ubuntu-latest
+             backend: pyside6
++# uncoment when new qtpy is released
++#          - python: '3.10'
++#            platform: ubuntu-latest
++#            backend: pyside6
+
+     steps:
+       - name: Cancel Previous Runs
+--
+2.34.1

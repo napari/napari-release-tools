@@ -1,0 +1,27 @@
+From c3674e3f1bd627313d79ca13bbbf3727bd122fea Mon Sep 17 00:00:00 2001
+From: Oren Amsalem <oren.amsalem1@mail.huji.ac.il>
+Date: Mon, 6 Mar 2023 03:33:29 -0500
+Subject: [PATCH] change print to f-string (#117)
+
+# Description
+change string format to f-string
+
+# References
+https://peps.python.org/pep-0498/
+---
+ docs/howtos/napari_imageJ.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/docs/howtos/napari_imageJ.md b/docs/howtos/napari_imageJ.md
+index 4a37e792..9d00cd8c 100644
+--- a/docs/howtos/napari_imageJ.md
++++ b/docs/howtos/napari_imageJ.md
+@@ -27,7 +27,7 @@ ij = imagej.init('sc.fiji:fiji') # Fiji includes Bio-Formats.
+
+ viewer = napari.Viewer()
+ for path in sys.argv[1:]:
+-    print('--> Reading {}'.format(path))
++    print(f'--> Reading {path}')
+
+     dataset = ij.io().open(path)
+     image = ij.py.from_java(dataset)

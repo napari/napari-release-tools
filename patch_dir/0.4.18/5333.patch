@@ -1,0 +1,91 @@
+From 0967359f66862b4df9b813cc1cbda0565daee476 Mon Sep 17 00:00:00 2001
+From: Grzegorz Bokota <bokota+github@gmail.com>
+Date: Mon, 5 Dec 2022 07:57:02 -0800
+Subject: [PATCH] Make settings and cache separate per each environment.
+ (#5333)
+
+---
+ napari/utils/_appdirs.py |  9 ++++-----
+ napari/utils/_base.py    |  8 ++++----
+ napari/utils/info.py     | 10 ++++++++++
+ 3 files changed, 18 insertions(+), 9 deletions(-)
+
+diff --git a/napari/utils/_appdirs.py b/napari/utils/_appdirs.py
+index 460fed88..27a8ffbd 100644
+--- a/napari/utils/_appdirs.py
++++ b/napari/utils/_appdirs.py
+@@ -1,3 +1,4 @@
++import hashlib
+ import os
+ import sys
+ from functools import partial
+@@ -5,13 +6,11 @@ from typing import Callable, Optional
+
+ import appdirs
+
+-from napari._version import __version_tuple__
++sha_short = f"{os.path.basename(sys.prefix)}_{hashlib.sha1(sys.prefix.encode()).hexdigest()}"
+
+ _appname = 'napari'
+ _appauthor = False
+
+-version_string = '.'.join(str(x) for x in __version_tuple__[:3])
+-
+
+ # all of these also take an optional "version" argument ... but if we want
+ # to be able to update napari while using data (e.g. plugins, settings) from
+@@ -21,10 +20,10 @@ user_data_dir: Callable[[], str] = partial(
+     appdirs.user_data_dir, _appname, _appauthor
+ )
+ user_config_dir: Callable[[], str] = partial(
+-    appdirs.user_config_dir, _appname, _appauthor
++    appdirs.user_config_dir, _appname, _appauthor, sha_short
+ )
+ user_cache_dir: Callable[[], str] = partial(
+-    appdirs.user_cache_dir, _appname, _appauthor, version_string
++    appdirs.user_cache_dir, _appname, _appauthor, sha_short
+ )
+ user_state_dir: Callable[[], str] = partial(
+     appdirs.user_state_dir, _appname, _appauthor
+diff --git a/napari/utils/_base.py b/napari/utils/_base.py
+index f7a82c76..47dc9e40 100644
+--- a/napari/utils/_base.py
++++ b/napari/utils/_base.py
+@@ -5,10 +5,10 @@ This is used by the translation loader as the settings models require using
+ the translator before the settings manager is created.
+ """
+
+-from appdirs import user_config_dir
++import os
++
++from napari.utils._appdirs import user_config_dir
+
+ _FILENAME = "settings.yaml"
+-_APPNAME = "Napari"
+-_APPAUTHOR = "Napari"
+ _DEFAULT_LOCALE = "en"
+-_DEFAULT_CONFIG_PATH = user_config_dir(_APPNAME, _APPAUTHOR, _FILENAME)
++_DEFAULT_CONFIG_PATH = os.path.join(user_config_dir(), _FILENAME)
+diff --git a/napari/utils/info.py b/napari/utils/info.py
+index 091a863c..38b33685 100644
+--- a/napari/utils/info.py
++++ b/napari/utils/info.py
+@@ -154,6 +154,16 @@ def sys_info(as_html=False):
+     except Exception as e:
+         text += f"  - failed to load screen information {e}"
+
++    text += "<br><b>Settings path:</b><br>"
++    try:
++        from napari.settings import get_settings
++
++        text += f"  - {get_settings().config_path}"
++    except ValueError:
++        from napari.utils._appdirs import user_config_dir
++
++        text += f"  - {os.getenv('NAPARI_CONFIG', user_config_dir())}"
++
+     if not as_html:
+         text = (
+             text.replace("<br>", "\n").replace("<b>", "").replace("</b>", "")
+--
+2.34.1

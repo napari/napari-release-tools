@@ -1,0 +1,58 @@
+From 81608a6f569aba289bfaa02b9c01c0c8add00235 Mon Sep 17 00:00:00 2001
+From: Lorenzo Gaifas <brisvag@gmail.com>
+Date: Thu, 25 May 2023 22:44:39 +0200
+Subject: [PATCH] Harmonize release notes to new mandatory labels (#141)
+
+# Description
+Harmonizes our release notes to the new labels enforced by
+napari/napari#5733
+
+## Type of change
+- [x] Fixes or improves workflow, documentation build or deployment
+
+cc @psobolewskiPhD
+---
+ docs/release/generate_release_notes.py | 18 ++++++++++--------
+ 1 file changed, 10 insertions(+), 8 deletions(-)
+
+diff --git a/docs/release/generate_release_notes.py b/docs/release/generate_release_notes.py
+index 339080aa..df89f5e7 100644
+--- a/docs/release/generate_release_notes.py
++++ b/docs/release/generate_release_notes.py
+@@ -211,26 +211,28 @@ def add_to_users(users, new_user):
+
+ highlights['Highlights'] = {}
+ highlights['New Features'] = {}
+-highlights['Improvements'] = {}
++highlights['Enhancements'] = {}
+ highlights["Performance"] = {}
+ highlights['Bug Fixes'] = {}
+ highlights['API Changes'] = {}
+ highlights['Deprecations'] = {}
+-highlights['Build Tools'] = {}
++highlights['Maintenance'] = {}
++highlights['Dependencies'] = {}
+ highlights['Documentation'] = {}
+ other_pull_requests = {}
+
+ label_to_section = {
+-    "bug": "Bug Fixes",
+     "bugfix": "Bug Fixes",
+     "feature": "New Features",
+-    "api": "API Changes",
+-    "highlight": "Highlights",
+     "performance": "Performance",
+-    "enhancement": "Improvements",
+-    "deprecation": "Deprecations",
+-    "dependencies": "Build Tools",
++    "enhancement": "Enhancements",
++    "maintenance": "Maintenance",
+     "documentation": "Documentation",
++    # things in here could be duplicates of the above
++    "highlight": "Highlights",
++    "api": "API Changes",
++    "dependencies": "Dependencies",
++    "deprecation": "Deprecations",
+ }
+
+ pr_count = 0

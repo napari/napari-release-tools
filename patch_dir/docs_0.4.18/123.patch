@@ -1,0 +1,46 @@
+From 2e89d61220fbadda40d3cd198f4f9479e7e6781a Mon Sep 17 00:00:00 2001
+From: Peter Sobolewski <76622105+psobolewskiPhD@users.noreply.github.com>
+Date: Tue, 21 Mar 2023 02:03:50 +0100
+Subject: [PATCH] Bugfix: documentation update for napari PR #5636 (#123)
+
+# Description
+
+Currently, the Viewer tutorial describes the delete button (trash) as
+being able to accept drag-n-drop events, making it work like the Trash
+on say macOS (and other OS with a similar desktop model). However, this
+behavior was broken in https://github.com/napari/napari/pull/2441
+
+It's not intuitive, so the broken behavior is being removed in napari PR
+[#5636](https://github.com/napari/napari/pull/5636)
+This companion PR updates the Viewer tutorial for this change.
+
+## Type of change
+<!-- Please delete options that are not relevant. -->
+- [x] Fixes or improves existing content
+- [ ] Adds new content page(s)
+- [ ] Fixes or improves workflow, documentation build or deployment
+
+# References
+Companion to https://github.com/napari/napari/pull/5636
+
+## Final checklist:
+- [x] My PR is the minimum possible work for the desired functionality
+- [ ] I have commented my code, particularly in hard-to-understand areas
+- [ ] I have added [alt text](https://webaim.org/techniques/alttext/) to
+new images included in this PR
+---
+ docs/tutorials/fundamentals/viewer.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/docs/tutorials/fundamentals/viewer.md b/docs/tutorials/fundamentals/viewer.md
+index c7aa4105..514bf83f 100644
+--- a/docs/tutorials/fundamentals/viewer.md
++++ b/docs/tutorials/fundamentals/viewer.md
+@@ -244,7 +244,7 @@ viewer.add_points()
+
+ Once added, either in the GUI or via the console, these layers become accessible in the layers list section of the GUI and at `viewer.layers`. For example, an empty Points layer created using the code snippet above can be accessed using `viewer.layers['Points']`.
+
+-Layers can be deleted by selecting them and clicking on the trash icon, or by dragging the layers and dropping them into the trash.
++Layers can be deleted by selecting them and clicking on the `delete` button with the trash icon (or using the keybinding as set in the Preferences).
+
+ In the console a layer at index `i` can be removed by:
