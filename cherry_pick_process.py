@@ -140,7 +140,7 @@ def perform_cherry_pick(
         if x.milestone == milestone
     ]
 
-    pr_commits_dict = get_pr_commits_dict(repo, base_branch)
+    pr_commits_dict = get_pr_commits_dict(repo, main_branch)
     consumed_pr = get_consumed_pr(repo, target_branch)
 
     # check for errors, may require to reset cache if happens
