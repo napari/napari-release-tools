@@ -23,6 +23,8 @@ from release_utils import (
     setup_cache,
 )
 
+os.environ["GH_TOKEN"] = "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"
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -71,7 +73,7 @@ def prepare_repo(
     if not working_dir.exists():
         repo = Repo.clone_from(f"git@{GH}:{GH_USER}/{GH_REPO}.git", working_dir)
     else:
-        repo = Repo(LOCAL_DIR / REPO_DIR_NAME)
+        repo = Repo(working_dir)
 
     if target_branch not in repo.branches:
         repo.git.checkout(base_branch)
@@ -140,7 +142,7 @@ def perform_cherry_pick(
         if x.milestone == milestone
     ]
 
-    pr_commits_dict = get_pr_commits_dict(repo, base_branch)
+    pr_commits_dict = get_pr_commits_dict(repo, main_branch)
     consumed_pr = get_consumed_pr(repo, target_branch)
 
     # check for errors, may require to reset cache if happens
