@@ -693,7 +693,7 @@ index 0d2312a9..1349dee6 100644
      # via
 @@ -570,9 +560,7 @@ zipp==3.15.0
      #   importlib-resources
- 
+
  # The following packages are considered to be unsafe in a requirements file:
 -pip==23.1.2
 -    # via napari-plugin-manager
@@ -702,5 +702,5 @@ index 0d2312a9..1349dee6 100644
      # via
      #   nvidia-cublas-cu11
      #   nvidia-cuda-cupti-cu11
--- 
+--
 2.40.0.windows.1

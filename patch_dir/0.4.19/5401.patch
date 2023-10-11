@@ -17,7 +17,7 @@ index b720bd5c..fb1e1fcc 100644
 +++ b/napari/_qt/qt_main_window.py
 @@ -125,6 +125,8 @@ class _QtMainWindow(QMainWindow):
          self.setWindowTitle(self._qt_viewer.viewer.title)
- 
+
          self._maximized_flag = False
 +        self._fullscreen_flag = False
 +        self._normal_geometry = QRect()
@@ -30,7 +30,7 @@ index b720bd5c..fb1e1fcc 100644
                  inst.append(inst.pop(inst.index(self)))
 +
          return super().event(e)
- 
+
 +    def isFullScreen(self):
 +        # Needed to prevent errors when going to fullscreen mode on Windows
 +        # Use a flag attribute to determine if the window is in full screen mode
@@ -90,13 +90,13 @@ index b720bd5c..fb1e1fcc 100644
          # We do not hide menubar when a menu is being shown or
 @@ -329,8 +386,8 @@ class _QtMainWindow(QMainWindow):
              self._qt_viewer.dockConsole.setVisible(False)
- 
+
          if window_fullscreen:
 -            self.setWindowState(Qt.WindowState.WindowFullScreen)
              self._maximized_flag = window_maximized
 +            self.showFullScreen()
          elif window_maximized:
              self.setWindowState(Qt.WindowState.WindowMaximized)
- 
--- 
+
+--
 2.40.0.windows.1

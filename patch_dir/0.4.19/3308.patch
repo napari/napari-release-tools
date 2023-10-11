@@ -157,8 +157,8 @@ index 9629cf2e..5da35126 100644
 +++ b/napari/_qt/_tests/test_qt_viewer.py
 @@ -697,6 +697,44 @@ def test_create_non_empty_viewer_model(qtbot):
      gc.collect()
- 
- 
+
+
 +@skip_local_popups
 +@skip_on_win_ci
 +def test_label_colors_matching_widget(qtbot, make_napari_viewer):
@@ -205,7 +205,7 @@ index d63c1b55..954fef39 100644
 --- a/napari/_vispy/layers/image.py
 +++ b/napari/_vispy/layers/image.py
 @@ -25,7 +25,9 @@ class ImageLayerNode:
- 
+
          self._custom_node = custom_node
          self._image_node = ImageNode(
 -            None,
@@ -216,8 +216,8 @@ index d63c1b55..954fef39 100644
              texture_format=texture_format,
          )
 @@ -47,9 +49,17 @@ class ImageLayerNode:
- 
- 
+
+
  class VispyImageLayer(VispyBaseLayer):
 -    def __init__(self, layer, node=None, texture_format='auto') -> None:
 +    def __init__(
@@ -232,7 +232,7 @@ index d63c1b55..954fef39 100644
 +        self._layer_node = layer_node_class(
 +            node, texture_format=texture_format
 +        )
- 
+
          # Default to 2D (image) node.
          super().__init__(layer, self._layer_node.get_node(2))
 diff --git a/napari/_vispy/layers/labels.py b/napari/_vispy/layers/labels.py
@@ -417,8 +417,8 @@ index 61589edc..e932c59d 100644
 +    for key, value in color_dict.items():
 +        hash2d_set(key, value, keys, values)
 +    return keys, values
- 
- 
+
+
  class VispyLabelsLayer(VispyImageLayer):
 -    def __init__(self, *args, **kwargs) -> None:
 -        super().__init__(*args, texture_format=None, **kwargs)
@@ -429,7 +429,7 @@ index 61589edc..e932c59d 100644
 +            texture_format=texture_format,
 +            layer_node_class=LabelLayerNode,
 +        )
- 
+
 +        self.layer.events.color_mode.connect(self._on_colormap_change)
          self.layer.events.labels_update.connect(self._on_partial_labels_update)
 +        self.layer.events.selected_label.connect(self._on_colormap_change)
@@ -483,7 +483,7 @@ index 61589edc..e932c59d 100644
 +            self.node.shared_program['LUT_shape'] = key_texture.shape
 +        else:
 +            self.node.cmap = VispyColormap(*colormap)
- 
+
      def _on_partial_labels_update(self, event):
          if not self.layer.loaded:
 @@ -22,3 +254,49 @@ class VispyLabelsLayer(VispyImageLayer):
@@ -543,7 +543,7 @@ index f3067487..06f3956b 100644
 @@ -32,7 +32,7 @@ int detectAdjacentBackground(float val_neg, float val_pos)
      return adjacent_bg;
  }
- 
+
 -vec4 calculateCategoricalColor(vec4 betterColor, vec3 loc, vec3 step)
 +vec4 calculateShadedCategoricalColor(vec4 betterColor, vec3 loc, vec3 step)
  {
@@ -610,15 +610,15 @@ index f3067487..06f3956b 100644
                      // calculate the color (apply lighting effects)
 -                    color = calculateCategoricalColor(color, iloc, dstep);
                      gl_FragColor = color;
- 
+
                      // set the variables for the depth buffer
 @@ -157,6 +197,7 @@ shaders['fragment'] = before + FUNCTION_DEFINITIONS + 'void main()' + after
- 
+
  rendering_methods = BaseVolume._rendering_methods.copy()
  rendering_methods['iso_categorical'] = ISO_CATEGORICAL_SNIPPETS
 +rendering_methods['translucent_categorical'] = TRANSLUCENT_CATEGORICAL_SNIPPETS
- 
- 
+
+
  class Volume(BaseVolume):
 diff --git a/napari/layers/labels/_tests/test_labels.py b/napari/layers/labels/_tests/test_labels.py
 index b11cc342..f8c4f9d3 100644
@@ -629,7 +629,7 @@ index b11cc342..f8c4f9d3 100644
  from numpy.testing import assert_array_almost_equal, assert_raises
  from skimage import data
 -from vispy.color import Colormap as VispyColormap
- 
+
  from napari._tests.utils import check_layer_world_data_extent
  from napari.components import ViewerModel
 @@ -20,7 +19,7 @@ from napari.layers import Labels
@@ -638,13 +638,13 @@ index b11cc342..f8c4f9d3 100644
  from napari.utils import Colormap
 -from napari.utils.colormaps import label_colormap, low_discrepancy_image
 +from napari.utils.colormaps import label_colormap
- 
- 
+
+
  def test_random_labels():
 @@ -241,13 +240,12 @@ def test_seed():
      layer = Labels(data, seed=0.7)
      assert layer.seed == 0.7
- 
+
 -    # ensure setting seed triggers
 -    # recalculation of _all_vals
 -    _all_vals_07 = layer._all_vals.copy()
@@ -657,21 +657,21 @@ index b11cc342..f8c4f9d3 100644
 -        AssertionError, assert_array_almost_equal, _all_vals_04, _all_vals_07
 +        AssertionError, assert_array_almost_equal, mapped_07, mapped_04
      )
- 
- 
+
+
 @@ -256,7 +254,7 @@ def test_num_colors():
      np.random.seed(0)
      data = np.random.randint(20, size=(10, 15))
      layer = Labels(data)
 -    assert layer.num_colors == 50
 +    assert layer.num_colors == 49
- 
+
      layer.num_colors = 80
      assert layer.num_colors == 80
 @@ -386,8 +384,15 @@ def test_label_colormap():
      # Make sure color 0 is transparent
      assert not np.any(colormap.map([0.0]))
- 
+
 -    # Test that out-of-range values map to last value
 -    assert np.all(colormap.map([1.0, 1.1, 2.0]) == colormap.colors[-1])
 +    # test that all four colors are represented in a large set of random
@@ -683,13 +683,13 @@ index b11cc342..f8c4f9d3 100644
 +    linear = np.reshape(colormapped, (-1, 4))
 +    unique = np.unique(linear, axis=0)
 +    assert len(unique) == 4
- 
- 
+
+
  def test_custom_color_dict():
 @@ -405,77 +410,12 @@ def test_custom_color_dict():
      assert (layer.get_color(4) == layer.get_color(16)).all()
      assert (layer.get_color(8) == layer.get_color(32)).all()
- 
+
 -    # Test to see if our label mapped control points map to those in the colormap
 -    # with an extra half step.
 -    local_controls = np.array(
@@ -704,8 +704,8 @@ index b11cc342..f8c4f9d3 100644
      # should not initialize as white since we are using random.seed
      layer.color_mode = 'auto'
      assert not (layer.get_color(1) == np.array([1.0, 1.0, 1.0, 1.0])).all()
- 
- 
+
+
 -def test_large_custom_color_dict():
 -    """Confirm that the napari & vispy colormaps behave the same."""
 -
@@ -766,14 +766,14 @@ index b11cc342..f8c4f9d3 100644
      np.random.seed(0)
 @@ -594,7 +534,8 @@ def test_contour(input_data, expected_data_view):
      np.testing.assert_array_equal(layer.data, input_data)
- 
+
      np.testing.assert_array_equal(
 -        layer._raw_to_displayed(input_data), layer._data_view
 +        layer._raw_to_displayed(input_data.astype(np.float32)),
 +        layer._data_view,
      )
      data_view_before_contour = layer._data_view.copy()
- 
+
 @@ -609,7 +550,7 @@ def test_contour(input_data, expected_data_view):
          layer._data_view,
          np.where(
@@ -785,8 +785,8 @@ index b11cc342..f8c4f9d3 100644
      )
 @@ -1011,40 +952,21 @@ def test_ndim_paint():
      )
- 
- 
+
+
 -def test_switching_display_func():
 -    label_data = np.random.randint(2**25, 2**25 + 5, size=(50, 50))
 -    layer = Labels(label_data)
@@ -801,8 +801,8 @@ index b11cc342..f8c4f9d3 100644
      layer = Labels(np.zeros((5, 5), dtype=int), scale=[-1, -1])
      layer.mode = 'paint'
      assert layer.cursor_size > 0
- 
- 
+
+
 -def test_switching_display_func_during_slicing():
 -    label_array = (5e6 * np.ones((2, 2, 2))).astype(np.uint64)
 -    label_array[0, :, :] = [[0, 1], [2, 3]]
@@ -823,60 +823,60 @@ index b11cc342..f8c4f9d3 100644
      layer = Labels(label_array)
 -    assert len(layer._all_vals) == 4
 +    mapped = layer._random_colormap.map(layer.data)
- 
+
 -    layer.show_selected_label = True
 -    layer.selected_label = int(5e6)
 -    assert layer._all_vals.size < 1026
 +    assert len(np.unique(mapped.reshape((-1, 4)), axis=0)) == 4
- 
- 
+
+
  def test_fill_tensorstore():
 @@ -1484,15 +1406,14 @@ def test_color_mapping_with_show_selected_label():
- 
+
      data = np.arange(5, dtype=np.int32)[:, np.newaxis].repeat(5, axis=1)
      layer = Labels(data)
 -    mapped_colors_all = layer._raw_to_displayed(layer._slice.image.raw).copy()
 +    mapped_colors_all = layer.colormap.map(data)
- 
+
 -    layer.selected_label = 1
      layer.show_selected_label = True
- 
+
 -    for selected_label in range(1, 5):
 +    for selected_label in range(5):
          layer.selected_label = selected_label
          label_mask = data == selected_label
 -        mapped_colors = layer._raw_to_displayed(layer._slice.image.raw)
 +        mapped_colors = layer.colormap.map(data)
- 
+
          assert np.allclose(
              mapped_colors[label_mask], mapped_colors_all[label_mask]
 @@ -1500,19 +1421,17 @@ def test_color_mapping_with_show_selected_label():
          assert np.allclose(mapped_colors[np.logical_not(label_mask)], 0)
- 
+
      layer.show_selected_label = False
 -    assert np.allclose(
 -        layer._raw_to_displayed(layer._slice.image.raw), mapped_colors_all
 -    )
 +    assert np.allclose(layer.colormap.map(data), mapped_colors_all)
- 
- 
+
+
  def test_color_mapping_when_seed_is_changed():
      """Checks if the color mapping is updated when the color palette seed is changed."""
      np.random.seed(0)
      layer = Labels(np.random.randint(50, size=(10, 10)))
 -    mapped_colors1 = layer._raw_to_displayed(layer._slice.image.raw)
 +    mapped_colors1 = layer.colormap.map(layer._as_type(layer._slice.image.raw))
- 
+
      layer.new_colormap()
 -    mapped_colors2 = layer._raw_to_displayed(layer._slice.image.raw)
 +    mapped_colors2 = layer.colormap.map(layer._as_type(layer._slice.image.raw))
- 
+
      assert not np.allclose(mapped_colors1, mapped_colors2)
- 
+
 @@ -1540,9 +1459,6 @@ def test_negative_label_slicing():
      assert tuple(layer.get_color(-2)) != tuple(layer.get_color(100))
- 
- 
+
+
 -@pytest.mark.xfail(
 -    reason='This is a known bug with the current label color implementation'
 -)
@@ -900,8 +900,8 @@ index b11cc342..f8c4f9d3 100644
 -    # indexing calculation, and changes color
 +
      assert tuple(layer.get_color(-1)) == minus_one_color_original
- 
- 
+
+
 diff --git a/napari/layers/labels/labels.py b/napari/layers/labels/labels.py
 index 49eb89e4..00873ae5 100644
 --- a/napari/layers/labels/labels.py
@@ -945,10 +945,10 @@ index 49eb89e4..00873ae5 100644
          self._contour = 0
 @@ -281,13 +282,12 @@ class Labels(_ImageBase):
          self._cached_mapped_labels = None
- 
+
          data = self._ensure_int_labels(data)
 -        self._color_lookup_func = None
- 
+
          super().__init__(
              data,
              rgb=False,
@@ -960,7 +960,7 @@ index 49eb89e4..00873ae5 100644
              rendering=rendering,
 @@ -335,6 +335,8 @@ class Labels(_ImageBase):
          self._brush_size = 10
- 
+
          self._selected_label = 1
 +        self.colormap.selection = self._selected_label
 +        self.colormap.use_selection = self._show_selected_label
@@ -980,25 +980,25 @@ index 49eb89e4..00873ae5 100644
 +        self.events.colormap()  # Will update the LabelVispyColormap shader
          self.refresh()
          self.events.selected_label()
- 
+
 @@ -539,6 +540,7 @@ class Labels(_ImageBase):
              for label, color_str in color.items()
          }
          self._color = colors
 +        self._direct_colormap = direct_colormap(colors)
- 
+
          # `colors` may contain just the default None and background label
          # colors, in which case we need to be in AUTO color mode. Otherwise,
 @@ -650,12 +652,12 @@ class Labels(_ImageBase):
          if selected_label == self.selected_label:
              return
- 
+
 +        self.colormap.selection = selected_label
          self._selected_label = selected_label
          self._selected_color = self.get_color(selected_label)
 +
          self.events.selected_label()
- 
+
 -        # note: self.color_mode returns a string and this comparison fails,
 -        # so use self._color_mode
          if self.show_selected_label:
@@ -1033,7 +1033,7 @@ index 49eb89e4..00873ae5 100644
          self.events.colormap()
 @@ -701,9 +693,10 @@ class Labels(_ImageBase):
          return self._show_selected_label
- 
+
      @show_selected_label.setter
 -    def show_selected_label(self, filter_val):
 -        self._show_selected_label = filter_val
@@ -1044,9 +1044,9 @@ index 49eb89e4..00873ae5 100644
 +        self.events.show_selected_label(show_selected_label=show_selected)
          self._cached_labels = None
          self.refresh()
- 
+
 @@ -764,14 +757,8 @@ class Labels(_ImageBase):
- 
+
      @contrast_limits.setter
      def contrast_limits(self, value):
 -        # Setting contrast_limits of labels layers leads to wrong visualization of the layer
@@ -1060,12 +1060,12 @@ index 49eb89e4..00873ae5 100644
 +        # Setting contrast_limits of labels layers leads to wrong visualization
 +        # of the layer, so we ignore the value
          self._contrast_limits = (0, 1)
- 
+
      def _reset_editable(self) -> None:
 @@ -805,100 +792,13 @@ class Labels(_ImageBase):
              image = np.where(im != 0, low_discrepancy_image(im, self._seed), 0)
          return image
- 
+
 -    def _lookup_with_index(self, im, selected_label=None):
 -        """Returns display version of im using color lookup array by index
 -
@@ -1157,19 +1157,19 @@ index 49eb89e4..00873ae5 100644
 -        return self._lookup_with_index
 +    def _as_type(self, data, selected_label=None):
 +        return data.astype(np.float32)
- 
+
      def _partial_labels_refresh(self):
          """Prepares and displays only an updated part of the labels."""
- 
+
 -        if self._updated_slice is None or not self._slice.loaded:
 +        if self._updated_slice is None or not self.loaded:
              return
- 
+
          dims_displayed = self._slice_input.displayed
 @@ -944,6 +844,7 @@ class Labels(_ImageBase):
          labels = raw  # for readability
          sliced_labels = None
- 
+
 +        # lookup function -> self._as_type
          if self.contour > 0:
              if labels.ndim == 2:
@@ -1177,21 +1177,21 @@ index 49eb89e4..00873ae5 100644
 @@ -996,7 +897,7 @@ class Labels(_ImageBase):
          if labels_to_map.size == 0:
              return self._cached_mapped_labels[data_slice]
- 
+
 -        mapped_labels = self._map_labels_to_colors(labels_to_map)
 +        mapped_labels = self._as_type(labels_to_map)
- 
+
          if update_mask is not None:
              self._cached_mapped_labels[data_slice][update_mask] = mapped_labels
 @@ -1005,79 +906,43 @@ class Labels(_ImageBase):
- 
+
          return self._cached_mapped_labels[data_slice]
- 
+
 -    def _map_labels_to_colors(self, labels_to_map):
 -        """Convert an integer labels to a float array of encoded colors.
 +    def _update_thumbnail(self):
 +        """Update the thumbnail with current data and colormap.
- 
+
 -        Parameters
 -        ----------
 -        labels_to_map : array
@@ -1219,7 +1219,7 @@ index 49eb89e4..00873ae5 100644
 +            # ASYNC_TODO: Do not compute the thumbnail until we are loaded.
 +            # Is there a nicer way to prevent this from getting called?
 +            return
- 
+
 -            if upper_bound_n_unique_labels < 65536:
 -                mapping = np.array(
 -                    [
@@ -1282,7 +1282,7 @@ index 49eb89e4..00873ae5 100644
 +            raw_zoom_factor * imshape, a_min=1, a_max=thumbshape
 +        )
 +        zoom_factor = tuple(new_shape / imshape)
- 
+
 -        return mapped_labels
 +        downsampled = ndi.zoom(image, zoom_factor, prefilter=False, order=0)
 +        if self.color_mode == LabelColorMode.AUTO:
@@ -1293,7 +1293,7 @@ index 49eb89e4..00873ae5 100644
 +        colormapped[..., 3] *= self.opacity
 +
 +        self.thumbnail = colormapped
- 
+
      def new_colormap(self):
          self.seed = np.random.rand()
 @@ -1086,10 +951,12 @@ class Labels(_ImageBase):
@@ -1310,7 +1310,7 @@ index 49eb89e4..00873ae5 100644
 +            val = self._as_type(np.array([label]))
              col = self.colormap.map(val)[0]
          return col
- 
+
 diff --git a/napari/utils/colormaps/__init__.py b/napari/utils/colormaps/__init__.py
 index d204d0dd..be76af6a 100644
 --- a/napari/utils/colormaps/__init__.py
@@ -1336,7 +1336,7 @@ index acf41d51..77969eae 100644
 --- a/napari/utils/colormaps/_tests/test_colormaps.py
 +++ b/napari/utils/colormaps/_tests/test_colormaps.py
 @@ -20,8 +20,12 @@ from napari.utils.colormaps.vendored import cm
- 
+
  @pytest.mark.parametrize("name", list(AVAILABLE_COLORMAPS.keys()))
  def test_colormap(name):
 -    np.random.seed(0)
@@ -1344,10 +1344,10 @@ index acf41d51..77969eae 100644
 +        pytest.skip(
 +            'label_colormap is inadvertantly added to AVAILABLE_COLORMAPS but is not a normal colormap'
 +        )
- 
+
 +    np.random.seed(0)
      cmap = AVAILABLE_COLORMAPS[name]
- 
+
      # Test can map random 0-1 values
 diff --git a/napari/utils/colormaps/colormap.py b/napari/utils/colormaps/colormap.py
 index 2b893cda..f2a29335 100644
@@ -1357,7 +1357,7 @@ index 2b893cda..f2a29335 100644
 +from collections import defaultdict
  from enum import Enum
  from typing import Optional
- 
+
 @@ -142,3 +143,68 @@ class Colormap(EventedModel):
      @property
      def colorbar(self):
@@ -1433,7 +1433,7 @@ index f747b1e4..169fe589 100644
 +++ b/napari/utils/colormaps/colormap_utils.py
 @@ -15,7 +15,12 @@ from vispy.color import (
  from vispy.color.colormap import LUT_len
- 
+
  from napari.utils.colormaps.bop_colors import bopd
 -from napari.utils.colormaps.colormap import Colormap, ColormapInterpolationMode
 +from napari.utils.colormaps.colormap import (
@@ -1453,8 +1453,8 @@ index f747b1e4..169fe589 100644
 +    # Clear zero (background) values, matching the shader behavior in _glsl_label_step
 +    image_out[image == 0] = 0.0
      return image_out
- 
- 
+
+
 @@ -419,28 +427,49 @@ def label_colormap(num_colors=256, seed=0.5):
      """
      # Starting the control points slightly above 0 and below 1 is necessary
@@ -1484,8 +1484,8 @@ index f747b1e4..169fe589 100644
          interpolation='zero',
 +        seed=seed,
      )
- 
- 
+
+
 +def direct_colormap(color_dict=None):
 +    """Make a direct colormap from a dictionary mapping labels to colors.
 +
@@ -1509,7 +1509,7 @@ index f747b1e4..169fe589 100644
 +
  def vispy_or_mpl_colormap(name):
      """Try to get a colormap from vispy, or convert an mpl one to vispy format.
- 
+
 diff --git a/pyproject.toml b/pyproject.toml
 index 7a171e36..d9d08b93 100644
 --- a/pyproject.toml
@@ -1521,7 +1521,7 @@ index 7a171e36..d9d08b93 100644
 -"examples/**" = ["INP001", "T20"]
 +"examples/**" = ["ICN001", "INP001", "T20"]
  "**/vendored/**" = ["TID"]
- 
+
  [tool.ruff.flake8-quotes]
--- 
+--
 2.40.0.windows.1

@@ -320,7 +320,7 @@ index 2e0b30cc..40b894ca 100644
      # via napari (setup.cfg)
  zipp==3.15.0
      # via importlib-metadata
- 
+
  # The following packages are considered to be unsafe in a requirements file:
 -pip==23.1.2
 -    # via napari-plugin-manager
@@ -623,7 +623,7 @@ index 32c7ea12..7d3acd38 100644
      # via
 @@ -551,9 +540,7 @@ zipp==3.15.0
      #   importlib-resources
- 
+
  # The following packages are considered to be unsafe in a requirements file:
 -pip==23.1.2
 -    # via napari-plugin-manager
@@ -931,7 +931,7 @@ index a2521a3a..e3aac73f 100644
      # via
 @@ -545,9 +533,7 @@ zipp==3.15.0
      #   importlib-resources
- 
+
  # The following packages are considered to be unsafe in a requirements file:
 -pip==23.1.2
 -    # via napari-plugin-manager
@@ -940,5 +940,5 @@ index a2521a3a..e3aac73f 100644
      # via
      #   nvidia-cublas-cu11
      #   nvidia-cuda-cupti-cu11
--- 
+--
 2.40.0.windows.1
