@@ -149,7 +149,8 @@ def iter_pull_request(additional_query, user=GH_USER, repo=GH_REPO):
         f"repo:{user}/{repo} " "is:pr " "sort:created-asc " + additional_query
     )
     print(
-        f"Found {iterable.totalCount} pull requests on query: {additional_query}",
+        f"Found {iterable.totalCount} pull requests on query: {additional_query}"
+        f" for repo {user}/{repo}",
         file=sys.stderr,
     )
     for pull_issue in tqdm(
