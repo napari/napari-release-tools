@@ -54,6 +54,12 @@ parser.add_argument(
     help="The file with the corrections",
     default=LOCAL_DIR / "name_corrections.yaml",
 )
+parser.add_argument(
+    "--with-pr",
+    help="Include PR numbers for not merged PRs",
+    type=int,
+    default=None,
+)
 
 args = parser.parse_args()
 
@@ -113,9 +119,8 @@ label_to_section = {
 }
 
 
-for pull in iter_pull_request(f"milestone:{args.milestone} is:merged"):
-    issue = pull.as_issue()
-    assert pull.merged
+def parse_pull(pull):
+    assert pull.merged or pull.number == args.with_pr
 
     commit = repo.get_commit(pull.merge_commit_sha)
 
@@ -142,6 +147,13 @@ for pull in iter_pull_request(f"milestone:{args.milestone} is:merged"):
     if not assigned_to_section:
         other_pull_requests[pull.number] = {"summary": summary, "repo": GH_REPO}
 
+
+for pull_ in iter_pull_request(f"milestone:{args.milestone} is:merged"):
+    parse_pull(pull_)
+
+if args.with_pr is not None:
+    pull = repo.get_pull(args.with_pr)
+    parse_pull(pull)
 
 for pull in iter_pull_request(
     f"milestone:{args.milestone} is:merged", repo=GH_DOCS_REPO
