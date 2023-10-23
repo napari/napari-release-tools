@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
 from pathlib import Path
 
 from git import GitCommandError, Repo
@@ -32,7 +33,7 @@ def main():
         "--first-commits", help="file with list of first commits to cherry pick"
     )
     parser.add_argument(
-        "--stop-after", help="Stop after this commit", default=0, type=int
+        "--stop-after", help="Stop after this PR", default=0, type=int
     )
     parser.add_argument(
         "--git-main-branch",
@@ -166,6 +167,7 @@ def perform_cherry_pick(
     for el in pr_list:
         if el.number in consumed_pr:
             print(el, el.number in consumed_pr)
+
 
     for pull in tqdm(pr_list):
         if pull.number in consumed_pr:

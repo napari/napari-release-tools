@@ -1,0 +1,711 @@
+From f6b4caa384dfe84e04366708e93fea53c1f48447 Mon Sep 17 00:00:00 2001
+From: Juan Nunez-Iglesias <jni@fastmail.com>
+Date: Fri, 25 Aug 2023 19:48:22 +1000
+Subject: [PATCH] Ensure visual is updated when painting into zarr array
+ (#6112)
+
+Fixes #6079
+
+It turns out that the caching behaviour introduced in #5732 depends on the
+slice data being updated by painting. This works out for NumPy arrays because
+the slice data is a view of the original data, so updating the original (as
+painting does) updates the slice. However, when the data is a zarr or
+tensorstore array, the slice is a NumPy copy of the original data, so the
+caching mechanism believes that nothing has changed and the display is not
+updated.
+
+This adds tests for the behaviour and fixes it by painting directly into the
+slice data if the data array is not a NumPy array. It's a bit of a bandaid fix
+but it works and is
+[endorsed](https://github.com/napari/napari/issues/6079#issuecomment-1648781280)
+by our slicing expert @andy-sweet. :joy:
+
+(I've also made a couple of drive-by updates to the code because some
+methods are no longer used in the code after #5732 but that was missed at the
+time.)
+
+- [x] Bug-fix (non-breaking change which fixes an issue)
+
+---------
+
+Co-authored-by: Grzegorz Bokota <bokota+github@gmail.com>
+Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.github.com>
+---
+ .../_vispy/_tests/test_vispy_labels_layer.py  |  98 +++++++
+ napari/layers/labels/_tests/test_labels.py    |   8 +-
+ napari/layers/labels/labels.py                | 245 +++++++++++++-----
+ napari/utils/indexing.py                      |  40 +++
+ 4 files changed, 323 insertions(+), 68 deletions(-)
+ create mode 100644 napari/_vispy/_tests/test_vispy_labels_layer.py
+ create mode 100644 napari/utils/indexing.py
+
+diff --git a/napari/_vispy/_tests/test_vispy_labels_layer.py b/napari/_vispy/_tests/test_vispy_labels_layer.py
+new file mode 100644
+index 00000000..4eecec08
+--- /dev/null
++++ b/napari/_vispy/_tests/test_vispy_labels_layer.py
+@@ -0,0 +1,98 @@
++import numpy as np
++import pytest
++import zarr
++from qtpy.QtCore import QCoreApplication
++
++from napari._tests.utils import skip_local_popups
++from napari.utils.interactions import mouse_press_callbacks
++
++
++def make_labels_layer(array_type, path, shape):
++    """Make a labels layer, either NumPy, zarr, or tensorstore."""
++    chunks = tuple(s // 2 for s in shape)
++    if array_type == 'numpy':
++        labels = np.zeros(shape, dtype=np.uint32)
++    elif array_type in {'zarr', 'tensorstore'}:
++        labels = zarr.open(path, shape=shape, dtype=np.uint32, chunks=chunks)
++    if array_type == 'tensorstore':
++        ts = pytest.importorskip('tensorstore')
++        spec = {
++            'driver': 'zarr',
++            'kvstore': {'driver': 'file', 'path': str(path)},
++            'path': '',
++            'metadata': {
++                'dtype': labels.dtype.str,
++                'order': labels.order,
++                'shape': labels.shape,
++            },
++        }
++        labels = ts.open(spec, create=False, open=True).result()
++
++    return labels
++
++
++@skip_local_popups
++@pytest.mark.parametrize('array_type', ['numpy', 'zarr', 'tensorstore'])
++def test_labels_painting(make_napari_viewer, array_type, tmp_path):
++    """Check that painting labels paints on the canvas.
++
++    This should work regardless of array type. See:
++    https://github.com/napari/napari/issues/6079
++    """
++    viewer = make_napari_viewer(show=True)
++    labels = make_labels_layer(array_type, tmp_path, shape=(20, 20))
++    layer = viewer.add_labels(labels)
++    QCoreApplication.instance().processEvents()
++    layer.paint((10, 10), 1, refresh=True)
++    visual = viewer.window._qt_viewer.layer_to_visual[layer]
++    assert np.any(visual.node._data)
++
++
++@skip_local_popups
++@pytest.mark.parametrize('array_type', ['numpy', 'zarr', 'tensorstore'])
++def test_labels_fill_slice(make_napari_viewer, array_type, tmp_path):
++    """Check that painting labels paints only on current slice.
++
++    This should work regardless of array type. See:
++    https://github.com/napari/napari/issues/6079
++    """
++    viewer = make_napari_viewer(show=True)
++    labels = make_labels_layer(array_type, tmp_path, shape=(3, 20, 20))
++    labels[0, :, :] = 1
++    labels[1, 10, 10] = 1
++    labels[2, :, :] = 1
++    layer = viewer.add_labels(labels)
++    layer.n_edit_dimensions = 3
++    QCoreApplication.instance().processEvents()
++    layer.fill((1, 10, 10), 13, refresh=True)
++    visual = viewer.window._qt_viewer.layer_to_visual[layer]
++    assert np.sum(visual.node._data) == 13
++
++
++@skip_local_popups
++@pytest.mark.parametrize('array_type', ['numpy', 'zarr', 'tensorstore'])
++def test_labels_painting_with_mouse(
++    MouseEvent, make_napari_viewer, array_type, tmp_path
++):
++    """Check that painting labels paints on the canvas when using mouse.
++
++    This should work regardless of array type. See:
++    https://github.com/napari/napari/issues/6079
++    """
++    viewer = make_napari_viewer(show=True)
++    labels = make_labels_layer(array_type, tmp_path, shape=(20, 20))
++
++    layer = viewer.add_labels(labels)
++    QCoreApplication.instance().processEvents()
++
++    layer.mode = 'paint'
++    event = MouseEvent(
++        type='mouse_press',
++        button=1,
++        position=(0, 10, 10),
++        dims_displayed=(0, 1),
++    )
++    visual = viewer.window._qt_viewer.layer_to_visual[layer]
++    assert not np.any(visual.node._data)
++    mouse_press_callbacks(layer, event)
++    assert np.any(visual.node._data)
+diff --git a/napari/layers/labels/_tests/test_labels.py b/napari/layers/labels/_tests/test_labels.py
+index f8c4f9d3..9f70a6f3 100644
+--- a/napari/layers/labels/_tests/test_labels.py
++++ b/napari/layers/labels/_tests/test_labels.py
+@@ -1428,10 +1428,14 @@ def test_color_mapping_when_seed_is_changed():
+     """Checks if the color mapping is updated when the color palette seed is changed."""
+     np.random.seed(0)
+     layer = Labels(np.random.randint(50, size=(10, 10)))
+-    mapped_colors1 = layer.colormap.map(layer._as_type(layer._slice.image.raw))
++    mapped_colors1 = layer.colormap.map(
++        layer._to_vispy_texture_dtype(layer._slice.image.raw)
++    )
+ 
+     layer.new_colormap()
+-    mapped_colors2 = layer.colormap.map(layer._as_type(layer._slice.image.raw))
++    mapped_colors2 = layer.colormap.map(
++        layer._to_vispy_texture_dtype(layer._slice.image.raw)
++    )
+ 
+     assert not np.allclose(mapped_colors1, mapped_colors2)
+ 
+diff --git a/napari/layers/labels/labels.py b/napari/layers/labels/labels.py
+index 00873ae5..93a6d5fc 100644
+--- a/napari/layers/labels/labels.py
++++ b/napari/layers/labels/labels.py
+@@ -1,11 +1,13 @@
+ import warnings
+ from collections import deque
+ from contextlib import contextmanager
+-from typing import Dict, List, Optional, Tuple, Union
++from typing import Callable, ClassVar, Dict, List, Optional, Tuple, Union
+ 
+ import numpy as np
++import numpy.typing as npt
+ import pandas as pd
+ from scipy import ndimage as ndi
++from skimage.draw import polygon2mask
+ 
+ from napari.layers.base import Layer, no_op
+ from napari.layers.base._base_mouse_bindings import (
+@@ -13,13 +15,18 @@ from napari.layers.base._base_mouse_bindings import (
+     transform_with_box,
+ )
+ from napari.layers.image._image_utils import guess_multiscale
++from napari.layers.image._slice import _ImageSliceResponse
+ from napari.layers.image.image import _ImageBase
+ from napari.layers.labels._labels_constants import (
+     LabelColorMode,
+     LabelsRendering,
+     Mode,
+ )
+-from napari.layers.labels._labels_mouse_bindings import draw, pick
++from napari.layers.labels._labels_mouse_bindings import (
++    BrushSizeOnMouseMove,
++    draw,
++    pick,
++)
+ from napari.layers.labels._labels_utils import (
+     expand_slice,
+     get_contours,
+@@ -29,7 +36,6 @@ from napari.layers.labels._labels_utils import (
+ )
+ from napari.layers.utils.color_transformations import transform_color
+ from napari.layers.utils.layer_utils import _FeatureTable
+-from napari.utils import config
+ from napari.utils._dtype import normalize_dtype
+ from napari.utils.colormaps import (
+     direct_colormap,
+@@ -39,7 +45,7 @@ from napari.utils.colormaps import (
+ from napari.utils.events import Event
+ from napari.utils.events.custom_types import Array
+ from napari.utils.geometry import clamp_point_to_bounding_box
+-from napari.utils.misc import _is_array_type
++from napari.utils.misc import StringEnum, _is_array_type
+ from napari.utils.naming import magic_name
+ from napari.utils.status_messages import generate_layer_coords_status
+ from napari.utils.translations import trans
+@@ -212,31 +218,36 @@ class Labels(_ImageBase):
+ 
+     _modeclass = Mode
+ 
+-    _drag_modes = {
++    _drag_modes: ClassVar[Dict[Mode, Callable[["Labels", Event], None]]] = {  # type: ignore[assignment]
+         Mode.PAN_ZOOM: no_op,
+         Mode.TRANSFORM: transform_with_box,
+         Mode.PICK: pick,
+         Mode.PAINT: draw,
+         Mode.FILL: draw,
+         Mode.ERASE: draw,
++        Mode.POLYGON: no_op,  # the overlay handles mouse events in this mode
+     }
+ 
+-    _move_modes = {
++    brush_size_on_mouse_move = BrushSizeOnMouseMove(min_brush_size=1)
++
++    _move_modes: ClassVar[Dict[StringEnum, Callable[["Labels", Event], None]]] = {  # type: ignore[assignment]
+         Mode.PAN_ZOOM: no_op,
+         Mode.TRANSFORM: highlight_box_handles,
+         Mode.PICK: no_op,
+-        Mode.PAINT: no_op,
++        Mode.PAINT: brush_size_on_mouse_move,
+         Mode.FILL: no_op,
+-        Mode.ERASE: no_op,
++        Mode.ERASE: brush_size_on_mouse_move,
++        Mode.POLYGON: no_op,  # the overlay handles mouse events in this mode
+     }
+ 
+-    _cursor_modes = {
++    _cursor_modes: ClassVar[Dict[Mode, str]] = {  # type: ignore[assignment]
+         Mode.PAN_ZOOM: 'standard',
+         Mode.TRANSFORM: 'standard',
+         Mode.PICK: 'cross',
+         Mode.PAINT: 'circle',
+         Mode.FILL: 'cross',
+         Mode.ERASE: 'circle',
++        Mode.POLYGON: 'cross',
+     }
+ 
+     _history_limit = 100
+@@ -278,8 +289,8 @@ class Labels(_ImageBase):
+         self._color_mode = LabelColorMode.AUTO
+         self._show_selected_label = False
+         self._contour = 0
+-        self._cached_labels = None
+-        self._cached_mapped_labels = None
++        self._cached_labels: Optional[np.ndarray] = None
++        self._cached_mapped_labels: Optional[np.ndarray] = None
+ 
+         data = self._ensure_int_labels(data)
+ 
+@@ -325,6 +336,12 @@ class Labels(_ImageBase):
+             labels_update=Event,
+         )
+ 
++        from napari.components.overlays.labels_polygon import (
++            LabelsPolygonOverlay,
++        )
++
++        self._overlays.update({"polygon": LabelsPolygonOverlay()})
++
+         self._feature_table = _FeatureTable.from_layer(
+             features=features, properties=properties
+         )
+@@ -337,6 +354,7 @@ class Labels(_ImageBase):
+         self._selected_label = 1
+         self.colormap.selection = self._selected_label
+         self.colormap.use_selection = self._show_selected_label
++        self._prev_selected_label = None
+         self._selected_color = self.get_color(self._selected_label)
+         self._updated_slice = None
+         self.color = color
+@@ -652,6 +670,7 @@ class Labels(_ImageBase):
+         if selected_label == self.selected_label:
+             return
+ 
++        self._prev_selected_label = self.selected_label
+         self.colormap.selection = selected_label
+         self._selected_label = selected_label
+         self._selected_color = self.get_color(selected_label)
+@@ -662,6 +681,13 @@ class Labels(_ImageBase):
+             self._cached_labels = None  # invalidates labels cache
+             self.refresh()
+ 
++    def swap_selected_and_background_labels(self):
++        """Swap between the selected label and the background label."""
++        if self.selected_label != self._background_label:
++            self.selected_label = self._background_label
++        else:
++            self.selected_label = self._prev_selected_label
++
+     @property
+     def color_mode(self):
+         """Color mode to change how color is represented.
+@@ -700,7 +726,8 @@ class Labels(_ImageBase):
+         self._cached_labels = None
+         self.refresh()
+ 
+-    @Layer.mode.getter
++    # Only overriding to change the docstring
++    @property
+     def mode(self):
+         """MODE: Interactive mode. The normal, default mode is PAN_ZOOM, which
+         allows for normal interactivity with the canvas.
+@@ -725,13 +752,19 @@ class Labels(_ImageBase):
+         In ERASE mode the cursor functions similarly to PAINT mode, but to
+         paint with background label, which effectively removes the label.
+         """
+-        return str(self._mode)
++        return Layer.mode.fget(self)
++
++    # Only overriding to change the docstring of the setter above
++    @mode.setter
++    def mode(self, mode):
++        Layer.mode.fset(self, mode)
+ 
+     def _mode_setter_helper(self, mode):
+         mode = super()._mode_setter_helper(mode)
+         if mode == self._mode:
+             return mode
+ 
++        self._overlays["polygon"].enabled = mode == Mode.POLYGON
+         if mode in {Mode.PAINT, Mode.ERASE}:
+             self.cursor_size = self._calculate_cursor_size()
+ 
+@@ -769,32 +802,21 @@ class Labels(_ImageBase):
+             self.mode = Mode.PAN_ZOOM
+             self._reset_history()
+ 
+-    def _lookup_with_low_discrepancy_image(self, im, selected_label=None):
+-        """Returns display version of im using low_discrepancy_image.
+-
+-        Passes the image through low_discrepancy_image, only coloring
+-        selected_label if it's not None.
++    def _to_vispy_texture_dtype(self, data):
++        """Convert data to a dtype that can be used as a VisPy texture.
+ 
+-        Parameters
+-        ----------
+-        im : array or int
+-            Raw integer input image.
+-        selected_label : int, optional
+-            Value of selected label to color, by default None
++        Labels layers allow all integer dtypes for data, but only a subset
++        are supported by VisPy textures. For now, we convert all data to
++        float32 as it can represent all input values (though not losslessly,
++        see https://github.com/napari/napari/issues/6084).
+         """
+-        if selected_label:
+-            image = np.where(
+-                im == selected_label,
+-                low_discrepancy_image(selected_label, self._seed),
+-                0,
+-            )
+-        else:
+-            image = np.where(im != 0, low_discrepancy_image(im, self._seed), 0)
+-        return image
+-
+-    def _as_type(self, data, selected_label=None):
+         return data.astype(np.float32)
+ 
++    def _update_slice_response(self, response: _ImageSliceResponse) -> None:
++        """Override to convert raw slice data to displayed label colors."""
++        response = response.to_displayed(self._raw_to_displayed)
++        super()._update_slice_response(response)
++
+     def _partial_labels_refresh(self):
+         """Prepares and displays only an updated part of the labels."""
+ 
+@@ -818,7 +840,9 @@ class Labels(_ImageBase):
+         self.events.labels_update(data=colors_sliced, offset=offset)
+         self._updated_slice = None
+ 
+-    def _raw_to_displayed(self, raw, data_slice: Tuple[slice] = None):
++    def _raw_to_displayed(
++        self, raw, data_slice: Optional[Tuple[slice, ...]] = None
++    ):
+         """Determine displayed image from a saved raw image and a saved seed.
+ 
+         This function ensures that the 0 label gets mapped to the 0 displayed
+@@ -878,6 +902,7 @@ class Labels(_ImageBase):
+         update_mask = None
+         if (
+             self._cached_labels is not None
++            and self._cached_mapped_labels is not None
+             and self._cached_labels.shape == labels.shape
+         ):
+             update_mask = self._cached_labels[data_slice] != sliced_labels
+@@ -886,18 +911,19 @@ class Labels(_ImageBase):
+             # Update the cache
+             self._cached_labels[data_slice][update_mask] = labels_to_map
+         else:
+-            self._cached_labels = np.zeros_like(labels)
++            _cached_labels = np.zeros_like(labels)
++            _cached_labels[data_slice] = sliced_labels.copy()
++            self._cached_labels = _cached_labels
+             self._cached_mapped_labels = np.zeros_like(
+                 labels, dtype=np.float32
+             )
+-            self._cached_labels[data_slice] = sliced_labels.copy()
+             labels_to_map = sliced_labels
+ 
+         # If there are no changes, just return the cached image
+         if labels_to_map.size == 0:
+             return self._cached_mapped_labels[data_slice]
+ 
+-        mapped_labels = self._as_type(labels_to_map)
++        mapped_labels = self._to_vispy_texture_dtype(labels_to_map)
+ 
+         if update_mask is not None:
+             self._cached_mapped_labels[data_slice][update_mask] = mapped_labels
+@@ -949,14 +975,14 @@ class Labels(_ImageBase):
+ 
+     def get_color(self, label):
+         """Return the color corresponding to a specific label."""
+-        if label == 0:
++        if label == self._background_label:
+             col = None
+         elif label is None or (
+             self.show_selected_label and label != self.selected_label
+         ):
+             col = self.colormap.map([0, 0, 0, 0])[0]
+         else:
+-            val = self._as_type(np.array([label]))
++            val = self._to_vispy_texture_dtype(np.array([label]))
+             col = self.colormap.map(val)[0]
+         return col
+ 
+@@ -999,8 +1025,15 @@ class Labels(_ImageBase):
+                 start_point, end_point, n_points, endpoint=True
+             )
+             im_slice = self._slice.image.raw
++            bounding_box = self._display_bounding_box(dims_displayed)
++            # the display bounding box is returned as a closed interval
++            # (i.e. the endpoint is included) by the method, but we need
++            # open intervals in the code that follows, so we add 1.
++            bounding_box[:, 1] += 1
++
+             clamped = clamp_point_to_bounding_box(
+-                sample_points, self._display_bounding_box(dims_displayed)
++                sample_points,
++                bounding_box,
+             ).astype(int)
+             values = im_slice[tuple(clamped.T)]
+             nonzero_indices = np.flatnonzero(values)
+@@ -1264,13 +1297,7 @@ class Labels(_ImageBase):
+             Whether to refresh view slice or not. Set to False to batch paint
+             calls.
+         """
+-        shape = self.data.shape
+-        dims_to_paint = sorted(
+-            self._slice_input.order[-self.n_edit_dimensions :]
+-        )
+-        dims_not_painted = sorted(
+-            self._slice_input.order[: -self.n_edit_dimensions]
+-        )
++        shape, dims_to_paint = self._get_shape_and_dims_to_paint()
+         paint_scale = np.array(
+             [self.scale[i] for i in dims_to_paint], dtype=float
+         )
+@@ -1278,7 +1305,6 @@ class Labels(_ImageBase):
+         slice_coord = [int(np.round(c)) for c in coord]
+         if self.n_edit_dimensions < self.ndim:
+             coord_paint = [coord[i] for i in dims_to_paint]
+-            shape = [shape[i] for i in dims_to_paint]
+         else:
+             coord_paint = coord
+ 
+@@ -1291,6 +1317,71 @@ class Labels(_ImageBase):
+             int
+         )
+ 
++        self._paint_indices(
++            mask_indices, new_label, shape, dims_to_paint, slice_coord, refresh
++        )
++
++    def paint_polygon(self, points, new_label):
++        """Paint a polygon over existing labels with a new label.
++
++        Parameters
++        ----------
++        points : list of coordinates
++            List of coordinates of the vertices of a polygon.
++        new_label : int
++            Value of the new label to be filled in.
++        """
++        shape, dims_to_paint = self._get_shape_and_dims_to_paint()
++
++        if len(dims_to_paint) != 2:
++            raise NotImplementedError(
++                "Polygon painting is implemented only in 2D."
++            )
++
++        points = np.array(points, dtype=int)
++        slice_coord = points[0].tolist()
++        points2d = points[:, dims_to_paint]
++
++        polygon_mask = polygon2mask(shape, points2d)
++        mask_indices = np.argwhere(polygon_mask)
++        self._paint_indices(
++            mask_indices,
++            new_label,
++            shape,
++            dims_to_paint,
++            slice_coord,
++            refresh=True,
++        )
++
++    def _paint_indices(
++        self,
++        mask_indices,
++        new_label,
++        shape,
++        dims_to_paint,
++        slice_coord=None,
++        refresh=True,
++    ):
++        """Paint over existing labels with a new label, using the selected
++        mask indices, either only on the visible slice or in all n dimensions.
++
++        Parameters
++        ----------
++        mask_indices : numpy array of integer coordinates
++            Mask to paint represented by an array of its coordinates.
++        new_label : int
++            Value of the new label to be filled in.
++        shape : list
++            The label data shape upon which painting is performed.
++        dims_to_paint: list
++            List of dimensions of the label data that are used for painting.
++        refresh : bool
++            Whether to refresh view slice or not. Set to False to batch paint
++            calls.
++        """
++        dims_not_painted = sorted(
++            self._slice_input.order[: -self.n_edit_dimensions]
++        )
+         # discard candidate coordinates that are out of bounds
+         mask_indices = indices_in_shape(mask_indices, shape)
+ 
+@@ -1321,14 +1412,26 @@ class Labels(_ImageBase):
+ 
+         self.data_setitem(slice_coord, new_label, refresh)
+ 
++    def _get_shape_and_dims_to_paint(self) -> Tuple[list, list]:
++        dims_to_paint = sorted(self._get_dims_to_paint())
++        shape = self.data.shape
++
++        if self.n_edit_dimensions < self.ndim:
++            shape = [shape[i] for i in dims_to_paint]
++
++        return shape, dims_to_paint
++
++    def _get_dims_to_paint(self) -> list:
++        return list(self._slice_input.order[-self.n_edit_dimensions :])
++
+     def data_setitem(self, indices, value, refresh=True):
+         """Set `indices` in `data` to `value`, while writing to edit history.
+ 
+         Parameters
+         ----------
+-        indices : tuple of int, slice, or sequence of int
+-            Indices in data to overwrite. Can be any valid NumPy indexing
+-            expression [1]_.
++        indices : tuple of arrays of int
++            Indices in data to overwrite. Must be a tuple of arrays of length
++            equal to the number of data dimensions. (Fancy indexing in [1]_).
+         value : int or array of int
+             New label value(s). If more than one value, must match or
+             broadcast with the given indices.
+@@ -1356,6 +1459,21 @@ class Labels(_ImageBase):
+         # update the labels image
+         self.data[indices] = value
+ 
++        if not (  # if not a numpy array or numpy-backed xarray
++            isinstance(self.data, np.ndarray)
++            or isinstance(getattr(self.data, 'data', None), np.ndarray)
++        ):
++            # In the absence of slicing, the current slice becomes
++            # invalidated by data_setitem; only in the special case of a NumPy
++            # array, or a NumPy-array-backed Xarray, is the slice a view and
++            # therefore updated automatically.
++            # For other types, we update it manually here.
++            dims = self._slice.dims
++            point = np.round(self.world_to_data(dims.point)).astype(int)
++            pt_not_disp = {dim: point[dim] for dim in dims.not_displayed}
++            displayed_indices = index_in_slice(indices, pt_not_disp)
++            self._slice.image.raw[displayed_indices] = value
++
+         # tensorstore and xarray do not return their indices in
+         # np.ndarray format, so they need to be converted explicitly
+         if not isinstance(self.data, np.ndarray):
+@@ -1389,9 +1507,9 @@ class Labels(_ImageBase):
+ 
+     def get_status(
+         self,
+-        position: Optional[Tuple] = None,
++        position: Optional[npt.ArrayLike] = None,
+         *,
+-        view_direction: Optional[np.ndarray] = None,
++        view_direction: Optional[npt.ArrayLike] = None,
+         dims_displayed: Optional[List[int]] = None,
+         world: bool = False,
+     ) -> dict:
+@@ -1427,14 +1545,16 @@ class Labels(_ImageBase):
+             value = None
+ 
+         source_info = self._get_source_info()
+-        source_info['coordinates'] = generate_layer_coords_status(
+-            position[-self.ndim :], value
+-        )
++
++        pos = position
++        if pos is not None:
++            pos = np.asarray(pos)[-self.ndim :]
++        source_info['coordinates'] = generate_layer_coords_status(pos, value)
+ 
+         # if this labels layer has properties
+         properties = self._get_properties(
+             position,
+-            view_direction=view_direction,
++            view_direction=np.asarray(view_direction),
+             dims_displayed=dims_displayed,
+             world=world,
+         )
+@@ -1518,13 +1638,6 @@ class Labels(_ImageBase):
+         ]
+ 
+ 
+-if config.async_octree:
+-    from napari.layers.image.experimental.octree_image import _OctreeImageBase
+-
+-    class Labels(Labels, _OctreeImageBase):
+-        pass
+-
+-
+ def _coerce_indices_for_vectorization(array, indices: list) -> tuple:
+     """Coerces indices so that they can be used for vectorized indexing in the given data array."""
+     if _is_array_type(array, 'xarray.DataArray'):
+diff --git a/napari/utils/indexing.py b/napari/utils/indexing.py
+new file mode 100644
+index 00000000..cba8fcd7
+--- /dev/null
++++ b/napari/utils/indexing.py
+@@ -0,0 +1,40 @@
++import numpy as np
++
++
++def index_in_slice(index, position_in_axes):
++    """Convert a NumPy fancy indexing expression from data to sliced space.
++
++    Parameters
++    ----------
++    index : tuple of array of int
++        A NumPy fancy indexing expression [1]_.
++    position_in_axes : dict[int, int]
++        A dictionary mapping sliced (non-displayed) axes to a slice position.
++
++    Returns
++    -------
++    sliced_index : tuple of array of int
++        The indexing expression (nD) restricted to the current slice (usually
++        2D or 3D).
++
++    Examples
++    --------
++    >>> index = (np.arange(5), np.full(5, 1), np.arange(4, 9))
++    >>> index_in_slice(index, {0: 3})
++    (array([1]), array([7]))
++    >>> index_in_slice(index, {1: 1, 2: 8})
++    (array([4]),)
++
++    References
++    ----------
++    [1]: https://numpy.org/doc/stable/user/basics.indexing.html#integer-array-indexing
++    """
++    queries = [
++        index[ax] == position for ax, position in position_in_axes.items()
++    ]
++    index_in_slice = np.logical_and.reduce(queries, axis=0)
++    return tuple(
++        ix[index_in_slice]
++        for i, ix in enumerate(index)
++        if i not in position_in_axes
++    )
+-- 
+2.34.1

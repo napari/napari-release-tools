@@ -1,0 +1,1215 @@
+From adb3bc889187f039c6539154939cfa8b6cd31afc Mon Sep 17 00:00:00 2001
+From: "pre-commit-ci[bot]"
+ <66853113+pre-commit-ci[bot]@users.noreply.github.com>
+Date: Tue, 5 Sep 2023 18:06:30 +0200
+Subject: [PATCH] [pre-commit.ci] pre-commit autoupdate (#6128)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+updates:
+- [github.com/astral-sh/ruff-pre-commit: v0.0.281 →
+v0.0.284](https://github.com/astral-sh/ruff-pre-commit/compare/v0.0.281...v0.0.284)
+- [github.com/python-jsonschema/check-jsonschema: 0.23.3 →
+0.24.1](https://github.com/python-jsonschema/check-jsonschema/compare/0.23.3...0.24.1)
+
+---------
+
+Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.github.com>
+Co-authored-by: Grzegorz Bokota <bokota+github@gmail.com>
+---
+ .pre-commit-config.yaml                       |  12 +-
+ .../dev/slicing/janelia_s3_n5_multiscale.py   |  31 +++
+ .../_tests/test_qt_layer_controls.py          |  18 +-
+ napari/_tests/test_with_screenshot.py         |  50 ++---
+ napari/_vispy/filters/tracks.py               |  18 +-
+ napari/benchmarks/benchmark_qt_slicing.py     | 192 ++++++++++++++++++
+ napari/benchmarks/benchmark_shapes_layer.py   | 103 ++++------
+ .../_tests/test_viewer_mouse_bindings.py      |  38 +---
+ napari/components/dims.py                     |   2 +-
+ .../experimental/remote/_commands.py          |   2 +-
+ napari/layers/image/_tests/test_image.py      |   4 +-
+ napari/layers/image/_tests/test_multiscale.py |   2 +-
+ napari/layers/image/_tests/test_volume.py     |   2 +-
+ napari/layers/labels/_tests/test_labels.py    |   2 +-
+ napari/layers/points/_tests/test_points.py    |   4 +-
+ napari/layers/points/points.py                |   6 +-
+ napari/layers/shapes/_shape_list.py           |  26 +--
+ napari/layers/shapes/_tests/test_shapes.py    |   4 +-
+ .../_tests/test_shapes_mouse_bindings.py      |  29 +--
+ napari/layers/utils/layer_utils.py            |   2 +-
+ napari/layers/vectors/_tests/test_vectors.py  |   2 +-
+ napari/layers/vectors/vectors.py              |   8 +-
+ napari/utils/_test_utils.py                   |  36 ++++
+ napari/utils/events/containers/_typed.py      |  11 +-
+ napari/utils/perf/_event.py                   |  35 +++-
+ 25 files changed, 426 insertions(+), 213 deletions(-)
+ create mode 100644 examples/dev/slicing/janelia_s3_n5_multiscale.py
+ create mode 100644 napari/benchmarks/benchmark_qt_slicing.py
+ create mode 100644 napari/utils/_test_utils.py
+
+diff --git a/.pre-commit-config.yaml b/.pre-commit-config.yaml
+index 3404c1fa..7c483132 100644
+--- a/.pre-commit-config.yaml
++++ b/.pre-commit-config.yaml
+@@ -1,21 +1,21 @@
+ repos:
+--   repo: https://github.com/psf/black
+-    rev: 23.3.0
++-   repo: https://github.com/psf/black-pre-commit-mirror
++    rev: 23.7.0
+     hooks:
+     - id: black
+       pass_filenames: true
+       exclude: _vendor|vendored|examples
+--   repo: https://github.com/charliermarsh/ruff-pre-commit
+-    rev: v0.0.270
++-   repo: https://github.com/astral-sh/ruff-pre-commit
++    rev: v0.0.287
+     hooks:
+       - id: ruff
+         exclude: _vendor|vendored
+ -   repo: https://github.com/seddonym/import-linter
+-    rev: v1.9.0
++    rev: v1.11.1
+     hooks:
+     - id: import-linter
+       stages: [manual]
+ -   repo: https://github.com/python-jsonschema/check-jsonschema
+-    rev: 0.23.0
++    rev: 0.26.3
+     hooks:
+       - id: check-github-workflows
+diff --git a/examples/dev/slicing/janelia_s3_n5_multiscale.py b/examples/dev/slicing/janelia_s3_n5_multiscale.py
+new file mode 100644
+index 00000000..501e3ccb
+--- /dev/null
++++ b/examples/dev/slicing/janelia_s3_n5_multiscale.py
+@@ -0,0 +1,31 @@
++import dask.array as da
++import zarr
++
++import napari
++
++"""
++The sample data here is Interphase HeLa Cell [https://openorganelle.janelia.org/datasets/jrc_hela-3],
++from HHMI's OpenOrganelle [https://openorganelle.janelia.org].
++
++The data are hosted by Open Data on AWS on S3.
++
++This tests access to multi-scale remote data.
++"""
++
++
++# access the root of the n5 container
++group = zarr.open(zarr.N5FSStore('s3://janelia-cosem-datasets/jrc_hela-2/jrc_hela-2.n5', anon=True))
++
++# s0 (highest resolution) through s5 (lowest resolution) are available
++data = []
++for i in range(5):
++    zarr_array = group[f'em/fibsem-uint16/s{i}']
++    data.append(da.from_zarr(zarr_array, chunks=zarr_array.chunks))
++
++# This order presents a better visualization, but seems to break simple async (issue #5106)
++# viewer = napari.view_image(data, order=(1, 0, 2), contrast_limits=(18000, 40000), multiscale=True)
++viewer = napari.view_image(data, contrast_limits=(18000, 40000), multiscale=True)
++
++if __name__ == '__main__':
++    napari.run()
++
+diff --git a/napari/_qt/layer_controls/_tests/test_qt_layer_controls.py b/napari/_qt/layer_controls/_tests/test_qt_layer_controls.py
+index f26c4fa7..eda37ab9 100644
+--- a/napari/_qt/layer_controls/_tests/test_qt_layer_controls.py
++++ b/napari/_qt/layer_controls/_tests/test_qt_layer_controls.py
+@@ -1,7 +1,7 @@
+ import os
+ import random
+ import sys
+-from collections import namedtuple
++from typing import NamedTuple, Optional, Type
+ 
+ import numpy as np
+ import pytest
+@@ -34,6 +34,7 @@ from napari.components import ViewerModel
+ from napari.layers import (
+     Image,
+     Labels,
++    Layer,
+     Points,
+     Shapes,
+     Surface,
+@@ -41,11 +42,18 @@ from napari.layers import (
+     Vectors,
+ )
+ 
++
++class LayerTypeWithData(NamedTuple):
++    type: Type[Layer]
++    data: np.ndarray
++    color: Optional[dict]
++    properties: Optional[dict]
++    expected_isinstance: Type[QtLayerControlsContainer]
++
++
+ np.random.seed(0)
+-LayerTypeWithData = namedtuple(
+-    'LayerTypeWithData',
+-    ['type', 'data', 'color', 'properties', 'expected_isinstance'],
+-)
++
++
+ _IMAGE = LayerTypeWithData(
+     type=Image,
+     data=np.random.rand(8, 8),
+diff --git a/napari/_tests/test_with_screenshot.py b/napari/_tests/test_with_screenshot.py
+index 2cf78425..5aa679dc 100644
+--- a/napari/_tests/test_with_screenshot.py
++++ b/napari/_tests/test_with_screenshot.py
+@@ -1,10 +1,8 @@
+-import collections
+-
+ import numpy as np
+ import pytest
+ 
+ from napari._tests.utils import skip_local_popups, skip_on_win_ci
+-from napari.utils._proxies import ReadOnlyWrapper
++from napari.utils._test_utils import read_only_mouse_event
+ from napari.utils.interactions import (
+     mouse_move_callbacks,
+     mouse_press_callbacks,
+@@ -370,48 +368,36 @@ def test_labels_painting(make_napari_viewer):
+     layer.selected_label = 3
+ 
+     # Simulate click
+-    Event = collections.namedtuple(
+-        'Event', field_names=['type', 'is_dragging', 'position']
+-    )
+-
+-    # Simulate click
+-    event = ReadOnlyWrapper(
+-        Event(
+-            type='mouse_press',
+-            is_dragging=False,
+-            position=viewer.cursor.position,
+-        )
++    event = read_only_mouse_event(
++        type='mouse_press',
++        is_dragging=False,
++        position=viewer.cursor.position,
+     )
+     mouse_press_callbacks(layer, event)
+ 
+     viewer.cursor.position = (100, 100)
+ 
+     # Simulate drag
+-    event = ReadOnlyWrapper(
+-        Event(
+-            type='mouse_move',
+-            is_dragging=True,
+-            position=viewer.cursor.position,
+-        )
++    event = read_only_mouse_event(
++        type='mouse_move',
++        is_dragging=True,
++        position=viewer.cursor.position,
+     )
+     mouse_move_callbacks(layer, event)
+ 
+     # Simulate release
+-    event = ReadOnlyWrapper(
+-        Event(
+-            type='mouse_release',
+-            is_dragging=False,
+-            position=viewer.cursor.position,
+-        )
++    event = read_only_mouse_event(
++        type='mouse_release',
++        is_dragging=False,
++        position=viewer.cursor.position,
+     )
++
+     mouse_release_callbacks(layer, event)
+ 
+-    event = ReadOnlyWrapper(
+-        Event(
+-            type='mouse_press',
+-            is_dragging=False,
+-            position=viewer.cursor.position,
+-        )
++    event = read_only_mouse_event(
++        type='mouse_press',
++        is_dragging=False,
++        position=viewer.cursor.position,
+     )
+     mouse_press_callbacks(layer, event)
+ 
+diff --git a/napari/_vispy/filters/tracks.py b/napari/_vispy/filters/tracks.py
+index 4c915422..be2c8df5 100644
+--- a/napari/_vispy/filters/tracks.py
++++ b/napari/_vispy/filters/tracks.py
+@@ -87,9 +87,9 @@ class TracksFilter(Filter):
+ 
+     def __init__(
+         self,
+-        current_time: Union[int, float] = 0,
+-        tail_length: Union[int, float] = 30,
+-        head_length: Union[int, float] = 0,
++        current_time: float = 0,
++        tail_length: float = 30,
++        head_length: float = 0,
+         use_fade: bool = True,
+         vertex_time: Union[List, np.ndarray] = None,
+     ) -> None:
+@@ -104,11 +104,11 @@ class TracksFilter(Filter):
+         self.vertex_time = vertex_time
+ 
+     @property
+-    def current_time(self) -> Union[int, float]:
++    def current_time(self) -> float:
+         return self._current_time
+ 
+     @current_time.setter
+-    def current_time(self, n: Union[int, float]):
++    def current_time(self, n: float):
+         self._current_time = n
+         if isinstance(n, slice):
+             n = np.max(self._vertex_time)
+@@ -124,20 +124,20 @@ class TracksFilter(Filter):
+         self.vshader['use_fade'] = float(self._use_fade)
+ 
+     @property
+-    def tail_length(self) -> Union[int, float]:
++    def tail_length(self) -> float:
+         return self._tail_length
+ 
+     @tail_length.setter
+-    def tail_length(self, tail_length: Union[int, float]):
++    def tail_length(self, tail_length: float):
+         self._tail_length = tail_length
+         self.vshader['tail_length'] = float(self._tail_length)
+ 
+     @property
+-    def head_length(self) -> Union[int, float]:
++    def head_length(self) -> float:
+         return self._tail_length
+ 
+     @head_length.setter
+-    def head_length(self, head_length: Union[int, float]):
++    def head_length(self, head_length: float):
+         self._head_length = head_length
+         self.vshader['head_length'] = float(self._head_length)
+ 
+diff --git a/napari/benchmarks/benchmark_qt_slicing.py b/napari/benchmarks/benchmark_qt_slicing.py
+new file mode 100644
+index 00000000..96ab6376
+--- /dev/null
++++ b/napari/benchmarks/benchmark_qt_slicing.py
+@@ -0,0 +1,192 @@
++# See "Writing benchmarks" in the asv docs for more information.
++# https://asv.readthedocs.io/en/latest/writing_benchmarks.html
++# or the napari documentation on benchmarking
++# https://github.com/napari/napari/blob/main/docs/BENCHMARKS.md
++
++import time
++
++import numpy as np
++import zarr
++from qtpy.QtWidgets import QApplication
++
++import napari
++from napari.layers import Image
++
++SAMPLE_PARAMS = {
++    'skin_data': {
++        # napari-bio-sample-data
++        'shape': (1280, 960, 3),
++        'chunk_shape': (512, 512, 3),
++        'dtype': 'uint8',
++    },
++    'jrc_hela-2 (scale 3)': {
++        # s3://janelia-cosem-datasets/jrc_hela-2/jrc_hela-2.n5
++        'shape': (796, 200, 1500),
++        'dtype': 'uint16',
++        'chunk_shape': (64, 64, 64),
++    },
++}
++
++
++def get_image_params():
++    # chunksizes = [(64,64,64), (256,256,256), (512,512,512)]
++    latencies = [0.05 * i for i in range(3)]
++    datanames = SAMPLE_PARAMS.keys()
++    params = (latencies, datanames)
++
++    return params
++
++
++class SlowMemoryStore(zarr.storage.MemoryStore):
++    def __init__(self, load_delay, *args, **kwargs) -> None:
++        self.load_delay = load_delay
++        super().__init__(*args, **kwargs)
++
++    def __getitem__(self, item: str):
++        time.sleep(self.load_delay)
++        return super().__getitem__(item)
++
++
++class AsyncImage2DSuite:
++    """TODO: these benchmarks are skipped. Remove the NotImplementedError in
++    setup to enable.
++    """
++
++    params = get_image_params()
++    timeout = 300
++
++    def setup(self, latency, dataname):
++        shape = SAMPLE_PARAMS[dataname]['shape']
++        chunk_shape = SAMPLE_PARAMS[dataname]['chunk_shape']
++        dtype = SAMPLE_PARAMS[dataname]['dtype']
++
++        store = SlowMemoryStore(load_delay=latency)
++        self.data = zarr.zeros(
++            shape,
++            chunks=chunk_shape,
++            dtype=dtype,
++            store=store,
++        )
++
++        self.layer = Image(self.data)
++        raise NotImplementedError
++
++    def time_create_layer(self, *args):
++        """Time to create an image layer."""
++        Image(self.data)
++
++    def time_set_view_slice(self, *args):
++        """Time to set view slice."""
++        self.layer._set_view_slice()
++
++    def time_refresh(self, *args):
++        """Time to refresh view."""
++        self.layer.refresh()
++
++
++class QtViewerAsyncImage2DSuite:
++    """TODO: these benchmarks are skipped. Remove the NotImplementedError in
++    setup to enable.
++    """
++
++    params = get_image_params()
++    timeout = 300
++
++    def setup(self, latency, dataname):
++        shape = SAMPLE_PARAMS[dataname]['shape']
++        chunk_shape = SAMPLE_PARAMS[dataname]['chunk_shape']
++        dtype = SAMPLE_PARAMS[dataname]['dtype']
++
++        if len(shape) == 3 and shape[2] == 3:
++            # Skip 2D RGB tests -- scrolling does not apply
++            self.viewer = None
++            raise NotImplementedError
++
++        store = SlowMemoryStore(load_delay=latency)
++        _ = QApplication.instance() or QApplication([])
++        self.data = zarr.zeros(
++            shape,
++            chunks=chunk_shape,
++            dtype=dtype,
++            store=store,
++        )
++
++        self.viewer = napari.Viewer()
++        self.viewer.add_image(self.data)
++        raise NotImplementedError
++
++    def time_z_scroll(self, *args):
++        layers_to_scroll = 4
++        for z in range(layers_to_scroll):
++            z = z * (self.data.shape[2] // layers_to_scroll)
++            self.viewer.dims.set_current_step(0, z)
++
++    def teardown(self, *args):
++        if self.viewer is not None:
++            self.viewer.window.close()
++
++
++class QtViewerAsyncPointsSuite:
++    """TODO: these benchmarks are skipped. Remove the NotImplementedError in
++    setup to enable.
++    """
++
++    n_points = [2**i for i in range(12, 18)]
++    params = n_points
++
++    def setup(self, n_points):
++        _ = QApplication.instance() or QApplication([])
++
++        np.random.seed(0)
++        self.viewer = napari.Viewer()
++        # Fake image layer to set bounds. Is this really needed?
++        self.empty_image = np.zeros((512, 512, 512), dtype="uint8")
++        self.viewer.add_image(self.empty_image)
++        self.point_data = np.random.randint(512, size=(n_points, 3))
++        self.viewer.add_points(self.point_data)
++        raise NotImplementedError
++
++    def time_z_scroll(self, *args):
++        for z in range(self.empty_image.shape[0]):
++            self.viewer.dims.set_current_step(0, z)
++
++    def teardown(self, *args):
++        self.viewer.window.close()
++
++
++class QtViewerAsyncPointsAndImage2DSuite:
++    """TODO: these benchmarks are skipped. Remove the NotImplementedError in
++    setup to enable.
++    """
++
++    n_points = [2**i for i in range(12, 18, 2)]
++    chunksize = [256, 512, 1024]
++    latency = [0.05 * i for i in range(3)]
++    params = (n_points, latency, chunksize)
++    timeout = 600
++
++    def setup(self, n_points, latency, chunksize):
++        store = SlowMemoryStore(load_delay=latency)
++        _ = QApplication.instance() or QApplication([])
++
++        np.random.seed(0)
++
++        self.image_data = zarr.zeros(
++            (64, 2048, 2048),
++            chunks=(1, chunksize, chunksize),
++            dtype='uint8',
++            store=store,
++        )
++
++        self.viewer = napari.Viewer()
++        self.viewer.add_image(self.image_data)
++        self.point_data = np.random.randint(512, size=(n_points, 3))
++        self.viewer.add_points(self.point_data)
++        raise NotImplementedError
++
++    def time_z_scroll(self, *args):
++        for z in range(self.image_data.shape[0]):
++            self.viewer.dims.set_current_step(0, z)
++
++    def teardown(self, *args):
++        self.viewer.window.close()
+diff --git a/napari/benchmarks/benchmark_shapes_layer.py b/napari/benchmarks/benchmark_shapes_layer.py
+index e8ff3908..afc45819 100644
+--- a/napari/benchmarks/benchmark_shapes_layer.py
++++ b/napari/benchmarks/benchmark_shapes_layer.py
+@@ -2,22 +2,17 @@
+ # https://asv.readthedocs.io/en/latest/writing_benchmarks.html
+ # or the napari documentation on benchmarking
+ # https://github.com/napari/napari/blob/main/docs/BENCHMARKS.md
+-import collections
+ 
+ import numpy as np
+ 
+ from napari.layers import Shapes
+-from napari.utils._proxies import ReadOnlyWrapper
++from napari.utils._test_utils import read_only_mouse_event
+ from napari.utils.interactions import (
+     mouse_move_callbacks,
+     mouse_press_callbacks,
+     mouse_release_callbacks,
+ )
+ 
+-Event = collections.namedtuple(
+-    'Event', field_names=['type', 'is_dragging', 'modifiers', 'position']
+-)
+-
+ 
+ class Shapes2DSuite:
+     """Benchmarks for the Shapes layer with 2D data"""
+@@ -112,24 +107,20 @@ class ShapesInteractionSuite:
+         position = tuple(np.mean(self.layer.data[0], axis=0))
+ 
+         # create events
+-        click_event = ReadOnlyWrapper(
+-            Event(
+-                type='mouse_press',
+-                is_dragging=False,
+-                modifiers=[],
+-                position=position,
+-            )
++        click_event = read_only_mouse_event(
++            type='mouse_press',
++            is_dragging=False,
++            modifiers=[],
++            position=position,
+         )
+         # Simulate click
+         mouse_press_callbacks(self.layer, click_event)
+ 
+-        release_event = ReadOnlyWrapper(
+-            Event(
+-                type='mouse_release',
+-                is_dragging=False,
+-                modifiers=[],
+-                position=position,
+-            )
++        release_event = read_only_mouse_event(
++            type='mouse_release',
++            is_dragging=False,
++            modifiers=[],
++            position=position,
+         )
+ 
+         # Simulate release
+@@ -141,26 +132,22 @@ class ShapesInteractionSuite:
+         position = tuple(np.mean(self.layer.data[0], axis=0))
+ 
+         # create events
+-        click_event = ReadOnlyWrapper(
+-            Event(
+-                type='mouse_press',
+-                is_dragging=False,
+-                modifiers=[],
+-                position=position,
+-            )
++        click_event = read_only_mouse_event(
++            type='mouse_press',
++            is_dragging=False,
++            modifiers=[],
++            position=position,
+         )
+ 
+         # Simulate click
+         mouse_press_callbacks(self.layer, click_event)
+ 
+         # create events
+-        drag_event = ReadOnlyWrapper(
+-            Event(
+-                type='mouse_press',
+-                is_dragging=True,
+-                modifiers=[],
+-                position=position,
+-            )
++        drag_event = read_only_mouse_event(
++            type='mouse_press',
++            is_dragging=True,
++            modifiers=[],
++            position=position,
+         )
+ 
+         # start drag event
+@@ -169,25 +156,21 @@ class ShapesInteractionSuite:
+         # simulate 5 drag events
+         for _ in range(5):
+             position = tuple(np.add(position, [10, 5]))
+-            drag_event = ReadOnlyWrapper(
+-                Event(
+-                    type='mouse_press',
+-                    is_dragging=True,
+-                    modifiers=[],
+-                    position=position,
+-                )
++            drag_event = read_only_mouse_event(
++                type='mouse_press',
++                is_dragging=True,
++                modifiers=[],
++                position=position,
+             )
+ 
+             # Simulate move, click, and release
+             mouse_move_callbacks(self.layer, drag_event)
+ 
+-        release_event = ReadOnlyWrapper(
+-            Event(
+-                type='mouse_release',
+-                is_dragging=False,
+-                modifiers=[],
+-                position=position,
+-            )
++        release_event = read_only_mouse_event(
++            type='mouse_release',
++            is_dragging=False,
++            modifiers=[],
++            position=position,
+         )
+ 
+         # Simulate release
+@@ -200,24 +183,20 @@ class ShapesInteractionSuite:
+         position = tuple(np.mean(self.layer.data[1], axis=0))
+ 
+         # create events
+-        click_event = ReadOnlyWrapper(
+-            Event(
+-                type='mouse_press',
+-                is_dragging=False,
+-                modifiers=[],
+-                position=position,
+-            )
++        click_event = read_only_mouse_event(
++            type='mouse_press',
++            is_dragging=False,
++            modifiers=[],
++            position=position,
+         )
+         # Simulate click
+         mouse_press_callbacks(self.layer, click_event)
+ 
+-        release_event = ReadOnlyWrapper(
+-            Event(
+-                type='mouse_release',
+-                is_dragging=False,
+-                modifiers=[],
+-                position=position,
+-            )
++        release_event = read_only_mouse_event(
++            type='mouse_release',
++            is_dragging=False,
++            modifiers=[],
++            position=position,
+         )
+ 
+         # Simulate release
+diff --git a/napari/components/_tests/test_viewer_mouse_bindings.py b/napari/components/_tests/test_viewer_mouse_bindings.py
+index 86db8bc1..88c5958e 100644
+--- a/napari/components/_tests/test_viewer_mouse_bindings.py
++++ b/napari/components/_tests/test_viewer_mouse_bindings.py
+@@ -1,28 +1,11 @@
+-import collections
+-
+ import numpy as np
+ import pytest
+ 
+ from napari.components import ViewerModel
+-from napari.utils._proxies import ReadOnlyWrapper
++from napari.utils._test_utils import read_only_mouse_event
+ from napari.utils.interactions import mouse_wheel_callbacks
+ 
+ 
+-@pytest.fixture
+-def mouse_event():
+-    """Create a subclass for simulating vispy mouse events.
+-
+-    Returns
+-    -------
+-    Event : Type
+-        A new tuple subclass named Event that can be used to create a
+-        NamedTuple object with fields "delta", "modifiers" and "inverted".
+-    """
+-    return collections.namedtuple(
+-        'Event', field_names=['delta', 'modifiers', 'native']
+-    )
+-
+-
+ class WheelEvent:
+     def __init__(self, inverted) -> None:
+         self._inverted = inverted
+@@ -47,7 +30,7 @@ class WheelEvent:
+         ),
+     ],
+ )
+-def test_paint(mouse_event, modifiers, native, expected_dim):
++def test_paint(modifiers, native, expected_dim):
+     """Test painting labels with circle/square brush."""
+     viewer = ViewerModel()
+     data = np.random.random((10, 10, 10))
+@@ -58,29 +41,30 @@ def test_paint(mouse_event, modifiers, native, expected_dim):
+     viewer.dims.set_point(axis=2, value=5)
+ 
+     # Simulate tiny scroll
+-    event = ReadOnlyWrapper(
+-        mouse_event(delta=[0, 0.6], modifiers=modifiers, native=native)
++    event = read_only_mouse_event(
++        delta=[0, 0.6], modifiers=modifiers, native=native, type="wheel"
+     )
+     mouse_wheel_callbacks(viewer, event)
+     assert np.equal(viewer.dims.point, expected_dim[0]).all()
+ 
+     # Simulate tiny scroll
+-    event = ReadOnlyWrapper(
+-        mouse_event(delta=[0, 0.6], modifiers=modifiers, native=native)
++    event = read_only_mouse_event(
++        delta=[0, 0.6], modifiers=modifiers, native=native, type="wheel"
+     )
++
+     mouse_wheel_callbacks(viewer, event)
+     assert np.equal(viewer.dims.point, expected_dim[1]).all()
+ 
+     # Simulate tiny scroll
+-    event = ReadOnlyWrapper(
+-        mouse_event(delta=[0, 0.9], modifiers=modifiers, native=native)
++    event = read_only_mouse_event(
++        delta=[0, 0.9], modifiers=modifiers, native=native, type="wheel"
+     )
+     mouse_wheel_callbacks(viewer, event)
+     assert np.equal(viewer.dims.point, expected_dim[2]).all()
+ 
+     # Simulate large scroll
+-    event = ReadOnlyWrapper(
+-        mouse_event(delta=[0, 3], modifiers=modifiers, native=native)
++    event = read_only_mouse_event(
++        delta=[0, 3], modifiers=modifiers, native=native, type="wheel"
+     )
+     mouse_wheel_callbacks(viewer, event)
+     assert np.equal(viewer.dims.point, expected_dim[3]).all()
+diff --git a/napari/components/dims.py b/napari/components/dims.py
+index 3d517d76..07979aa0 100644
+--- a/napari/components/dims.py
++++ b/napari/components/dims.py
+@@ -231,7 +231,7 @@ class Dims(EventedModel):
+     def set_point(
+         self,
+         axis: Union[int, Sequence[int]],
+-        value: Union[Union[int, float], Sequence[Union[int, float]]],
++        value: Union[float, Sequence[float]],
+     ):
+         """Sets point to slice dimension in world coordinates.
+ 
+diff --git a/napari/components/experimental/remote/_commands.py b/napari/components/experimental/remote/_commands.py
+index 74beab04..3538f8b2 100644
+--- a/napari/components/experimental/remote/_commands.py
++++ b/napari/components/experimental/remote/_commands.py
+@@ -75,4 +75,4 @@ class RemoteCommands:
+                 LOGGER.info("Calling RemoteCommands.%s(%s)", name, args)
+                 method(args)
+             except AttributeError:
+-                LOGGER.error("RemoteCommands.%s does not exist.", name)
++                LOGGER.exception("RemoteCommands.%s does not exist.", name)
+diff --git a/napari/layers/image/_tests/test_image.py b/napari/layers/image/_tests/test_image.py
+index 0d5eb53c..6ce7bee4 100644
+--- a/napari/layers/image/_tests/test_image.py
++++ b/napari/layers/image/_tests/test_image.py
+@@ -575,7 +575,7 @@ def test_message():
+     data = np.random.random((10, 15))
+     layer = Image(data)
+     msg = layer.get_status((0,) * 2)
+-    assert type(msg) == dict
++    assert isinstance(msg, dict)
+ 
+ 
+ def test_message_3d():
+@@ -587,7 +587,7 @@ def test_message_3d():
+     msg = layer.get_status(
+         (0, 0, 0), view_direction=[1, 0, 0], dims_displayed=[0, 1, 2]
+     )
+-    assert type(msg) == dict
++    assert isinstance(msg, dict)
+ 
+ 
+ def test_thumbnail():
+diff --git a/napari/layers/image/_tests/test_multiscale.py b/napari/layers/image/_tests/test_multiscale.py
+index a1833815..bcafce40 100644
+--- a/napari/layers/image/_tests/test_multiscale.py
++++ b/napari/layers/image/_tests/test_multiscale.py
+@@ -374,7 +374,7 @@ def test_message():
+     data = [np.random.random(s) for s in shapes]
+     layer = Image(data, multiscale=True)
+     msg = layer.get_status((0,) * 2)
+-    assert type(msg) == dict
++    assert isinstance(msg, dict)
+ 
+ 
+ def test_thumbnail():
+diff --git a/napari/layers/image/_tests/test_volume.py b/napari/layers/image/_tests/test_volume.py
+index 362dacc1..1f3e2ce4 100644
+--- a/napari/layers/image/_tests/test_volume.py
++++ b/napari/layers/image/_tests/test_volume.py
+@@ -160,7 +160,7 @@ def test_message():
+     layer = Image(data)
+     layer._slice_dims(ndisplay=3)
+     msg = layer.get_status((0,) * 3)
+-    assert type(msg) == dict
++    assert isinstance(msg, dict)
+ 
+ 
+ def test_plane_drag_callback():
+diff --git a/napari/layers/labels/_tests/test_labels.py b/napari/layers/labels/_tests/test_labels.py
+index 42e6ee6b..13eba14c 100644
+--- a/napari/layers/labels/_tests/test_labels.py
++++ b/napari/layers/labels/_tests/test_labels.py
+@@ -839,7 +839,7 @@ def test_message():
+     data = np.random.randint(20, size=(10, 15))
+     layer = Labels(data)
+     msg = layer.get_status((0, 0))
+-    assert type(msg) == dict
++    assert isinstance(msg, dict)
+ 
+ 
+ def test_thumbnail():
+diff --git a/napari/layers/points/_tests/test_points.py b/napari/layers/points/_tests/test_points.py
+index 1fd7abbc..c19a1b30 100644
+--- a/napari/layers/points/_tests/test_points.py
++++ b/napari/layers/points/_tests/test_points.py
+@@ -1657,7 +1657,7 @@ def test_message():
+     data[-1] = [0, 0]
+     layer = Points(data)
+     msg = layer.get_status((0,) * 2)
+-    assert type(msg) == dict
++    assert isinstance(msg, dict)
+ 
+ 
+ def test_message_3d():
+@@ -1669,7 +1669,7 @@ def test_message_3d():
+     msg = layer.get_status(
+         (0, 0, 0), view_direction=[1, 0, 0], dims_displayed=[0, 1, 2]
+     )
+-    assert type(msg) == dict
++    assert isinstance(msg, dict)
+ 
+ 
+ def test_thumbnail():
+diff --git a/napari/layers/points/points.py b/napari/layers/points/points.py
+index c713f188..c441276d 100644
+--- a/napari/layers/points/points.py
++++ b/napari/layers/points/points.py
+@@ -836,7 +836,7 @@ class Points(Layer):
+         return self._size
+ 
+     @size.setter
+-    def size(self, size: Union[int, float, np.ndarray, list]) -> None:
++    def size(self, size: Union[float, np.ndarray, list]) -> None:
+         try:
+             self._size = np.broadcast_to(size, len(self.data)).copy()
+         except ValueError as e:
+@@ -966,9 +966,7 @@ class Points(Layer):
+         return self._edge_width
+ 
+     @edge_width.setter
+-    def edge_width(
+-        self, edge_width: Union[int, float, np.ndarray, list]
+-    ) -> None:
++    def edge_width(self, edge_width: Union[float, np.ndarray, list]) -> None:
+         # broadcast to np.array
+         edge_width = np.broadcast_to(edge_width, self.data.shape[0]).copy()
+ 
+diff --git a/napari/layers/shapes/_shape_list.py b/napari/layers/shapes/_shape_list.py
+index 2ad1a8ec..9d9f4737 100644
+--- a/napari/layers/shapes/_shape_list.py
++++ b/napari/layers/shapes/_shape_list.py
+@@ -709,7 +709,7 @@ class ShapeList:
+         """
+         if new_type is not None:
+             cur_shape = self.shapes[index]
+-            if type(new_type) == str:
++            if isinstance(new_type, str):
+                 shape_type = ShapeType(new_type)
+                 if shape_type in shape_classes:
+                     shape_cls = shape_classes[shape_type]
+@@ -933,7 +933,7 @@ class ShapeList:
+         self.add(shape, shape_index=index)
+         self._update_z_order()
+ 
+-    def outline(self, indices):
++    def outline(self, indices: Union[int, Sequence[int]]):
+         """Finds outlines of shapes listed in indices
+ 
+         Parameters
+@@ -951,7 +951,16 @@ class ShapeList:
+         triangles : np.ndarray
+             Mx3 array of any indices of vertices for triangles of outline
+         """
+-        if type(indices) is list:
++        if isinstance(indices, int):
++            triangle_indices = np.all(
++                self._mesh.triangles_index == [indices, 1], axis=1
++            )
++            triangle_indices = np.where(triangle_indices)[0]
++            vertices_indices = np.all(
++                self._mesh.vertices_index == [indices, 1], axis=1
++            )
++            vertices_indices = np.where(vertices_indices)[0]
++        else:
+             meshes = self._mesh.triangles_index
+             triangle_indices = [
+                 i
+@@ -964,21 +973,12 @@ class ShapeList:
+                 for i, x in enumerate(meshes)
+                 if x[0] in indices and x[1] == 1
+             ]
+-        else:
+-            triangle_indices = np.all(
+-                self._mesh.triangles_index == [indices, 1], axis=1
+-            )
+-            triangle_indices = np.where(triangle_indices)[0]
+-            vertices_indices = np.all(
+-                self._mesh.vertices_index == [indices, 1], axis=1
+-            )
+-            vertices_indices = np.where(vertices_indices)[0]
+ 
+         offsets = self._mesh.vertices_offsets[vertices_indices]
+         centers = self._mesh.vertices_centers[vertices_indices]
+         triangles = self._mesh.triangles[triangle_indices]
+ 
+-        if type(indices) is list:
++        if not isinstance(indices, int):
+             t_ind = self._mesh.triangles_index[triangle_indices][:, 0]
+             inds = self._mesh.vertices_index[vertices_indices][:, 0]
+             starts = np.unique(inds, return_index=True)[1]
+diff --git a/napari/layers/shapes/_tests/test_shapes.py b/napari/layers/shapes/_tests/test_shapes.py
+index 6c64d08e..7f64155b 100644
+--- a/napari/layers/shapes/_tests/test_shapes.py
++++ b/napari/layers/shapes/_tests/test_shapes.py
+@@ -2102,7 +2102,7 @@ def test_message():
+     data = 20 * np.random.random(shape)
+     layer = Shapes(data)
+     msg = layer.get_status((0,) * 2)
+-    assert type(msg) == dict
++    assert isinstance(msg, dict)
+ 
+ 
+ def test_message_3d():
+@@ -2114,7 +2114,7 @@ def test_message_3d():
+     msg = layer.get_status(
+         (0, 0, 0), view_direction=[1, 0, 0], dims_displayed=[0, 1, 2]
+     )
+-    assert type(msg) == dict
++    assert isinstance(msg, dict)
+ 
+ 
+ def test_thumbnail():
+diff --git a/napari/layers/shapes/_tests/test_shapes_mouse_bindings.py b/napari/layers/shapes/_tests/test_shapes_mouse_bindings.py
+index 5238b4e7..388d80c5 100644
+--- a/napari/layers/shapes/_tests/test_shapes_mouse_bindings.py
++++ b/napari/layers/shapes/_tests/test_shapes_mouse_bindings.py
+@@ -1,5 +1,3 @@
+-from dataclasses import dataclass, field
+-from typing import List, Optional, Tuple, Union
+ from unittest.mock import Mock
+ 
+ import numpy as np
+@@ -9,7 +7,7 @@ from napari.layers import Shapes
+ from napari.layers.base._base_constants import ActionType
+ from napari.layers.shapes.shapes import Mode
+ from napari.settings import get_settings
+-from napari.utils._proxies import ReadOnlyWrapper
++from napari.utils._test_utils import read_only_mouse_event
+ from napari.utils.interactions import (
+     mouse_double_click_callbacks,
+     mouse_move_callbacks,
+@@ -18,31 +16,6 @@ from napari.utils.interactions import (
+ )
+ 
+ 
+-@dataclass
+-class MouseEvent:
+-    """Create a subclass for simulating vispy mouse events."""
+-
+-    type: str
+-    is_dragging: bool = False
+-    modifiers: List[str] = field(default_factory=list)
+-    position: Union[Tuple[int, int], Tuple[int, int, int]] = (
+-        0,
+-        0,
+-    )  # world coords
+-    pos: np.ndarray = field(
+-        default_factory=lambda: np.zeros(2)
+-    )  # canvas coords
+-    view_direction: Optional[List[float]] = None
+-    up_direction: Optional[List[float]] = None
+-    dims_displayed: List[int] = field(default_factory=lambda: [0, 1])
+-
+-
+-def read_only_mouse_event(*args, **kwargs):
+-    return ReadOnlyWrapper(
+-        MouseEvent(*args, **kwargs), exceptions=('handled',)
+-    )
+-
+-
+ @pytest.fixture
+ def create_known_shapes_layer():
+     """Create shapes layer with known coordinates
+diff --git a/napari/layers/utils/layer_utils.py b/napari/layers/utils/layer_utils.py
+index e8a9b821..3cbe5aba 100644
+--- a/napari/layers/utils/layer_utils.py
++++ b/napari/layers/utils/layer_utils.py
+@@ -494,7 +494,7 @@ def _validate_property_choices(property_choices):
+ 
+ 
+ def _coerce_current_properties_value(
+-    value: Union[float, str, int, bool, list, tuple, np.ndarray]
++    value: Union[float, str, bool, list, tuple, np.ndarray]
+ ) -> np.ndarray:
+     """Coerce a value in a current_properties dictionary into the correct type.
+ 
+diff --git a/napari/layers/vectors/_tests/test_vectors.py b/napari/layers/vectors/_tests/test_vectors.py
+index 51f5598b..68a632b8 100644
+--- a/napari/layers/vectors/_tests/test_vectors.py
++++ b/napari/layers/vectors/_tests/test_vectors.py
+@@ -648,7 +648,7 @@ def test_message():
+     data[:, 0, :] = 20 * data[:, 0, :]
+     layer = Vectors(data)
+     msg = layer.get_status((0,) * 2)
+-    assert type(msg) == dict
++    assert isinstance(msg, dict)
+ 
+ 
+ def test_world_data_extent():
+diff --git a/napari/layers/vectors/vectors.py b/napari/layers/vectors/vectors.py
+index 1709c6ff..494fe9d4 100644
+--- a/napari/layers/vectors/vectors.py
++++ b/napari/layers/vectors/vectors.py
+@@ -442,12 +442,12 @@ class Vectors(Layer):
+         self.refresh()
+ 
+     @property
+-    def edge_width(self) -> Union[int, float]:
++    def edge_width(self) -> float:
+         """float: Width for all vectors in pixels."""
+         return self._edge_width
+ 
+     @edge_width.setter
+-    def edge_width(self, edge_width: Union[int, float]):
++    def edge_width(self, edge_width: float):
+         self._edge_width = edge_width
+ 
+         self.events.edge_width()
+@@ -475,12 +475,12 @@ class Vectors(Layer):
+             self.refresh()
+ 
+     @property
+-    def length(self) -> Union[int, float]:
++    def length(self) -> float:
+         """float: Multiplicative factor for length of all vectors."""
+         return self._length
+ 
+     @length.setter
+-    def length(self, length: Union[int, float]):
++    def length(self, length: float):
+         self._length = float(length)
+ 
+         self.events.length()
+diff --git a/napari/utils/_test_utils.py b/napari/utils/_test_utils.py
+new file mode 100644
+index 00000000..127c20b8
+--- /dev/null
++++ b/napari/utils/_test_utils.py
+@@ -0,0 +1,36 @@
++"""
++File with things that are useful for testing, but not to be fixtures
++"""
++from dataclasses import dataclass, field
++from typing import List, Optional, Tuple, Union
++
++import numpy as np
++
++from napari.utils._proxies import ReadOnlyWrapper
++
++
++@dataclass
++class MouseEvent:
++    """Create a subclass for simulating vispy mouse events."""
++
++    type: str
++    is_dragging: bool = False
++    modifiers: List[str] = field(default_factory=list)
++    position: Union[Tuple[int, int], Tuple[int, int, int]] = (
++        0,
++        0,
++    )  # world coords
++    pos: np.ndarray = field(
++        default_factory=lambda: np.zeros(2)
++    )  # canvas coords
++    view_direction: Optional[List[float]] = None
++    up_direction: Optional[List[float]] = None
++    dims_displayed: List[int] = field(default_factory=lambda: [0, 1])
++    delta: Optional[Tuple[float, float]] = None
++    native: Optional[bool] = None
++
++
++def read_only_mouse_event(*args, **kwargs):
++    return ReadOnlyWrapper(
++        MouseEvent(*args, **kwargs), exceptions=('handled',)
++    )
+diff --git a/napari/utils/events/containers/_typed.py b/napari/utils/events/containers/_typed.py
+index bbb7bfee..fc1e33b9 100644
+--- a/napari/utils/events/containers/_typed.py
++++ b/napari/utils/events/containers/_typed.py
+@@ -13,6 +13,9 @@ from typing import (
+     overload,
+ )
+ 
++# change on import from typing when drop python 3.10 support
++from typing_extensions import Self
++
+ from napari.utils.translations import trans
+ 
+ logger = logging.getLogger(__name__)
+@@ -66,7 +69,7 @@ class TypedMutableSequence(MutableSequence[_T]):
+     def __repr__(self) -> str:
+         return repr(self._list)
+ 
+-    def __eq__(self, other: Any):
++    def __eq__(self, other: object):
+         return self._list == other
+ 
+     def __hash__(self) -> int:
+@@ -172,17 +175,17 @@ class TypedMutableSequence(MutableSequence[_T]):
+         new.extend(iterable)
+         return new
+ 
+-    def copy(self) -> 'TypedMutableSequence[_T]':
++    def copy(self) -> Self:
+         """Return a shallow copy of the list."""
+         return self.__newlike__(self)
+ 
+-    def __add__(self, other: Iterable[_T]) -> 'TypedMutableSequence[_T]':
++    def __add__(self, other: Iterable[_T]) -> Self:
+         """Add other to self, return new object."""
+         copy = self.copy()
+         copy.extend(other)
+         return copy
+ 
+-    def __iadd__(self, other: Iterable[_T]) -> 'TypedMutableSequence[_T]':
++    def __iadd__(self, other: Iterable[_T]) -> Self:
+         """Add other to self in place (self += other)."""
+         self.extend(other)
+         return self
+diff --git a/napari/utils/perf/_event.py b/napari/utils/perf/_event.py
+index 2028b8f6..fb10e7e8 100644
+--- a/napari/utils/perf/_event.py
++++ b/napari/utils/perf/_event.py
+@@ -2,14 +2,37 @@
+ """
+ import os
+ import threading
+-from collections import namedtuple
+-from typing import Optional
++from typing import NamedTuple, Optional
+ 
+-# The span of time that the event ocurred.
+-Span = namedtuple("Span", "start_ns end_ns")
+ 
+-# What process/thread produced the event.
+-Origin = namedtuple("Origin", "process_id thread_id")
++class Span(NamedTuple):
++    """The span of time that the event ocurred.
++
++    Parameters
++    ----------
++    start_ns : int
++        Start time in nanoseconds.
++    end_ns : int
++        End time in nanoseconds.
++    """
++
++    start_ns: int
++    end_ns: int
++
++
++class Origin(NamedTuple):
++    """What process/thread produced the event.
++
++    Parameters
++    ----------
++    process_id : int
++        The process id that produced the event.
++    thread_id : int
++        The thread id that produced the event.
++    """
++
++    process_id: int
++    thread_id: int
+ 
+ 
+ class PerfEvent:
+-- 
+2.34.1
+

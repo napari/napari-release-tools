@@ -1,0 +1,141 @@
+From 04932f08451f0e39b210ec6dea333667c9b7b6c1 Mon Sep 17 00:00:00 2001
+From: Grzegorz Bokota <bokota+github@gmail.com>
+Date: Tue, 5 Sep 2023 13:20:45 +0200
+Subject: [PATCH] Add collision check when set colors for labels layer (#6193)
+
+This PR adds a check if two user-defined colors for labels above 2*23
+collide in the same value after being cast to float32.
+
+We need to cast values to this type because of the texture mechanism
+currently used.
+
+extracted from #6182 requested in
+https://github.com/napari/napari/pull/6182#discussion_r1307641841
+---
+ napari/layers/labels/_tests/test_labels.py | 12 +++++
+ napari/layers/labels/labels.py             | 60 ++++++++++++++++++++--
+ 2 files changed, 68 insertions(+), 4 deletions(-)
+
+diff --git a/napari/layers/labels/_tests/test_labels.py b/napari/layers/labels/_tests/test_labels.py
+index 9f70a6f3..42e6ee6b 100644
+--- a/napari/layers/labels/_tests/test_labels.py
++++ b/napari/layers/labels/_tests/test_labels.py
+@@ -1,5 +1,6 @@
+ import itertools
+ import time
++import warnings
+ from dataclasses import dataclass
+ from tempfile import TemporaryDirectory
+ from typing import List
+@@ -1505,6 +1506,17 @@ def test_get_status_with_custom_index():
+     )
+ 
+ 
++def test_collision_warning():
++    label = Labels(data=np.zeros((10, 10), dtype=np.uint8))
++    with pytest.warns(
++        RuntimeWarning, match="Because integer labels are cast to less-precise"
++    ):
++        label.color = {2**25 + 1: 'red', 2**25 + 2: 'blue'}
++    with warnings.catch_warnings():
++        warnings.simplefilter("error")
++        label.color = {1: 'red', 2: 'blue'}
++
++
+ def test_labels_features_event():
+     event_emitted = False
+ 
+diff --git a/napari/layers/labels/labels.py b/napari/layers/labels/labels.py
+index 086f5755..4a83196a 100644
+--- a/napari/layers/labels/labels.py
++++ b/napari/layers/labels/labels.py
+@@ -1,7 +1,16 @@
+ import warnings
+ from collections import deque
+ from contextlib import contextmanager
+-from typing import Dict, List, Optional, Tuple, Union
++from typing import (
++    Callable,
++    ClassVar,
++    Dict,
++    Iterable,
++    List,
++    Optional,
++    Tuple,
++    Union,
++)
+ 
+ import numpy as np
+ import pandas as pd
+@@ -532,8 +541,11 @@ class Labels(_ImageBase):
+ 
+         if self._background_label not in color:
+             color[self._background_label] = 'transparent'
+-        if None not in color:
+-            color[None] = 'black'
++
++        none_color = color.pop(None, 'black')
++        self._validate_colors(color)
++
++        color[None] = none_color
+ 
+         colors = {
+             label: transform_color(color_str)[0]
+@@ -557,6 +569,45 @@ class Labels(_ImageBase):
+ 
+         self.color_mode = color_mode
+ 
++    @classmethod
++    def _validate_colors(cls, labels: Iterable[int]):
++        """Check whether any of the given labels will be aliased together.
++
++        See https://github.com/napari/napari/issues/6084 for details.
++        """
++        labels_int = np.fromiter(labels, dtype=int)
++        labels_unique = np.unique(cls._to_vispy_texture_dtype(labels_int))
++        if labels_unique.size == labels_int.size:
++            return
++
++        # recalculate here second time to provide best performance on colors that are not colliding
++        labels_unique, inverse, count = np.unique(
++            cls._to_vispy_texture_dtype(labels_int),
++            return_inverse=True,
++            return_counts=True,
++        )
++        collided_idx = np.where(count > 1)[0]
++        aliased_list = [
++            labels_int[np.where(inverse == idx)[0]] for idx in collided_idx
++        ]
++
++        alias_string = "\n".join(
++            trans._(
++                'Labels {col_li} will display as the same color as {col_la};',
++                col_li=",".join(str(i) for i in lst[:-1]),
++                col_la=str(lst[-1]),
++            )
++            for lst in aliased_list
++        )
++        warn_text = trans._(
++            "Because integer labels are cast to less-precise float for display, "
++            "the following label sets will render as the same color:\n"
++            "{alias_string}\n"
++            "See https://github.com/napari/napari/issues/6084 for details.",
++            alias_string=alias_string,
++        )
++        warnings.warn(warn_text, category=RuntimeWarning)
++
+     def _is_default_colors(self, color):
+         """Returns True if color contains only default colors, otherwise False.
+ 
+@@ -769,7 +820,8 @@ class Labels(_ImageBase):
+             self.mode = Mode.PAN_ZOOM
+             self._reset_history()
+ 
+-    def _to_vispy_texture_dtype(self, data):
++    @staticmethod
++    def _to_vispy_texture_dtype(data):
+         """Convert data to a dtype that can be used as a VisPy texture.
+ 
+         Labels layers allow all integer dtypes for data, but only a subset
+-- 
+2.34.1

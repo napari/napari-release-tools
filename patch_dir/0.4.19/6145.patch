@@ -1,0 +1,152 @@
+From 6edac7c9c3ca6e2ff9428a468e10ba25a58c63b9 Mon Sep 17 00:00:00 2001
+From: Grzegorz Bokota <bokota+github@gmail.com>
+Date: Wed, 23 Aug 2023 03:53:34 +0200
+Subject: [PATCH] Fix oblique button by chekcing if action is generator (#6145)
+
+This Pr fixes a bug that was claimed to be tested in #4265, but it does
+not happens (action is dataclass so never will be generator).
+
+As having `orient_plane_normal_along_view_direction` as the generator is
+important then I add a separate function
+`orient_plane_normal_along_view_direction_no_gen` for this.
+
+- [x] Bug-fix (non-breaking change which fixes an issue)
+
+- [x] Manually
+
+Closes #6040
+---
+ .../_qt/layer_controls/qt_image_controls.py   |  2 +-
+ napari/layers/base/base.py                    |  2 +-
+ napari/layers/image/_image_key_bindings.py    | 22 ++++++++-----------
+ napari/utils/_tests/test_action_manager.py    | 17 ++++++++++++++
+ napari/utils/action_manager.py                |  9 ++++++--
+ 5 files changed, 35 insertions(+), 17 deletions(-)
+
+diff --git a/napari/_qt/layer_controls/qt_image_controls.py b/napari/_qt/layer_controls/qt_image_controls.py
+index 3733372c..eb5e8c0b 100644
+--- a/napari/_qt/layer_controls/qt_image_controls.py
++++ b/napari/_qt/layer_controls/qt_image_controls.py
+@@ -120,7 +120,7 @@ class QtImageControls(QtBaseImageControls):
+             self.planeNormalButtons.xButton,
+         )
+         action_manager.bind_button(
+-            'napari:orient_plane_normal_along_view_direction',
++            'napari:orient_plane_normal_along_view_direction_no_gen',
+             self.planeNormalButtons.obliqueButton,
+         )
+ 
+diff --git a/napari/layers/base/base.py b/napari/layers/base/base.py
+index 8231e087..d5ca0e5c 100644
+--- a/napari/layers/base/base.py
++++ b/napari/layers/base/base.py
+@@ -1365,7 +1365,7 @@ class Layer(KeymapProvider, MousemapProvider, ABC):
+         return tuple(normalized_vector)
+ 
+     def _world_to_displayed_data_ray(
+-        self, vector_world, dims_displayed
++        self, vector_world: npt.ArrayLike, dims_displayed: List[int]
+     ) -> np.ndarray:
+         """Convert an orientation from world to displayed data coordinates.
+ 
+diff --git a/napari/layers/image/_image_key_bindings.py b/napari/layers/image/_image_key_bindings.py
+index 763f7f4e..e271363b 100644
+--- a/napari/layers/image/_image_key_bindings.py
++++ b/napari/layers/image/_image_key_bindings.py
+@@ -55,18 +55,14 @@ def orient_plane_normal_along_view_direction(layer: Image):
+     )
+ 
+ 
+-@Image.bind_key('Space', overwrite=True)
+-def hold_to_pan_zoom(layer):
+-    """Hold to pan and zoom in the viewer."""
+-    if layer._mode != Mode.PAN_ZOOM:
+-        # on key press
+-        prev_mode = layer.mode
+-        layer.mode = Mode.PAN_ZOOM
+-
+-        yield
+-
+-        # on key release
+-        layer.mode = prev_mode
++@register_image_action(trans._('orient plane normal along view direction'))
++def orient_plane_normal_along_view_direction_no_gen(layer: Image):
++    viewer = napari.viewer.current_viewer()
++    if viewer is None or viewer.dims.ndisplay != 3:
++        return
++    layer.plane.normal = layer._world_to_displayed_data_ray(
++        viewer.camera.view_direction, [-3, -2, -1]
++    )
+ 
+ 
+ @register_image_action(trans._('Transform'))
+@@ -76,7 +72,7 @@ def activate_image_transform_mode(layer):
+ 
+ @register_image_action(trans._('Pan/zoom'))
+ def activate_image_pan_zoom_mode(layer: Image):
+-    layer.mode = Mode.PAN_ZOOM
++    layer.mode = str(Mode.PAN_ZOOM)
+ 
+ 
+ image_fun_to_mode = [
+diff --git a/napari/utils/_tests/test_action_manager.py b/napari/utils/_tests/test_action_manager.py
+index 877ed255..b3562cd1 100644
+--- a/napari/utils/_tests/test_action_manager.py
++++ b/napari/utils/_tests/test_action_manager.py
+@@ -1,6 +1,8 @@
+ """
+ This module test some of the behavior of action manager.
+ """
++from unittest.mock import Mock
++
+ import pytest
+ 
+ from napari.utils.action_manager import ActionManager
+@@ -48,3 +50,18 @@ def test_bind_unbind_existing_action(action_manager):
+     assert action_manager.bind_shortcut('napari:test_action_1', 'X') is None
+     assert action_manager.unbind_shortcut('napari:test_action_1') == ['X']
+     assert action_manager._shortcuts['napari:test_action_1'] == []
++
++
++def test_bind_key_generator(action_manager):
++    def _sample_generator():
++        yield 'X'
++
++    action_manager.register_action(
++        "napari:test_action_1",
++        _sample_generator,
++        "this is a test action",
++        None,
++    )
++
++    with pytest.raises(ValueError, match="generator functions"):
++        action_manager.bind_button('napari:test_action_1', Mock())
+diff --git a/napari/utils/action_manager.py b/napari/utils/action_manager.py
+index 0dcc0684..e60d7739 100644
+--- a/napari/utils/action_manager.py
++++ b/napari/utils/action_manager.py
+@@ -216,7 +216,9 @@ class ActionManager:
+         """
+         self._validate_action_name(name)
+ 
+-        if (action := self._actions.get(name)) and isgeneratorfunction(action):
++        if (action := self._actions.get(name)) and isgeneratorfunction(
++            getattr(action, "command", None)
++        ):
+             raise ValueError(
+                 trans._(
+                     '`bind_button` cannot be used with generator functions',
+@@ -224,7 +226,10 @@ class ActionManager:
+                 )
+             )
+ 
+-        button.clicked.connect(lambda: self.trigger(name))
++        def _trigger():
++            self.trigger(name)
++
++        button.clicked.connect(_trigger)
+         if name in self._actions:
+             button.setToolTip(
+                 f'{self._build_tooltip(name)} {extra_tooltip_text}'
+-- 
+2.34.1

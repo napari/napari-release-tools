@@ -1,0 +1,33 @@
+From 6363d8b272ffa7b5052187b59e7ae94835a46605 Mon Sep 17 00:00:00 2001
+From: Grzegorz Bokota <bokota+github@gmail.com>
+Date: Mon, 21 Aug 2023 11:03:18 +0200
+Subject: [PATCH] Fix split logic in shortcut editor (#6163)
+
+# Description
+
+Fix splitting logic shortcut logic. Previous one split one `-(?=.+)`
+characters. Current split on `-+` if any character follows this character.
+
+## Type of change
+
+- [x] Bug-fix (non-breaking change which fixes an issue)
+---
+ napari/_qt/widgets/qt_keyboard_settings.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/napari/_qt/widgets/qt_keyboard_settings.py b/napari/_qt/widgets/qt_keyboard_settings.py
+index 709cbd89..c88bb6f0 100644
+--- a/napari/_qt/widgets/qt_keyboard_settings.py
++++ b/napari/_qt/widgets/qt_keyboard_settings.py
+@@ -612,7 +612,7 @@ class EditorWidget(QLineEdit):
+         event_keystr = event_keyseq.toString(QKeySequence.PortableText)
+ 
+         # Split the shortcut if it contains a symbol.
+-        parsed = re.split('[-(?=.+)]', event_keystr)
++        parsed = re.split(r'[-+](?=.+)', event_keystr)
+ 
+         keys_li = []
+         # Format how the shortcut is written (ex. 'Ctrl+B' is changed to 'Control-B')
+-- 
+2.34.1
+

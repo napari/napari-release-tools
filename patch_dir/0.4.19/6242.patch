@@ -1,0 +1,186 @@
+From b767a19c6ea5c387fb528cc7e46bb9f999eadb8e Mon Sep 17 00:00:00 2001
+From: Kira Evans <contact@kne42.me>
+Date: Sat, 23 Sep 2023 10:41:25 -0700
+Subject: [PATCH] Fix Python 3.11 StrEnum Compatibility (#6242)
+
+in Python 3.11, using a base of `class MyEnum(str, Enum)` instead of
+`class MyEnum(StrEnum)` will cause it to put the enum name instead of
+its string value when used in an f-string
+
+see https://github.com/python/cpython/issues/100458
+---
+ napari/_app_model/constants/_commands.py        |  4 ++--
+ napari/_app_model/constants/_menus.py           |  4 ++--
+ napari/components/_viewer_constants.py          |  6 +++---
+ napari/layers/utils/_color_manager_constants.py |  4 ++--
+ napari/settings/_constants.py                   |  9 +++++++++
+ napari/utils/_tests/test_compat.py              | 14 ++++++++++++++
+ napari/utils/colormaps/colormap.py              |  4 ++--
+ napari/utils/compat.py                          | 12 ++++++++++++
+ 8 files changed, 46 insertions(+), 11 deletions(-)
+ create mode 100644 napari/utils/_tests/test_compat.py
+ create mode 100644 napari/utils/compat.py
+
+diff --git a/napari/_app_model/constants/_commands.py b/napari/_app_model/constants/_commands.py
+index e1b15d6a..e77be983 100644
+--- a/napari/_app_model/constants/_commands.py
++++ b/napari/_app_model/constants/_commands.py
+@@ -8,14 +8,14 @@ documentation.
+ CommandId values should be namespaced, e.g. 'napari:layer:something' for a command
+ that operates on layers.
+ """
+-from enum import Enum
+ from typing import NamedTuple, Optional
+ 
++from napari.utils.compat import StrEnum
+ from napari.utils.translations import trans
+ 
+ 
+ # fmt: off
+-class CommandId(str, Enum):
++class CommandId(StrEnum):
+     """Id representing a napari command."""
+ 
+     # View menubar
+diff --git a/napari/_app_model/constants/_menus.py b/napari/_app_model/constants/_menus.py
+index d033e357..0682c1f4 100644
+--- a/napari/_app_model/constants/_menus.py
++++ b/napari/_app_model/constants/_menus.py
+@@ -11,10 +11,10 @@ SOME of these (but definitely not all) will be exposed as "contributable"
+ menus for plugins to contribute commands and submenu items to.
+ """
+ 
+-from enum import Enum
++from napari.utils.compat import StrEnum
+ 
+ 
+-class MenuId(str, Enum):
++class MenuId(StrEnum):
+     """Id representing a menu somewhere in napari."""
+ 
+     MENUBAR_VIEW = 'napari/view'
+diff --git a/napari/components/_viewer_constants.py b/napari/components/_viewer_constants.py
+index 7e0fa081..031e6967 100644
+--- a/napari/components/_viewer_constants.py
++++ b/napari/components/_viewer_constants.py
+@@ -1,7 +1,7 @@
+-from enum import Enum
++from napari.utils.compat import StrEnum
+ 
+ 
+-class CanvasPosition(str, Enum):
++class CanvasPosition(StrEnum):
+     """Canvas overlay position.
+ 
+     Sets the position of an object in the canvas
+@@ -21,7 +21,7 @@ class CanvasPosition(str, Enum):
+     BOTTOM_LEFT = 'bottom_left'
+ 
+ 
+-class CursorStyle(str, Enum):
++class CursorStyle(StrEnum):
+     """CursorStyle: Style on the cursor.
+ 
+     Sets the style of the cursor
+diff --git a/napari/layers/utils/_color_manager_constants.py b/napari/layers/utils/_color_manager_constants.py
+index c9049ee5..1bfea8cd 100644
+--- a/napari/layers/utils/_color_manager_constants.py
++++ b/napari/layers/utils/_color_manager_constants.py
+@@ -1,7 +1,7 @@
+-from enum import Enum
++from napari.utils.compat import StrEnum
+ 
+ 
+-class ColorMode(str, Enum):
++class ColorMode(StrEnum):
+     """
+     ColorMode: Color setting mode.
+     DIRECT (default mode) allows each point to be set arbitrarily
+diff --git a/napari/settings/_constants.py b/napari/settings/_constants.py
+index 28c4dd19..c4e6c802 100644
+--- a/napari/settings/_constants.py
++++ b/napari/settings/_constants.py
+@@ -1,5 +1,6 @@
+ from enum import auto
+ 
++from napari.utils.compat import StrEnum
+ from napari.utils.misc import StringEnum
+ 
+ 
+@@ -20,3 +21,11 @@ class LoopMode(StringEnum):
+     ONCE = auto()
+     LOOP = auto()
+     BACK_AND_FORTH = auto()
++
++
++class BrushSizeOnMouseModifiers(StrEnum):
++    ALT = 'Alt'
++    CTRL = 'Control'
++    CTRL_ALT = 'Control+Alt'
++    CTRL_SHIFT = 'Control+Shift'
++    DISABLED = 'Disabled'  # a non-existent modifier that is never activated
+diff --git a/napari/utils/_tests/test_compat.py b/napari/utils/_tests/test_compat.py
+new file mode 100644
+index 00000000..829fbd41
+--- /dev/null
++++ b/napari/utils/_tests/test_compat.py
+@@ -0,0 +1,14 @@
++from napari.utils.compat import StrEnum
++
++
++def test_str_enum():
++    class Cake(StrEnum):
++        CHOC = "chocolate"
++        VANILLA = "vanilla"
++        STRAWBERRY = "strawberry"
++
++    assert Cake.CHOC == "chocolate"
++    assert Cake.CHOC == Cake.CHOC
++    assert f'{Cake.CHOC}' == "chocolate"
++    assert Cake.CHOC != "vanilla"
++    assert Cake.CHOC != Cake.VANILLA
+diff --git a/napari/utils/colormaps/colormap.py b/napari/utils/colormaps/colormap.py
+index 9384db54..762debc5 100644
+--- a/napari/utils/colormaps/colormap.py
++++ b/napari/utils/colormaps/colormap.py
+@@ -1,5 +1,4 @@
+ from collections import defaultdict
+-from enum import Enum
+ from typing import Optional, cast
+ 
+ import numpy as np
+@@ -7,12 +6,13 @@ from pydantic import Field, PrivateAttr, validator
+ 
+ from napari.utils.color import ColorArray
+ from napari.utils.colormaps.colorbars import make_colorbar
++from napari.utils.compat import StrEnum
+ from napari.utils.events import EventedModel
+ from napari.utils.events.custom_types import Array
+ from napari.utils.translations import trans
+ 
+ 
+-class ColormapInterpolationMode(str, Enum):
++class ColormapInterpolationMode(StrEnum):
+     """INTERPOLATION: Interpolation mode for colormaps.
+ 
+     Selects an interpolation mode for the colormap.
+diff --git a/napari/utils/compat.py b/napari/utils/compat.py
+new file mode 100644
+index 00000000..89fe7c6e
+--- /dev/null
++++ b/napari/utils/compat.py
+@@ -0,0 +1,12 @@
++"""compatibility between newer and older python versions
++"""
++import sys
++
++if sys.version_info >= (3, 11):
++    from enum import StrEnum
++else:
++    # in 3.11+, using the below class in an f-string would put the enum name instead of its value
++    from enum import Enum
++
++    class StrEnum(str, Enum):
++        pass
+-- 
+2.34.1

@@ -1,0 +1,983 @@
+From 05960f150974f25d58f3c049636d7700b5f76ace Mon Sep 17 00:00:00 2001
+From: Wouter-Michiel Vierdag <w-mv@hotmail.com>
+Date: Mon, 28 Aug 2023 16:28:45 +0200
+Subject: [PATCH] Layer data events before and after (#6178)
+
+Closes #6177
+
+This PR fixes the issue of `layer.events.data` not emitting in a
+consistent manner. For example in case of adding a shape, an emit would
+happen at the start of drawing a shape, while for removing data it would
+happen after data was removed. This PR fixes the issue by changing
+`ActionType` in present participle and past participle and emitting
+before and after `layer.data` has been edited.
+Furthermore, the way `layer.events.data` emits in the `data.setter` of
+`Shapes` and `Points` has changed. The behaviour is as follows:
+
+1. If `layer.data` is populated and new data is not empty use
+`ActionType.CHANGING` and `ActionType.CHANGED`. In this case the
+`data_indices` correspond to the indices of the original data.
+2. In case `layer.data` is not populated and new data is not empty use
+`ActionType.ADDING` and `ActionType.ADDED`. The `data_indices`
+correspond to the data being added.
+3. In case new data is empty use `ActionType.REMOVING` and
+`ActionType.REMOVED`. The `data_indices` correspond to the original data
+
+---------
+
+Co-authored-by: Grzegorz Bokota <bokota+github@gmail.com>
+Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.github.com>
+---
+ napari/layers/base/_base_constants.py         |   9 +-
+ .../layers/points/_points_mouse_bindings.py   |  11 ++
+ napari/layers/points/_tests/test_points.py    |  87 +++++++++-
+ napari/layers/points/points.py                |  57 +++++--
+ .../layers/shapes/_shapes_mouse_bindings.py   |  38 ++++-
+ napari/layers/shapes/_tests/test_shapes.py    |  72 +++++++--
+ .../_tests/test_shapes_mouse_bindings.py      |  69 ++++----
+ napari/layers/shapes/shapes.py                | 150 ++++++++++++------
+ 8 files changed, 377 insertions(+), 116 deletions(-)
+
+diff --git a/napari/layers/base/_base_constants.py b/napari/layers/base/_base_constants.py
+index 798d8034..0e808867 100644
+--- a/napari/layers/base/_base_constants.py
++++ b/napari/layers/base/_base_constants.py
+@@ -123,6 +123,9 @@ class ActionType(StringEnum):
+     Action types for layer.events.data of Shapes and Points layer.
+     """
+ 
+-    ADD = auto()
+-    REMOVE = auto()
+-    CHANGE = auto()
++    ADDING = auto()
++    REMOVING = auto()
++    CHANGING = auto()
++    ADDED = auto()
++    REMOVED = auto()
++    CHANGED = auto()
+diff --git a/napari/layers/points/_points_mouse_bindings.py b/napari/layers/points/_points_mouse_bindings.py
+index fb638416..ee1e02bf 100644
+--- a/napari/layers/points/_points_mouse_bindings.py
++++ b/napari/layers/points/_points_mouse_bindings.py
+@@ -2,6 +2,7 @@ from typing import Set, TypeVar
+ 
+ import numpy as np
+ 
++from napari.layers.base import ActionType
+ from napari.layers.points._points_utils import _points_in_box_3d, points_in_box
+ 
+ 
+@@ -68,6 +69,16 @@ def select(layer, event):
+         coordinates = layer.world_to_data(event.position)
+         # If not holding modifying selection and points selected then drag them
+         if not modify_selection and len(layer.selected_data) > 0:
++            # only emit just before moving
++            if not is_moving:
++                layer.events.data(
++                    value=layer.data,
++                    action=ActionType.CHANGING,
++                    data_indices=tuple(
++                        layer.selected_data,
++                    ),
++                    vertex_indices=((),),
++                )
+             is_moving = True
+             with layer.events.data.blocker():
+                 layer._move(layer.selected_data, coordinates)
+diff --git a/napari/layers/points/_tests/test_points.py b/napari/layers/points/_tests/test_points.py
+index 00a52c35..1fd7abbc 100644
+--- a/napari/layers/points/_tests/test_points.py
++++ b/napari/layers/points/_tests/test_points.py
+@@ -457,6 +457,7 @@ def test_remove_selected_updates_value():
+     data = 20 * np.random.random(shape)
+     layer = Points(data)
+ 
++    old_data = layer.data
+     layer.events.data = Mock()
+     # set the value
+     layer._value = 3
+@@ -465,9 +466,15 @@ def test_remove_selected_updates_value():
+     selection = {0, 5, 6, 7}
+     layer.selected_data = selection
+     layer.remove_selected()
++    assert layer.events.data.call_args_list[0][1] == {
++        "value": old_data,
++        "action": ActionType.REMOVING,
++        "data_indices": tuple(selection),
++        "vertex_indices": ((),),
++    }
+     assert layer.events.data.call_args[1] == {
+         "value": layer.data,
+-        "action": ActionType.REMOVE.value,
++        "action": ActionType.REMOVED,
+         "data_indices": tuple(selection),
+         "vertex_indices": ((),),
+     }
+@@ -538,7 +545,7 @@ def test_move():
+     assert np.all(layer.data[1:] == unmoved[1:])
+     assert layer.events.data.call_args[1] == {
+         "value": layer.data,
+-        "action": ActionType.CHANGE.value,
++        "action": ActionType.CHANGED,
+         "data_indices": (0,),
+         "vertex_indices": ((),),
+     }
+@@ -548,7 +555,7 @@ def test_move():
+     layer._move([1, 2], np.add([2, 2], [-3, 4]))
+     assert layer.events.data.call_args[1] == {
+         "value": layer.data,
+-        "action": ActionType.CHANGE.value,
++        "action": ActionType.CHANGED,
+         "data_indices": (1, 2),
+         "vertex_indices": ((),),
+     }
+@@ -1148,6 +1155,7 @@ def test_add_colormap(attribute):
+ def test_add_point_direct(attribute: str):
+     """Test adding points to layer directly"""
+     layer = Points()
++    old_data = layer.data
+     assert len(getattr(layer, f'{attribute}_color')) == 0
+ 
+     layer.events.data = Mock()
+@@ -1155,9 +1163,15 @@ def test_add_point_direct(attribute: str):
+     coord = [18, 18]
+ 
+     layer.add(coord)
++    assert layer.events.data.call_args_list[0][1] == {
++        "value": old_data,
++        "action": ActionType.ADDING,
++        "data_indices": (-1,),
++        "vertex_indices": ((),),
++    }
+     assert layer.events.data.call_args[1] == {
+         "value": layer.data,
+-        "action": ActionType.ADD.value,
++        "action": ActionType.ADDED,
+         "data_indices": (-1,),
+         "vertex_indices": ((),),
+     }
+@@ -2460,16 +2474,73 @@ def test_points_data_setter_emits_event():
+     layer = Points(data)
+     layer.events.data.connect(emitted_events)
+     layer.data = np.random.random((5, 2))
+-    emitted_events.assert_called_once()
++    assert emitted_events.call_count == 2
+ 
+ 
+-def test_points_add_delete_only_emit_one_event():
++def test_points_add_delete_only_emit_two_events():
+     data = np.random.random((5, 2))
+     emitted_events = Mock()
+     layer = Points(data)
+     layer.events.data.connect(emitted_events)
+     layer.add(np.random.random(2))
+-    assert emitted_events.call_count == 1
++    assert emitted_events.call_count == 2
+     layer.selected_data = {3}
+     layer.remove_selected()
+-    assert emitted_events.call_count == 2
++    assert emitted_events.call_count == 4
++
++
++def test_data_setter_events():
++    data = np.random.random((5, 2))
++    layer = Points(data)
++    layer.events.data = Mock()
++
++    layer.data = []
++    assert layer.events.data.call_args_list[0][1] == {
++        "value": data,
++        "action": ActionType.REMOVING,
++        "data_indices": tuple(i for i in range(len(data))),
++        "vertex_indices": ((),),
++    }
++
++    # Avoid truth value of empty array error
++    assert np.array_equal(
++        layer.events.data.call_args_list[1][1]["value"], np.empty((0, 2))
++    )
++    assert (
++        layer.events.data.call_args_list[1][1]["action"] == ActionType.REMOVED
++    )
++    assert layer.events.data.call_args_list[1][1]["data_indices"] == ()
++    assert layer.events.data.call_args_list[1][1]["vertex_indices"] == ((),)
++
++    layer.data = data
++    assert np.array_equal(
++        layer.events.data.call_args_list[2][1]["value"], np.empty((0, 2))
++    )
++    assert (
++        layer.events.data.call_args_list[2][1]["action"] == ActionType.ADDING
++    )
++    assert layer.events.data.call_args_list[2][1]["data_indices"] == tuple(
++        i for i in range(len(data))
++    )
++    assert layer.events.data.call_args_list[2][1]["vertex_indices"] == ((),)
++
++    assert layer.events.data.call_args_list[3][1] == {
++        "value": data,
++        "action": ActionType.ADDED,
++        "data_indices": tuple(i for i in range(len(data))),
++        "vertex_indices": ((),),
++    }
++
++    layer.data = data
++    assert layer.events.data.call_args_list[4][1] == {
++        "value": data,
++        "action": ActionType.CHANGING,
++        "data_indices": tuple(i for i in range(len(layer.data))),
++        "vertex_indices": ((),),
++    }
++    assert layer.events.data.call_args_list[5][1] == {
++        "value": data,
++        "action": ActionType.CHANGED,
++        "data_indices": tuple(i for i in range(len(layer.data))),
++        "vertex_indices": ((),),
++    }
+diff --git a/napari/layers/points/points.py b/napari/layers/points/points.py
+index 7ea27318..c713f188 100644
+--- a/napari/layers/points/points.py
++++ b/napari/layers/points/points.py
+@@ -524,13 +524,38 @@ class Points(Layer):
+     @data.setter
+     def data(self, data: Optional[np.ndarray]):
+         """Set the data array and emit a corresponding event."""
+-        self._set_data(data)
+-        self.events.data(
+-            value=self.data,
+-            action=ActionType.CHANGE.value,
+-            data_indices=slice(None),
+-            vertex_indices=((),),
++        prior_data = len(self.data) > 0
++        data_not_empty = (
++            data is not None
++            and (isinstance(data, np.ndarray) and data.size > 0)
++            or (isinstance(data, list) and len(data) > 0)
+         )
++        kwargs = {
++            "value": self.data,
++            "vertex_indices": ((),),
++            "data_indices": tuple(i for i in range(len(self.data))),
++        }
++        if prior_data and data_not_empty:
++            kwargs["action"] = ActionType.CHANGING
++        elif data_not_empty:
++            kwargs["action"] = ActionType.ADDING
++            kwargs["data_indices"] = tuple(i for i in range(len(data)))
++        else:
++            kwargs["action"] = ActionType.REMOVING
++
++        self.events.data(**kwargs)
++        self._set_data(data)
++        kwargs["data_indices"] = tuple(i for i in range(len(self.data)))
++        kwargs["value"] = self.data
++
++        if prior_data and data_not_empty:
++            kwargs["action"] = ActionType.CHANGED
++        elif data_not_empty:
++            kwargs["data_indices"] = tuple(i for i in range(len(data)))
++            kwargs["action"] = ActionType.ADDED
++        else:
++            kwargs["action"] = ActionType.REMOVED
++        self.events.data(**kwargs)
+ 
+     def _set_data(self, data: Optional[np.ndarray]):
+         """Set the .data array attribute, without emitting an event."""
+@@ -1928,10 +1953,16 @@ class Points(Layer):
+             Point or points to add to the layer data.
+         """
+         cur_points = len(self.data)
++        self.events.data(
++            value=self.data,
++            action=ActionType.ADDING,
++            data_indices=(-1,),
++            vertex_indices=((),),
++        )
+         self._set_data(np.append(self.data, np.atleast_2d(coords), axis=0))
+         self.events.data(
+             value=self.data,
+-            action=ActionType.ADD.value,
++            action=ActionType.ADDED,
+             data_indices=(-1,),
+             vertex_indices=((),),
+         )
+@@ -1942,6 +1973,14 @@ class Points(Layer):
+         index = list(self.selected_data)
+         index.sort()
+         if len(index):
++            self.events.data(
++                value=self.data,
++                action=ActionType.REMOVING,
++                data_indices=tuple(
++                    self.selected_data,
++                ),
++                vertex_indices=((),),
++            )
+             self._shown = np.delete(self._shown, index, axis=0)
+             self._size = np.delete(self._size, index, axis=0)
+             self._symbol = np.delete(self._symbol, index, axis=0)
+@@ -1966,7 +2005,7 @@ class Points(Layer):
+             self._set_data(np.delete(self.data, index, axis=0))
+             self.events.data(
+                 value=self.data,
+-                action=ActionType.REMOVE.value,
++                action=ActionType.REMOVED,
+                 data_indices=tuple(
+                     self.selected_data,
+                 ),
+@@ -2000,7 +2039,7 @@ class Points(Layer):
+             self.refresh()
+         self.events.data(
+             value=self.data,
+-            action=ActionType.CHANGE.value,
++            action=ActionType.CHANGED,
+             data_indices=tuple(selection_indices),
+             vertex_indices=((),),
+         )
+diff --git a/napari/layers/shapes/_shapes_mouse_bindings.py b/napari/layers/shapes/_shapes_mouse_bindings.py
+index 07582367..244af715 100644
+--- a/napari/layers/shapes/_shapes_mouse_bindings.py
++++ b/napari/layers/shapes/_shapes_mouse_bindings.py
+@@ -120,7 +120,7 @@ def select(layer: Shapes, event: MouseEvent) -> None:
+         )
+         layer.events.data(
+             value=layer.data,
+-            action=ActionType.CHANGE.value,
++            action=ActionType.CHANGED,
+             data_indices=tuple(layer.selected_data),
+             vertex_indices=vertex_indices,
+         )
+@@ -253,7 +253,7 @@ def _add_line_rectangle_ellipse(
+     """
+     # on press
+     # Start drawing rectangle / ellipse / line
+-    layer.add(data, shape_type=shape_type)
++    layer.add(data, shape_type=shape_type, gui=True)
+     layer.selected_data = {layer.nshapes - 1}
+     layer._value = (layer.nshapes - 1, 4)
+     layer._moving_value = copy(layer._value)
+@@ -305,7 +305,7 @@ def initiate_polygon_draw(
+         A tuple with the coordinates of the initial vertex in image data space.
+     """
+     data = np.array([coordinates, coordinates])
+-    layer.add(data, shape_type='path')
++    layer.add(data, shape_type='path', gui=True)
+     layer.selected_data = {layer.nshapes - 1}
+     layer._value = (layer.nshapes - 1, 1)
+     layer._moving_value = copy(layer._value)
+@@ -526,6 +526,12 @@ def vertex_insert(layer: Shapes, event: MouseEvent) -> None:
+         elif int(ind) == len(vertices) - 1 and loc > 1:
+             ind = ind + 1
+ 
++    layer.events.data(
++        value=layer.data,
++        action=ActionType.CHANGING,
++        data_indices=(index,),
++        vertex_indices=((ind,),),
++    )
+     # Insert new vertex at appropriate place in vertices of target shape
+     vertices = np.insert(vertices, ind, [coordinates], axis=0)
+     with layer.events.set_data.blocker():
+@@ -533,7 +539,7 @@ def vertex_insert(layer: Shapes, event: MouseEvent) -> None:
+         layer._selected_box = layer.interaction_box(layer.selected_data)
+     layer.events.data(
+         value=layer.data,
+-        action=ActionType.CHANGE.value,
++        action=ActionType.CHANGED,
+         data_indices=(index,),
+         vertex_indices=((ind,),),
+     )
+@@ -560,6 +566,13 @@ def vertex_remove(layer: Shapes, event: MouseEvent) -> None:
+         # No vertex was clicked on so return
+         return
+ 
++    layer.events.data(
++        value=layer.data,
++        action=ActionType.CHANGING,
++        data_indices=(shape_under_cursor,),
++        vertex_indices=((vertex_under_cursor,),),
++    )
++
+     # Have clicked on a current vertex so remove
+     shape_type = type(layer._data_view.shapes[shape_under_cursor])
+     if shape_type == Ellipse:
+@@ -590,7 +603,7 @@ def vertex_remove(layer: Shapes, event: MouseEvent) -> None:
+             layer._selected_box = layer.interaction_box(shapes)
+     layer.events.data(
+         value=layer.data,
+-        action=ActionType.CHANGE.value,
++        action=ActionType.CHANGED,
+         data_indices=(shape_under_cursor,),
+         vertex_indices=((vertex_under_cursor,),),
+     )
+@@ -669,6 +682,21 @@ def _move_active_element_under_cursor(
+     if layer._mode in (
+         [Mode.SELECT, Mode.ADD_RECTANGLE, Mode.ADD_ELLIPSE, Mode.ADD_LINE]
+     ):
++        if layer._mode == Mode.SELECT and not layer._is_moving:
++            vertex_indices = tuple(
++                tuple(
++                    vertex_index
++                    for vertex_index, coord in enumerate(layer.data[i])
++                )
++                for i in layer.selected_data
++            )
++            layer.events.data(
++                value=layer.data,
++                action=ActionType.CHANGING,
++                data_indices=tuple(layer.selected_data),
++                vertex_indices=vertex_indices,
++            )
++
+         coord = _set_drag_start(layer, coordinates)
+         layer._moving_coordinates = coordinates
+         layer._is_moving = True
+diff --git a/napari/layers/shapes/_tests/test_shapes.py b/napari/layers/shapes/_tests/test_shapes.py
+index ae331378..6c64d08e 100644
+--- a/napari/layers/shapes/_tests/test_shapes.py
++++ b/napari/layers/shapes/_tests/test_shapes.py
+@@ -184,6 +184,7 @@ def test_data_setter_with_properties():
+     data = 20 * np.random.random(shape)
+     properties = {'shape_type': _make_cycled_properties(['A', 'B'], shape[0])}
+     layer = Shapes(data, properties=properties)
++    layer.events.data = Mock()
+ 
+     # test setting to data with fewer shapes
+     n_new_shapes = 4
+@@ -949,10 +950,21 @@ def test_polygons(shape):
+     assert np.all([s == 'polygon' for s in layer2.shape_type])
+ 
+     # Avoid a.any(), a.all()
+-    assert np.array_equal(layer2.events.data.call_args[1]["value"], layer.data)
+-    assert layer2.events.data.call_args[1]["action"] == ActionType.ADD.value
+-    assert layer2.events.data.call_args[1]["data_indices"] == (-1,)
+-    assert layer2.events.data.call_args[1]["vertex_indices"] == ((),)
++    assert layer2.events.data.call_args_list[0][1] == {
++        "value": [],
++        "action": ActionType.ADDING,
++        "data_indices": (-1,),
++        "vertex_indices": ((),),
++    }
++
++    assert np.array_equal(
++        layer2.events.data.call_args_list[1][1]["value"], layer.data
++    )
++    assert (
++        layer2.events.data.call_args_list[0][1]["action"] == ActionType.ADDING
++    )
++    assert layer2.events.data.call_args_list[0][1]["data_indices"] == (-1,)
++    assert layer2.events.data.call_args_list[0][1]["vertex_indices"] == ((),)
+ 
+ 
+ def test_add_polygons_raises_error():
+@@ -1210,10 +1222,24 @@ def test_removing_all_shapes_empty_list():
+     data = 20 * np.random.random((10, 4, 2))
+     np.random.seed(0)
+     layer = Shapes(data)
++    layer.events.data = Mock()
++    old_data = layer.data
+     assert layer.nshapes == 10
+ 
+     layer.data = []
+     assert layer.nshapes == 0
++    assert layer.events.data.call_args_list[0][1] == {
++        "value": old_data,
++        "action": ActionType.REMOVING,
++        "data_indices": tuple(i for i in range(len(old_data))),
++        "vertex_indices": ((),),
++    }
++    assert layer.events.data.call_args_list[1][1] == {
++        "value": layer.data,
++        "action": ActionType.REMOVED,
++        "data_indices": (),
++        "vertex_indices": ((),),
++    }
+ 
+ 
+ def test_removing_all_shapes_empty_array():
+@@ -1221,10 +1247,24 @@ def test_removing_all_shapes_empty_array():
+     data = 20 * np.random.random((10, 4, 2))
+     np.random.seed(0)
+     layer = Shapes(data)
++    layer.events.data = Mock()
++    old_data = layer.data
+     assert layer.nshapes == 10
+ 
+     layer.data = np.empty((0, 2))
+     assert layer.nshapes == 0
++    assert layer.events.data.call_args_list[0][1] == {
++        "value": old_data,
++        "action": ActionType.REMOVING,
++        "data_indices": tuple(i for i in range(len(old_data))),
++        "vertex_indices": ((),),
++    }
++    assert layer.events.data.call_args_list[1][1] == {
++        "value": layer.data,
++        "action": ActionType.REMOVED,
++        "data_indices": (),
++        "vertex_indices": ((),),
++    }
+ 
+ 
+ def test_removing_selected_shapes():
+@@ -1236,17 +1276,27 @@ def test_removing_selected_shapes():
+     shape_type = ['polygon'] * 5 + ['rectangle'] * 3 + ['ellipse'] * 2
+     layer = Shapes(data, shape_type=shape_type)
+     layer.events.data = Mock()
++    old_data = layer.data
+     # With nothing selected no points should be removed
+     layer.remove_selected()
++    layer.events.data.assert_not_called()
+     assert len(layer.data) == len(data)
+ 
+     # Select three shapes and remove them
+     selection = {1, 7, 8}
+     layer.selected_data = selection
+     layer.remove_selected()
+-    assert layer.events.data.call_args[1] == {
++    assert layer.events.data.call_args_list[0][1] == {
++        "value": old_data,
++        "action": ActionType.REMOVING,
++        "data_indices": tuple(
++            selection,
++        ),
++        "vertex_indices": ((),),
++    }
++    assert layer.events.data.call_args_list[1][1] == {
+         "value": layer.data,
+-        "action": ActionType.REMOVE.value,
++        "action": ActionType.REMOVED,
+         "data_indices": tuple(
+             selection,
+         ),
+@@ -2241,22 +2291,22 @@ def test_editing_4d():
+     ]
+ 
+ 
+-def test_points_data_setter_emits_event():
++def test_shapes_data_setter_emits_event():
+     data = np.random.random((4, 2))
+     emitted_events = Mock()
+     layer = Shapes(data)
+     layer.events.data.connect(emitted_events)
+     layer.data = np.random.random((4, 2))
+-    emitted_events.assert_called_once()
++    assert emitted_events.call_count == 2
+ 
+ 
+-def test_points_add_delete_only_emit_one_event():
++def test_shapes_add_delete_only_emit_two_events():
+     data = np.random.random((4, 2))
+     emitted_events = Mock()
+     layer = Shapes(data)
+     layer.events.data.connect(emitted_events)
+     layer.add(np.random.random((4, 2)))
+-    assert emitted_events.call_count == 1
++    assert emitted_events.call_count == 2
+     layer.selected_data = {1}
+     layer.remove_selected()
+-    assert emitted_events.call_count == 2
++    assert emitted_events.call_count == 4
+diff --git a/napari/layers/shapes/_tests/test_shapes_mouse_bindings.py b/napari/layers/shapes/_tests/test_shapes_mouse_bindings.py
+index c38e6b12..6653fdc2 100644
+--- a/napari/layers/shapes/_tests/test_shapes_mouse_bindings.py
++++ b/napari/layers/shapes/_tests/test_shapes_mouse_bindings.py
+@@ -52,6 +52,8 @@ def create_known_shapes_layer():
+     n_shapes = len(data)
+ 
+     layer = Shapes(data)
++    # very zoomed in, guaranteed no overlap between vertices
++    layer.scale_factor = 0.001
+     assert layer.ndim == 2
+     assert len(layer.data) == n_shapes
+     assert len(layer.selected_data) == 0
+@@ -347,7 +349,7 @@ def test_vertex_insert(create_known_shapes_layer, Event):
+     n_coord = len(layer.data[0])
+     layer.mode = 'vertex_insert'
+     layer.selected_data = {0}
+-
++    old_data = layer.data
+     # Simulate click
+     event = ReadOnlyWrapper(
+         Event(
+@@ -375,9 +377,15 @@ def test_vertex_insert(create_known_shapes_layer, Event):
+     # Check new shape added at coordinates
+     assert len(layer.data) == n_shapes
+     assert len(layer.data[0]) == n_coord + 1
++    assert layer.events.data.call_args_list[0][1] == {
++        "value": old_data,
++        "action": ActionType.CHANGING,
++        "data_indices": tuple(layer.selected_data),
++        "vertex_indices": ((2,),),
++    }
+     assert layer.events.data.call_args[1] == {
+         "value": layer.data,
+-        "action": ActionType.CHANGE.value,
++        "action": ActionType.CHANGED,
+         "data_indices": tuple(layer.selected_data),
+         "vertex_indices": ((2,),),
+     }
+@@ -389,6 +397,7 @@ def test_vertex_insert(create_known_shapes_layer, Event):
+ def test_vertex_remove(create_known_shapes_layer, Event):
+     """Remove vertex from shape."""
+     layer, n_shapes, known_non_shape = create_known_shapes_layer
++    old_data = layer.data
+     layer.events.data = Mock()
+     n_coord = len(layer.data[0])
+     layer.mode = 'vertex_remove'
+@@ -407,27 +416,22 @@ def test_vertex_remove(create_known_shapes_layer, Event):
+         )
+     )
+     mouse_press_callbacks(layer, event)
+-
+-    # Simulate drag end
+-    event = ReadOnlyWrapper(
+-        Event(
+-            type='mouse_move',
+-            is_dragging=True,
+-            modifiers=[],
+-            position=position,
+-            pos=position,
+-        )
+-    )
+-    mouse_move_callbacks(layer, event)
++    assert layer.events.data.call_args_list[0][1] == {
++        "value": old_data,
++        "action": ActionType.CHANGING,
++        "data_indices": tuple(
++            select,
++        ),
++        "vertex_indices": ((0,),),
++    }
+     assert layer.events.data.call_args[1] == {
+         "value": layer.data,
+-        "action": ActionType.CHANGE.value,
++        "action": ActionType.CHANGED,
+         "data_indices": tuple(
+             select,
+         ),
+-        "vertex_indices": ((3,),),
++        "vertex_indices": ((0,),),
+     }
+-    # Check new shape added at coordinates
+     assert len(layer.data) == n_shapes
+     assert len(layer.data[0]) == n_coord - 1
+ 
+@@ -474,6 +478,7 @@ def test_drag_shape(create_known_shapes_layer, Event):
+     layer, n_shapes, _ = create_known_shapes_layer
+     layer.events.data = Mock()
+ 
++    old_data = layer.data
+     layer.mode = 'select'
+     # Zoom in so as to not select any vertices
+     layer.scale_factor = 0.01
+@@ -566,9 +571,15 @@ def test_drag_shape(create_known_shapes_layer, Event):
+     vertex_indices = (tuple(range(len(layer.data[0]))),)
+     assert len(layer.selected_data) == 1
+     assert layer.selected_data == {0}
++    assert layer.events.data.call_args_list[0][1] == {
++        "value": old_data,
++        "action": ActionType.CHANGING,
++        "data_indices": (0,),
++        "vertex_indices": vertex_indices,
++    }
+     assert layer.events.data.call_args[1] == {
+         "value": layer.data,
+-        "action": ActionType.CHANGE.value,
++        "action": ActionType.CHANGED,
+         "data_indices": (0,),
+         "vertex_indices": vertex_indices,
+     }
+@@ -644,7 +655,7 @@ def test_drag_vertex(create_known_shapes_layer, Event):
+     layer.events.data = Mock()
+     layer.mode = 'direct'
+     layer.selected_data = {0}
+-    position = tuple(layer.data[0][0])
++    old_position = tuple(layer.data[0][0])
+ 
+     # Simulate click
+     event = ReadOnlyWrapper(
+@@ -652,21 +663,23 @@ def test_drag_vertex(create_known_shapes_layer, Event):
+             type='mouse_press',
+             is_dragging=False,
+             modifiers=[],
+-            position=position,
+-            pos=position,
++            position=old_position,
++            pos=old_position,
+         )
+     )
+     mouse_press_callbacks(layer, event)
+ 
+-    position = [0, 0]
++    new_position = [0, 0]
++    assert np.all(new_position != old_position)
++
+     # Simulate move, click, and release
+     event = ReadOnlyWrapper(
+         Event(
+             type='mouse_move',
+             is_dragging=True,
+             modifiers=[],
+-            position=position,
+-            pos=position,
++            position=new_position,
++            pos=new_position,
+         )
+     )
+     mouse_move_callbacks(layer, event)
+@@ -677,8 +690,8 @@ def test_drag_vertex(create_known_shapes_layer, Event):
+             type='mouse_release',
+             is_dragging=True,
+             modifiers=[],
+-            position=position,
+-            pos=position,
++            position=new_position,
++            pos=new_position,
+         )
+     )
+     mouse_release_callbacks(layer, event)
+@@ -689,11 +702,11 @@ def test_drag_vertex(create_known_shapes_layer, Event):
+     assert layer.selected_data == {0}
+     assert layer.events.data.call_args[1] == {
+         "value": layer.data,
+-        "action": ActionType.CHANGE.value,
++        "action": ActionType.CHANGED,
+         "data_indices": (0,),
+         "vertex_indices": vertex_indices,
+     }
+-    np.testing.assert_allclose(layer.data[0][-1], [0, 0])
++    np.testing.assert_allclose(layer.data[0][0], [0, 0])
+ 
+ 
+ @pytest.mark.parametrize(
+diff --git a/napari/layers/shapes/shapes.py b/napari/layers/shapes/shapes.py
+index 72eebfb3..0f00bb92 100644
+--- a/napari/layers/shapes/shapes.py
++++ b/napari/layers/shapes/shapes.py
+@@ -626,7 +626,7 @@ class Shapes(Layer):
+     @data.setter
+     def data(self, data):
+         self._finish_drawing()
+-
++        prior_data = len(self.data) > 0
+         data, shape_type = extract_shape_type(data)
+         n_new_shapes = number_of_shapes(data)
+         # not given a shape_type through data
+@@ -666,7 +666,25 @@ class Shapes(Layer):
+                     self._get_new_shape_color(n_shapes_difference, 'face'),
+                 )
+             )
++        data_not_empty = (
++            data is not None
++            and (isinstance(data, np.ndarray) and data.size > 0)
++            or (isinstance(data, list) and len(data) > 0)
++        )
++        kwargs = {
++            "value": self.data,
++            "vertex_indices": ((),),
++            "data_indices": tuple(i for i in range(len(self.data))),
++        }
++        if prior_data and data_not_empty:
++            kwargs["action"] = ActionType.CHANGING
++        elif data_not_empty:
++            kwargs["action"] = ActionType.ADDING
++            kwargs["data_indices"] = tuple(i for i in range(len(data)))
++        else:
++            kwargs["action"] = ActionType.REMOVING
+ 
++        self.events.data(**kwargs)
+         self._data_view = ShapeList(ndisplay=self._slice_input.ndisplay)
+         self._data_view.slice_key = np.array(self._slice_indices)[
+             self._slice_input.not_displayed
+@@ -680,14 +698,18 @@ class Shapes(Layer):
+             z_index=z_indices,
+             n_new_shapes=n_new_shapes,
+         )
+-
+         self._update_dims()
+-        self.events.data(
+-            value=self.data,
+-            action=ActionType.CHANGE.value,
+-            data_indices=slice(None),
+-            vertex_indices=((),),
+-        )
++
++        kwargs["data_indices"] = tuple(i for i in range(len(data)))
++        kwargs["value"] = self.data
++        if prior_data and data_not_empty:
++            kwargs["action"] = ActionType.CHANGED
++        elif data_not_empty:
++            kwargs["action"] = ActionType.ADDED
++        else:
++            kwargs["action"] = ActionType.REMOVED
++        self.events.data(**kwargs)
++
+         self._reset_editable()
+ 
+     def _on_selection(self, selected: bool):
+@@ -1943,6 +1965,7 @@ class Shapes(Layer):
+         edge_color=None,
+         face_color=None,
+         z_index=None,
++        gui=False,
+     ):
+         """Add shapes to the current layer.
+ 
+@@ -1983,12 +2006,20 @@ class Shapes(Layer):
+             same length as the length of `data` and each element will be
+             applied to each shape otherwise the same value will be used for all
+             shapes.
++        gui: bool
++            Whether the shape is drawn by drawing in the gui.
+         """
+         data, shape_type = extract_shape_type(data, shape_type)
+ 
+         n_new_shapes = number_of_shapes(data)
+ 
+         if n_new_shapes > 0:
++            self.events.data(
++                value=self.data,
++                action=ActionType.ADDING,
++                data_indices=(-1,),
++                vertex_indices=((),),
++            )
+             self._add_shapes(
+                 data,
+                 shape_type=shape_type,
+@@ -1998,12 +2029,14 @@ class Shapes(Layer):
+                 z_index=z_index,
+                 n_new_shapes=n_new_shapes,
+             )
+-            self.events.data(
+-                value=self.data,
+-                action=ActionType.ADD.value,
+-                data_indices=(-1,),
+-                vertex_indices=((),),
+-            )
++            # This should only emit when programmatically adding as with drawing this leads to premature emit.
++            if not gui:
++                self.events.data(
++                    value=self.data,
++                    action=ActionType.ADDED,
++                    data_indices=(-1,),
++                    vertex_indices=((),),
++                )
+ 
+     def _init_shapes(
+         self,
+@@ -2502,33 +2535,37 @@ class Shapes(Layer):
+         self._fixed_vertex = None
+         self._value = (None, None)
+         self._moving_value = (None, None)
+-        if self._is_creating is True and self._mode == Mode.ADD_PATH:
+-            vertices = self._data_view.shapes[index].data
+-            if len(vertices) <= 2:
+-                self._data_view.remove(index)
+-            else:
+-                self._data_view.edit(index, vertices[:-1])
+-        if self._is_creating is True and (
+-            self._mode
+-            in {
+-                Mode.ADD_POLYGON,
+-                Mode.ADD_POLYGON_LASSO,
+-            }
+-        ):
+-            vertices = self._data_view.shapes[index].data
+-            if len(vertices) <= 3:
+-                self._data_view.remove(index)
+-            elif self._mode == Mode.ADD_POLYGON:
+-                self._data_view.edit(index, vertices[:-1])
+-            else:
+-                vertices = rdp(
+-                    vertices, epsilon=get_settings().experimental.rdp_epsilon
+-                )
+-                self._data_view.edit(
+-                    index,
+-                    vertices[:-1],
+-                    new_type=shape_classes[ShapeType.POLYGON],
+-                )
++        if self._is_creating is True:
++            if self._mode == Mode.ADD_PATH:
++                vertices = self._data_view.shapes[index].data
++                if len(vertices) <= 2:
++                    self._data_view.remove(index)
++                else:
++                    self._data_view.edit(index, vertices[:-1])
++            if self._mode in {Mode.ADD_POLYGON, Mode.ADD_POLYGON_LASSO}:
++                vertices = self._data_view.shapes[index].data
++                if len(vertices) <= 3:
++                    self._data_view.remove(index)
++                elif self._mode == Mode.ADD_POLYGON:
++                    self._data_view.edit(index, vertices[:-1])
++                else:
++                    vertices = rdp(
++                        vertices,
++                        epsilon=get_settings().experimental.rdp_epsilon,
++                    )
++                    self._data_view.edit(
++                        index,
++                        vertices[:-1],
++                        new_type=shape_classes[ShapeType.POLYGON],
++                    )
++        # handles the case that
++        if index is not None:
++            self.events.data(
++                value=self.data,
++                action=ActionType.ADDED,
++                data_indices=(-1,),
++                vertex_indices=((),),
++            )
+         self._is_creating = False
+         self._update_dims()
+ 
+@@ -2582,10 +2619,19 @@ class Shapes(Layer):
+         """Remove any selected shapes."""
+         index = list(self.selected_data)
+         to_remove = sorted(index, reverse=True)
+-        for ind in to_remove:
+-            self._data_view.remove(ind)
+ 
+         if len(index) > 0:
++            self.events.data(
++                value=self.data,
++                action=ActionType.REMOVING,
++                data_indices=tuple(
++                    index,
++                ),
++                vertex_indices=((),),
++            )
++            for ind in to_remove:
++                self._data_view.remove(ind)
++
+             self._feature_table.remove(index)
+             self.text.remove(index)
+             self._data_view._edge_color = np.delete(
+@@ -2594,16 +2640,16 @@ class Shapes(Layer):
+             self._data_view._face_color = np.delete(
+                 self._data_view._face_color, index, axis=0
+             )
+-        self.selected_data = set()
++            self.events.data(
++                value=self.data,
++                action=ActionType.REMOVED,
++                data_indices=tuple(
++                    index,
++                ),
++                vertex_indices=((),),
++            )
++        self.selected_data.clear()
+         self._finish_drawing()
+-        self.events.data(
+-            value=self.data,
+-            action=ActionType.REMOVE.value,
+-            data_indices=tuple(
+-                index,
+-            ),
+-            vertex_indices=((),),
+-        )
+ 
+     def _rotate_box(self, angle, center=(0, 0)):
+         """Perform a rotation on the selected box.
+-- 
+2.34.1
