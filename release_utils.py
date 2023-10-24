@@ -14,7 +14,7 @@ from tqdm import tqdm
 from unidecode import unidecode
 from yaml import safe_load
 
-pr_num_pattern = re.compile(r"\(#(\d+)\)(?:$|\n)")
+PR_NUM_PATTERN = re.compile(r"\(#(\d+)\)(?:$|\n)")
 
 
 @contextmanager
@@ -118,7 +118,7 @@ def get_commit_counts_from_ancestor(release, rev="main"):
     """
     ancestor = get_common_ancestor(release, rev)
     return sum(
-        pr_num_pattern.search(c.message) is not None
+        PR_NUM_PATTERN.search(c.message) is not None
         for c in get_commits_to_ancestor(ancestor, rev)
     )
 
@@ -146,7 +146,7 @@ def get_split_date(previous_release, rev="main"):
 
 def iter_pull_request(additional_query, user=GH_USER, repo=GH_REPO):
     iterable = get_github().search_issues(
-        f"repo:{user}/{repo} " "is:pr " "sort:created-asc " + additional_query
+        f"repo:{user}/{repo} is:pr sort:created-asc {additional_query}"
     )
     print(
         f"Found {iterable.totalCount} pull requests on query: {additional_query}"
@@ -176,7 +176,7 @@ def get_pr_commits_dict(repo: Repo, branch: str = "main") -> dict[int, str]:
     """
     res = {}
     for commit in repo.iter_commits(branch):
-        if (match := pr_num_pattern.search(commit.message)) is not None:
+        if (match := PR_NUM_PATTERN.search(commit.message)) is not None:
             pr_num = int(match[1])
             res[pr_num] = commit.hexsha
     return res
@@ -197,7 +197,7 @@ def get_consumed_pr(repo: Repo, target_branch: str) -> set[int]:
     res = set()
 
     for commit in repo.iter_commits(target_branch):
-        if (match := pr_num_pattern.search(commit.message)) is not None:
+        if (match := PR_NUM_PATTERN.search(commit.message)) is not None:
             pr_num = int(match[1])
             res.add(pr_num)
     return res

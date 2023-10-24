@@ -1,0 +1,118 @@
+From 24e9b69a77963586af9aa75fa3058064129e8d3e Mon Sep 17 00:00:00 2001
+From: Andy Sweet <andrew.d.sweet@gmail.com>
+Date: Tue, 24 Oct 2023 00:43:25 -0700
+Subject: [PATCH] Exclude the loaded property when linking two layers (#6377)
+
+Closes #6372
+
+This fixes a bug when linking layers and using the experimental async
+loading/slicing feature. The bug exists for both the old implementation
+available in v0.4.* and the new implementation available on the main
+branch, which are the only things that can cause `Layer.loaded` to
+change value and therefore cause the corresponding `Layer.events.loaded`
+to be emitted. The underlying cause is that the `loaded` property (which
+returns `True` when a layer's slice/view is fully loaded) is read-only
+from the public API (i.e. there is no public property setter).
+
+The fix is to add `loaded` to the attribute/property names excluded when
+finding the common evented attributes. Even if this were user-settable
+(which it should *not* be), it should still be excluded because it
+corresponds to a slice/view of a layer which is not state that should be
+shared between two linked layers.
+
+I added a test to cover this specific case.
+
+I also fixed some nearby typos.
+---
+ napari/layers/utils/_link_layers.py            | 13 ++++++++-----
+ napari/layers/utils/_tests/test_link_layers.py | 18 ++++++++++++++++--
+ 2 files changed, 24 insertions(+), 7 deletions(-)
+
+diff --git a/napari/layers/utils/_link_layers.py b/napari/layers/utils/_link_layers.py
+index 100849fe..275ee8c8 100644
+--- a/napari/layers/utils/_link_layers.py
++++ b/napari/layers/utils/_link_layers.py
+@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING, Callable, DefaultDict, Iterable, Set, Tuple
+ from weakref import ReferenceType, ref
+ 
+ if TYPE_CHECKING:
++    from collections import abc
++
+     from napari.layers import Layer
+ 
+ from napari.utils.events.event import WarningEmitter
+@@ -35,9 +37,10 @@ def get_linked_layers(*layers: Layer) -> Set[Layer]:
+     directly linked to each other.  This is useful for context menu generation.
+     """
+     if not layers:
+-        return {}
++        return set()
+     refs = set.union(*(_LINKED_LAYERS.get(ref(x), set()) for x in layers))
+-    return {x() for x in refs if x() is not None}
++    linked_layers = {x() for x in refs}
++    return {x for x in linked_layers if x is not None}
+ 
+ 
+ def link_layers(
+@@ -127,7 +130,7 @@ def link_layers(
+             setter.__qualname__ = f"set_{attr}_on_layer_{id(l2)}"
+             return setter
+ 
+-        # acually make the connection
++        # actually make the connection
+         callback = _make_l2_setter()
+         emitter_group = getattr(lay1.events, attribute)
+         emitter_group.connect(callback)
+@@ -187,8 +190,8 @@ def layers_linked(layers: Iterable[Layer], attributes: Iterable[str] = ()):
+ 
+ def _get_common_evented_attributes(
+     layers: Iterable[Layer],
+-    exclude: set[str] = frozenset(
+-        ('thumbnail', 'status', 'name', 'data', 'extent')
++    exclude: abc.Set[str] = frozenset(
++        ('thumbnail', 'status', 'name', 'data', 'extent', 'loaded')
+     ),
+     with_private=False,
+ ) -> set[str]:
+diff --git a/napari/layers/utils/_tests/test_link_layers.py b/napari/layers/utils/_tests/test_link_layers.py
+index 20af93b9..4bff1fe6 100644
+--- a/napari/layers/utils/_tests/test_link_layers.py
++++ b/napari/layers/utils/_tests/test_link_layers.py
+@@ -90,7 +90,7 @@ def test_removed_linked_target():
+     l1.opacity = 0.5
+     assert l1.opacity == l2.opacity == l3.opacity == 0.5
+ 
+-    # if we delete layer3 we shouldn't get an error when updating otherlayers
++    # if we delete layer3 we shouldn't get an error when updating other layers
+     del l3
+     l1.opacity = 0.25
+     assert l1.opacity == l2.opacity
+@@ -142,7 +142,7 @@ def test_unlink_single_layer():
+ 
+     link_layers([l1, l2, l3])
+     assert len(l1.events.opacity.callbacks) == 2
+-    unlink_layers([l1], ('opacity',))  # just unlink L1 opacicity from others
++    unlink_layers([l1], ('opacity',))  # just unlink L1 opacity from others
+     assert len(l1.events.opacity.callbacks) == 0
+     assert len(l2.events.opacity.callbacks) == 1
+     assert len(l3.events.opacity.callbacks) == 1
+@@ -161,3 +161,17 @@ def test_mode_recursion():
+     l2 = layers.Points(None, name='l2')
+     link_layers([l1, l2])
+     l1.mode = 'add'
++
++
++def test_link_layers_with_images_then_loaded_not_linked():
++    """See https://github.com/napari/napari/issues/6372"""
++    l1 = layers.Image(np.zeros((5, 5)))
++    l2 = layers.Image(np.ones((5, 5)))
++    assert l1.loaded
++    assert l2.loaded
++
++    link_layers([l1, l2])
++    l1._set_loaded(False)
++
++    assert not l1.loaded
++    assert l2.loaded
+-- 
+2.34.1

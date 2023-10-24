@@ -232,8 +232,6 @@ https://github.com/napari/napari
 )
 highlights_path = LOCAL_DIR / "highlight" / (args.milestone + ".md")
 
-print(highlights_path, file=file_handle)
-
 for section, pull_request_dicts in highlights.items():
     print(f"## {section}\n", file=file_handle)
     if section == "Highlights" and highlights_path.exists():
