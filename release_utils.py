@@ -247,6 +247,20 @@ def get_corrections_from_citation_cff(cff_data: str | Path | dict) -> dict[str, 
     res = {}
     for author in cff_data["authors"]:
         if "alias" in author:
+            res[author["alias"]] = f'{author["given-names"]} {author["family-names"]}'
+    return res
+
+
+def get_corrections_from_citation_cff2(cff_data: str | Path | dict) -> dict[str, str]:
+    if isinstance(cff_data, (str, Path)):
+        cff_data = Path(cff_data)
+        if not cff_data.exists():
+            return {}
+        with cff_data.open(encoding="utf8") as f:
+            cff_data = safe_load(f)
+    res = {}
+    for author in cff_data["authors"]:
+        if "alias" in author:
             res[author["alias"]] = unidecode(
                 f'{author["given-names"]} {author["family-names"]}'.lower()
             )

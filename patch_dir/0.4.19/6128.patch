@@ -127,7 +127,7 @@ index f26c4fa7..eda37ab9 100644
  import sys
 -from collections import namedtuple
 +from typing import NamedTuple, Optional, Type
- 
+
  import numpy as np
  import pytest
 @@ -34,6 +34,7 @@ from napari.components import ViewerModel
@@ -141,7 +141,7 @@ index f26c4fa7..eda37ab9 100644
 @@ -41,11 +42,18 @@ from napari.layers import (
      Vectors,
  )
- 
+
 +
 +class LayerTypeWithData(NamedTuple):
 +    type: Type[Layer]
@@ -170,7 +170,7 @@ index 2cf78425..5aa679dc 100644
 -
  import numpy as np
  import pytest
- 
+
  from napari._tests.utils import skip_local_popups, skip_on_win_ci
 -from napari.utils._proxies import ReadOnlyWrapper
 +from napari.utils._test_utils import read_only_mouse_event
@@ -179,7 +179,7 @@ index 2cf78425..5aa679dc 100644
      mouse_press_callbacks,
 @@ -370,48 +368,36 @@ def test_labels_painting(make_napari_viewer):
      layer.selected_label = 3
- 
+
      # Simulate click
 -    Event = collections.namedtuple(
 -        'Event', field_names=['type', 'is_dragging', 'position']
@@ -198,9 +198,9 @@ index 2cf78425..5aa679dc 100644
 +        position=viewer.cursor.position,
      )
      mouse_press_callbacks(layer, event)
- 
+
      viewer.cursor.position = (100, 100)
- 
+
      # Simulate drag
 -    event = ReadOnlyWrapper(
 -        Event(
@@ -214,7 +214,7 @@ index 2cf78425..5aa679dc 100644
 +        position=viewer.cursor.position,
      )
      mouse_move_callbacks(layer, event)
- 
+
      # Simulate release
 -    event = ReadOnlyWrapper(
 -        Event(
@@ -229,7 +229,7 @@ index 2cf78425..5aa679dc 100644
      )
 +
      mouse_release_callbacks(layer, event)
- 
+
 -    event = ReadOnlyWrapper(
 -        Event(
 -            type='mouse_press',
@@ -242,13 +242,13 @@ index 2cf78425..5aa679dc 100644
 +        position=viewer.cursor.position,
      )
      mouse_press_callbacks(layer, event)
- 
+
 diff --git a/napari/_vispy/filters/tracks.py b/napari/_vispy/filters/tracks.py
 index 4c915422..be2c8df5 100644
 --- a/napari/_vispy/filters/tracks.py
 +++ b/napari/_vispy/filters/tracks.py
 @@ -87,9 +87,9 @@ class TracksFilter(Filter):
- 
+
      def __init__(
          self,
 -        current_time: Union[int, float] = 0,
@@ -262,12 +262,12 @@ index 4c915422..be2c8df5 100644
      ) -> None:
 @@ -104,11 +104,11 @@ class TracksFilter(Filter):
          self.vertex_time = vertex_time
- 
+
      @property
 -    def current_time(self) -> Union[int, float]:
 +    def current_time(self) -> float:
          return self._current_time
- 
+
      @current_time.setter
 -    def current_time(self, n: Union[int, float]):
 +    def current_time(self, n: float):
@@ -276,29 +276,29 @@ index 4c915422..be2c8df5 100644
              n = np.max(self._vertex_time)
 @@ -124,20 +124,20 @@ class TracksFilter(Filter):
          self.vshader['use_fade'] = float(self._use_fade)
- 
+
      @property
 -    def tail_length(self) -> Union[int, float]:
 +    def tail_length(self) -> float:
          return self._tail_length
- 
+
      @tail_length.setter
 -    def tail_length(self, tail_length: Union[int, float]):
 +    def tail_length(self, tail_length: float):
          self._tail_length = tail_length
          self.vshader['tail_length'] = float(self._tail_length)
- 
+
      @property
 -    def head_length(self) -> Union[int, float]:
 +    def head_length(self) -> float:
          return self._tail_length
- 
+
      @head_length.setter
 -    def head_length(self, head_length: Union[int, float]):
 +    def head_length(self, head_length: float):
          self._head_length = head_length
          self.vshader['head_length'] = float(self._head_length)
- 
+
 diff --git a/napari/benchmarks/benchmark_qt_slicing.py b/napari/benchmarks/benchmark_qt_slicing.py
 new file mode 100644
 index 00000000..96ab6376
@@ -506,9 +506,9 @@ index e8ff3908..afc45819 100644
  # or the napari documentation on benchmarking
  # https://github.com/napari/napari/blob/main/docs/BENCHMARKS.md
 -import collections
- 
+
  import numpy as np
- 
+
  from napari.layers import Shapes
 -from napari.utils._proxies import ReadOnlyWrapper
 +from napari.utils._test_utils import read_only_mouse_event
@@ -517,17 +517,17 @@ index e8ff3908..afc45819 100644
      mouse_press_callbacks,
      mouse_release_callbacks,
  )
- 
+
 -Event = collections.namedtuple(
 -    'Event', field_names=['type', 'is_dragging', 'modifiers', 'position']
 -)
 -
- 
+
  class Shapes2DSuite:
      """Benchmarks for the Shapes layer with 2D data"""
 @@ -112,24 +107,20 @@ class ShapesInteractionSuite:
          position = tuple(np.mean(self.layer.data[0], axis=0))
- 
+
          # create events
 -        click_event = ReadOnlyWrapper(
 -            Event(
@@ -544,7 +544,7 @@ index e8ff3908..afc45819 100644
          )
          # Simulate click
          mouse_press_callbacks(self.layer, click_event)
- 
+
 -        release_event = ReadOnlyWrapper(
 -            Event(
 -                type='mouse_release',
@@ -558,11 +558,11 @@ index e8ff3908..afc45819 100644
 +            modifiers=[],
 +            position=position,
          )
- 
+
          # Simulate release
 @@ -141,26 +132,22 @@ class ShapesInteractionSuite:
          position = tuple(np.mean(self.layer.data[0], axis=0))
- 
+
          # create events
 -        click_event = ReadOnlyWrapper(
 -            Event(
@@ -577,10 +577,10 @@ index e8ff3908..afc45819 100644
 +            modifiers=[],
 +            position=position,
          )
- 
+
          # Simulate click
          mouse_press_callbacks(self.layer, click_event)
- 
+
          # create events
 -        drag_event = ReadOnlyWrapper(
 -            Event(
@@ -595,7 +595,7 @@ index e8ff3908..afc45819 100644
 +            modifiers=[],
 +            position=position,
          )
- 
+
          # start drag event
 @@ -169,25 +156,21 @@ class ShapesInteractionSuite:
          # simulate 5 drag events
@@ -614,10 +614,10 @@ index e8ff3908..afc45819 100644
 +                modifiers=[],
 +                position=position,
              )
- 
+
              # Simulate move, click, and release
              mouse_move_callbacks(self.layer, drag_event)
- 
+
 -        release_event = ReadOnlyWrapper(
 -            Event(
 -                type='mouse_release',
@@ -631,11 +631,11 @@ index e8ff3908..afc45819 100644
 +            modifiers=[],
 +            position=position,
          )
- 
+
          # Simulate release
 @@ -200,24 +183,20 @@ class ShapesInteractionSuite:
          position = tuple(np.mean(self.layer.data[1], axis=0))
- 
+
          # create events
 -        click_event = ReadOnlyWrapper(
 -            Event(
@@ -652,7 +652,7 @@ index e8ff3908..afc45819 100644
          )
          # Simulate click
          mouse_press_callbacks(self.layer, click_event)
- 
+
 -        release_event = ReadOnlyWrapper(
 -            Event(
 -                type='mouse_release',
@@ -666,7 +666,7 @@ index e8ff3908..afc45819 100644
 +            modifiers=[],
 +            position=position,
          )
- 
+
          # Simulate release
 diff --git a/napari/components/_tests/test_viewer_mouse_bindings.py b/napari/components/_tests/test_viewer_mouse_bindings.py
 index 86db8bc1..88c5958e 100644
@@ -677,13 +677,13 @@ index 86db8bc1..88c5958e 100644
 -
  import numpy as np
  import pytest
- 
+
  from napari.components import ViewerModel
 -from napari.utils._proxies import ReadOnlyWrapper
 +from napari.utils._test_utils import read_only_mouse_event
  from napari.utils.interactions import mouse_wheel_callbacks
- 
- 
+
+
 -@pytest.fixture
 -def mouse_event():
 -    """Create a subclass for simulating vispy mouse events.
@@ -713,7 +713,7 @@ index 86db8bc1..88c5958e 100644
      data = np.random.random((10, 10, 10))
 @@ -58,29 +41,30 @@ def test_paint(mouse_event, modifiers, native, expected_dim):
      viewer.dims.set_point(axis=2, value=5)
- 
+
      # Simulate tiny scroll
 -    event = ReadOnlyWrapper(
 -        mouse_event(delta=[0, 0.6], modifiers=modifiers, native=native)
@@ -722,7 +722,7 @@ index 86db8bc1..88c5958e 100644
      )
      mouse_wheel_callbacks(viewer, event)
      assert np.equal(viewer.dims.point, expected_dim[0]).all()
- 
+
      # Simulate tiny scroll
 -    event = ReadOnlyWrapper(
 -        mouse_event(delta=[0, 0.6], modifiers=modifiers, native=native)
@@ -732,7 +732,7 @@ index 86db8bc1..88c5958e 100644
 +
      mouse_wheel_callbacks(viewer, event)
      assert np.equal(viewer.dims.point, expected_dim[1]).all()
- 
+
      # Simulate tiny scroll
 -    event = ReadOnlyWrapper(
 -        mouse_event(delta=[0, 0.9], modifiers=modifiers, native=native)
@@ -741,7 +741,7 @@ index 86db8bc1..88c5958e 100644
      )
      mouse_wheel_callbacks(viewer, event)
      assert np.equal(viewer.dims.point, expected_dim[2]).all()
- 
+
      # Simulate large scroll
 -    event = ReadOnlyWrapper(
 -        mouse_event(delta=[0, 3], modifiers=modifiers, native=native)
@@ -762,7 +762,7 @@ index 3d517d76..07979aa0 100644
 +        value: Union[float, Sequence[float]],
      ):
          """Sets point to slice dimension in world coordinates.
- 
+
 diff --git a/napari/components/experimental/remote/_commands.py b/napari/components/experimental/remote/_commands.py
 index 74beab04..3538f8b2 100644
 --- a/napari/components/experimental/remote/_commands.py
@@ -783,8 +783,8 @@ index 0d5eb53c..6ce7bee4 100644
      msg = layer.get_status((0,) * 2)
 -    assert type(msg) == dict
 +    assert isinstance(msg, dict)
- 
- 
+
+
  def test_message_3d():
 @@ -587,7 +587,7 @@ def test_message_3d():
      msg = layer.get_status(
@@ -792,8 +792,8 @@ index 0d5eb53c..6ce7bee4 100644
      )
 -    assert type(msg) == dict
 +    assert isinstance(msg, dict)
- 
- 
+
+
  def test_thumbnail():
 diff --git a/napari/layers/image/_tests/test_multiscale.py b/napari/layers/image/_tests/test_multiscale.py
 index a1833815..bcafce40 100644
@@ -805,8 +805,8 @@ index a1833815..bcafce40 100644
      msg = layer.get_status((0,) * 2)
 -    assert type(msg) == dict
 +    assert isinstance(msg, dict)
- 
- 
+
+
  def test_thumbnail():
 diff --git a/napari/layers/image/_tests/test_volume.py b/napari/layers/image/_tests/test_volume.py
 index 362dacc1..1f3e2ce4 100644
@@ -818,8 +818,8 @@ index 362dacc1..1f3e2ce4 100644
      msg = layer.get_status((0,) * 3)
 -    assert type(msg) == dict
 +    assert isinstance(msg, dict)
- 
- 
+
+
  def test_plane_drag_callback():
 diff --git a/napari/layers/labels/_tests/test_labels.py b/napari/layers/labels/_tests/test_labels.py
 index 42e6ee6b..13eba14c 100644
@@ -831,8 +831,8 @@ index 42e6ee6b..13eba14c 100644
      msg = layer.get_status((0, 0))
 -    assert type(msg) == dict
 +    assert isinstance(msg, dict)
- 
- 
+
+
  def test_thumbnail():
 diff --git a/napari/layers/points/_tests/test_points.py b/napari/layers/points/_tests/test_points.py
 index 1fd7abbc..c19a1b30 100644
@@ -844,8 +844,8 @@ index 1fd7abbc..c19a1b30 100644
      msg = layer.get_status((0,) * 2)
 -    assert type(msg) == dict
 +    assert isinstance(msg, dict)
- 
- 
+
+
  def test_message_3d():
 @@ -1669,7 +1669,7 @@ def test_message_3d():
      msg = layer.get_status(
@@ -853,8 +853,8 @@ index 1fd7abbc..c19a1b30 100644
      )
 -    assert type(msg) == dict
 +    assert isinstance(msg, dict)
- 
- 
+
+
  def test_thumbnail():
 diff --git a/napari/layers/points/points.py b/napari/layers/points/points.py
 index c713f188..c441276d 100644
@@ -862,7 +862,7 @@ index c713f188..c441276d 100644
 +++ b/napari/layers/points/points.py
 @@ -836,7 +836,7 @@ class Points(Layer):
          return self._size
- 
+
      @size.setter
 -    def size(self, size: Union[int, float, np.ndarray, list]) -> None:
 +    def size(self, size: Union[float, np.ndarray, list]) -> None:
@@ -871,7 +871,7 @@ index c713f188..c441276d 100644
          except ValueError as e:
 @@ -966,9 +966,7 @@ class Points(Layer):
          return self._edge_width
- 
+
      @edge_width.setter
 -    def edge_width(
 -        self, edge_width: Union[int, float, np.ndarray, list]
@@ -879,7 +879,7 @@ index c713f188..c441276d 100644
 +    def edge_width(self, edge_width: Union[float, np.ndarray, list]) -> None:
          # broadcast to np.array
          edge_width = np.broadcast_to(edge_width, self.data.shape[0]).copy()
- 
+
 diff --git a/napari/layers/shapes/_shape_list.py b/napari/layers/shapes/_shape_list.py
 index 2ad1a8ec..9d9f4737 100644
 --- a/napari/layers/shapes/_shape_list.py
@@ -896,11 +896,11 @@ index 2ad1a8ec..9d9f4737 100644
 @@ -933,7 +933,7 @@ class ShapeList:
          self.add(shape, shape_index=index)
          self._update_z_order()
- 
+
 -    def outline(self, indices):
 +    def outline(self, indices: Union[int, Sequence[int]]):
          """Finds outlines of shapes listed in indices
- 
+
          Parameters
 @@ -951,7 +951,16 @@ class ShapeList:
          triangles : np.ndarray
@@ -933,11 +933,11 @@ index 2ad1a8ec..9d9f4737 100644
 -                self._mesh.vertices_index == [indices, 1], axis=1
 -            )
 -            vertices_indices = np.where(vertices_indices)[0]
- 
+
          offsets = self._mesh.vertices_offsets[vertices_indices]
          centers = self._mesh.vertices_centers[vertices_indices]
          triangles = self._mesh.triangles[triangle_indices]
- 
+
 -        if type(indices) is list:
 +        if not isinstance(indices, int):
              t_ind = self._mesh.triangles_index[triangle_indices][:, 0]
@@ -953,8 +953,8 @@ index 6c64d08e..7f64155b 100644
      msg = layer.get_status((0,) * 2)
 -    assert type(msg) == dict
 +    assert isinstance(msg, dict)
- 
- 
+
+
  def test_message_3d():
 @@ -2114,7 +2114,7 @@ def test_message_3d():
      msg = layer.get_status(
@@ -962,8 +962,8 @@ index 6c64d08e..7f64155b 100644
      )
 -    assert type(msg) == dict
 +    assert isinstance(msg, dict)
- 
- 
+
+
  def test_thumbnail():
 diff --git a/napari/layers/shapes/_tests/test_shapes_mouse_bindings.py b/napari/layers/shapes/_tests/test_shapes_mouse_bindings.py
 index 5238b4e7..388d80c5 100644
@@ -973,7 +973,7 @@ index 5238b4e7..388d80c5 100644
 -from dataclasses import dataclass, field
 -from typing import List, Optional, Tuple, Union
  from unittest.mock import Mock
- 
+
  import numpy as np
 @@ -9,7 +7,7 @@ from napari.layers import Shapes
  from napari.layers.base._base_constants import ActionType
@@ -986,8 +986,8 @@ index 5238b4e7..388d80c5 100644
      mouse_move_callbacks,
 @@ -18,31 +16,6 @@ from napari.utils.interactions import (
  )
- 
- 
+
+
 -@dataclass
 -class MouseEvent:
 -    """Create a subclass for simulating vispy mouse events."""
@@ -1021,14 +1021,14 @@ index e8a9b821..3cbe5aba 100644
 --- a/napari/layers/utils/layer_utils.py
 +++ b/napari/layers/utils/layer_utils.py
 @@ -494,7 +494,7 @@ def _validate_property_choices(property_choices):
- 
- 
+
+
  def _coerce_current_properties_value(
 -    value: Union[float, str, int, bool, list, tuple, np.ndarray]
 +    value: Union[float, str, bool, list, tuple, np.ndarray]
  ) -> np.ndarray:
      """Coerce a value in a current_properties dictionary into the correct type.
- 
+
 diff --git a/napari/layers/vectors/_tests/test_vectors.py b/napari/layers/vectors/_tests/test_vectors.py
 index 51f5598b..68a632b8 100644
 --- a/napari/layers/vectors/_tests/test_vectors.py
@@ -1039,8 +1039,8 @@ index 51f5598b..68a632b8 100644
      msg = layer.get_status((0,) * 2)
 -    assert type(msg) == dict
 +    assert isinstance(msg, dict)
- 
- 
+
+
  def test_world_data_extent():
 diff --git a/napari/layers/vectors/vectors.py b/napari/layers/vectors/vectors.py
 index 1709c6ff..494fe9d4 100644
@@ -1048,33 +1048,33 @@ index 1709c6ff..494fe9d4 100644
 +++ b/napari/layers/vectors/vectors.py
 @@ -442,12 +442,12 @@ class Vectors(Layer):
          self.refresh()
- 
+
      @property
 -    def edge_width(self) -> Union[int, float]:
 +    def edge_width(self) -> float:
          """float: Width for all vectors in pixels."""
          return self._edge_width
- 
+
      @edge_width.setter
 -    def edge_width(self, edge_width: Union[int, float]):
 +    def edge_width(self, edge_width: float):
          self._edge_width = edge_width
- 
+
          self.events.edge_width()
 @@ -475,12 +475,12 @@ class Vectors(Layer):
              self.refresh()
- 
+
      @property
 -    def length(self) -> Union[int, float]:
 +    def length(self) -> float:
          """float: Multiplicative factor for length of all vectors."""
          return self._length
- 
+
      @length.setter
 -    def length(self, length: Union[int, float]):
 +    def length(self, length: float):
          self._length = float(length)
- 
+
          self.events.length()
 diff --git a/napari/utils/_test_utils.py b/napari/utils/_test_utils.py
 new file mode 100644
@@ -1125,38 +1125,38 @@ index bbb7bfee..fc1e33b9 100644
 @@ -13,6 +13,9 @@ from typing import (
      overload,
  )
- 
+
 +# change on import from typing when drop python 3.10 support
 +from typing_extensions import Self
 +
  from napari.utils.translations import trans
- 
+
  logger = logging.getLogger(__name__)
 @@ -66,7 +69,7 @@ class TypedMutableSequence(MutableSequence[_T]):
      def __repr__(self) -> str:
          return repr(self._list)
- 
+
 -    def __eq__(self, other: Any):
 +    def __eq__(self, other: object):
          return self._list == other
- 
+
      def __hash__(self) -> int:
 @@ -172,17 +175,17 @@ class TypedMutableSequence(MutableSequence[_T]):
          new.extend(iterable)
          return new
- 
+
 -    def copy(self) -> 'TypedMutableSequence[_T]':
 +    def copy(self) -> Self:
          """Return a shallow copy of the list."""
          return self.__newlike__(self)
- 
+
 -    def __add__(self, other: Iterable[_T]) -> 'TypedMutableSequence[_T]':
 +    def __add__(self, other: Iterable[_T]) -> Self:
          """Add other to self, return new object."""
          copy = self.copy()
          copy.extend(other)
          return copy
- 
+
 -    def __iadd__(self, other: Iterable[_T]) -> 'TypedMutableSequence[_T]':
 +    def __iadd__(self, other: Iterable[_T]) -> Self:
          """Add other to self in place (self += other)."""
@@ -1173,10 +1173,10 @@ index 2028b8f6..fb10e7e8 100644
 -from collections import namedtuple
 -from typing import Optional
 +from typing import NamedTuple, Optional
- 
+
 -# The span of time that the event ocurred.
 -Span = namedtuple("Span", "start_ns end_ns")
- 
+
 -# What process/thread produced the event.
 -Origin = namedtuple("Origin", "process_id thread_id")
 +class Span(NamedTuple):
@@ -1207,9 +1207,8 @@ index 2028b8f6..fb10e7e8 100644
 +
 +    process_id: int
 +    thread_id: int
- 
- 
- class PerfEvent:
--- 
-2.34.1
 
+
+ class PerfEvent:
+--
+2.34.1

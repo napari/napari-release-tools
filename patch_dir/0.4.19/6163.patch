@@ -21,13 +21,12 @@ index 709cbd89..c88bb6f0 100644
 +++ b/napari/_qt/widgets/qt_keyboard_settings.py
 @@ -612,7 +612,7 @@ class EditorWidget(QLineEdit):
          event_keystr = event_keyseq.toString(QKeySequence.PortableText)
- 
+
          # Split the shortcut if it contains a symbol.
 -        parsed = re.split('[-(?=.+)]', event_keystr)
 +        parsed = re.split(r'[-+](?=.+)', event_keystr)
- 
+
          keys_li = []
          # Format how the shortcut is written (ex. 'Ctrl+B' is changed to 'Control-B')
--- 
+--
 2.34.1
-

@@ -75,7 +75,7 @@ index f12ae798..156a57a6 100644
 +    with pytest.raises(ValueError):
 +        _npe2.read(["some.randomext"], stack=False)
      mock_pm.commands.get.assert_not_called()
- 
+
      mock_pm.commands.get.reset_mock()
 @@ -62,8 +62,7 @@ def test_read(mock_pm: 'TestPluginManager'):
      reason='Older versions of npe2 do not throw specific error.',
@@ -85,8 +85,8 @@ index f12ae798..156a57a6 100644
 -    with pytest.raises(ValueError, match=match):
 +    with pytest.raises(ValueError):
          _npe2.read(["some.randomext"], stack=True, plugin=PLUGIN_NAME)
- 
- 
+
+
 diff --git a/napari/types.py b/napari/types.py
 index dd8ad859..6794813a 100644
 --- a/napari/types.py
@@ -101,18 +101,18 @@ index dd8ad859..6794813a 100644
      Sequence,
 @@ -18,6 +17,9 @@ from typing import (
  )
- 
+
  import numpy as np
 +
 +# TODO decide where types should be defined to have single place for them
 +from npe2.types import LayerName as LayerTypeName
  from typing_extensions import TypedDict, get_args
- 
+
  if TYPE_CHECKING:
 @@ -64,10 +66,6 @@ __all__ = [
  # since it includes all valid arguments for np.array() ( int, float, str...)
  ArrayLike = Union[np.ndarray, 'dask.array.Array', 'zarr.Array']
- 
+
 -LayerTypeName = Literal[
 -    "image", "labels", "points", "shapes", "surface", "tracks", "vectors"
 -]
@@ -349,7 +349,7 @@ index a081ce95..405684b7 100644
 -zipp==3.16.0
 +zipp==3.16.2
      # via importlib-metadata
- 
+
  # The following packages are considered to be unsafe in a requirements file:
 -pip==23.1.2
 +pip==23.2.1
@@ -578,7 +578,7 @@ index 30092961..28dd119d 100644
 -zipp==3.16.0
 +zipp==3.16.2
      # via importlib-metadata
- 
+
  # The following packages are considered to be unsafe in a requirements file:
 -pip==23.1.2
 +pip==23.2.1
@@ -808,7 +808,7 @@ index 4e82451a..861f713c 100644
      # via
      #   importlib-metadata
      #   importlib-resources
- 
+
  # The following packages are considered to be unsafe in a requirements file:
 -pip==23.1.2
 +pip==23.2.1
@@ -1046,7 +1046,7 @@ index 696797fd..35dc364d 100644
      # via
      #   importlib-metadata
      #   importlib-resources
- 
+
  # The following packages are considered to be unsafe in a requirements file:
 -pip==23.1.2
 +pip==23.2.1
@@ -1287,7 +1287,7 @@ index 384cdc65..f1483ac2 100644
      # via
      #   importlib-metadata
      #   importlib-resources
- 
+
  # The following packages are considered to be unsafe in a requirements file:
 -pip==23.1.2
 +pip==23.2.1
@@ -1408,8 +1408,8 @@ index cd82241d..f37ea199 100644
      qtconsole>=4.5.1
      rich>=12.0.0
 +    napari-plugin-manager >=0.1.0a2, <0.2.0
- release = 
+ release =
      PyGithub>=1.44.1
      twine>=3.1.1
--- 
+--
 2.34.1

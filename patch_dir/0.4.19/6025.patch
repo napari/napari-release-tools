@@ -38,7 +38,7 @@ index 5b3eff2b..b365734c 100644
 +++ b/napari/_vispy/visuals/points.py
 @@ -17,7 +17,14 @@ class PointsVisual(ClippingPlanesMixin, Compound):
      """
- 
+
      def __init__(self) -> None:
 -        super().__init__([Markers(), Markers(), Line(), Text()])
 +        super().__init__(
@@ -50,7 +50,7 @@ index 5b3eff2b..b365734c 100644
 +            ]
 +        )
          self.scaling = True
- 
+
      @property
 @@ -26,12 +33,12 @@ class PointsVisual(ClippingPlanesMixin, Compound):
          Scaling property for both the markers visuals. If set to true,
@@ -58,13 +58,13 @@ index 5b3eff2b..b365734c 100644
          """
 -        return self._subvisuals[0].scaling
 +        return self._subvisuals[0].scaling == 'visual'
- 
+
      @scaling.setter
      def scaling(self, value):
          for marker in self._subvisuals[:2]:
 -            marker.scaling = value
 +            marker.scaling = 'visual' if value else 'fixed'
- 
+
      @property
      def antialias(self):
 diff --git a/resources/constraints/constraints_py3.10.txt b/resources/constraints/constraints_py3.10.txt
@@ -458,7 +458,7 @@ index 758c681d..a081ce95 100644
 -zipp==3.15.0
 +zipp==3.16.0
      # via importlib-metadata
- 
+
  # The following packages are considered to be unsafe in a requirements file:
 -setuptools==67.7.2
 +pip==23.1.2
@@ -718,7 +718,7 @@ index d3a85530..30092961 100644
 -zipp==3.15.0
 +zipp==3.16.0
      # via importlib-metadata
- 
+
  # The following packages are considered to be unsafe in a requirements file:
 diff --git a/resources/constraints/constraints_py3.8.txt b/resources/constraints/constraints_py3.8.txt
 index 884ca141..4e82451a 100644
@@ -1111,7 +1111,7 @@ index 884ca141..4e82451a 100644
      # via
      #   importlib-metadata
      #   importlib-resources
- 
+
  # The following packages are considered to be unsafe in a requirements file:
 -setuptools==67.7.2
 +pip==23.1.2
@@ -1525,7 +1525,7 @@ index ffacc9bf..696797fd 100644
      # via
      #   importlib-metadata
      #   importlib-resources
- 
+
  # The following packages are considered to be unsafe in a requirements file:
 -setuptools==67.7.2
 +pip==23.1.2
@@ -1948,7 +1948,7 @@ index 1639bef1..384cdc65 100644
      # via
      #   importlib-metadata
      #   importlib-resources
- 
+
  # The following packages are considered to be unsafe in a requirements file:
 -setuptools==67.7.2
 +pip==23.1.2
@@ -2029,13 +2029,13 @@ index 29a65497..cd82241d 100644
 -    vispy>=0.12.1,<0.13
 +    vispy>=0.13.0,<0.14
      wrapt>=1.11.1
- 
+
 +
  [options.package_data]
  * = *.pyi
  napari_builtins =
      builtins.yaml
- 
+
 +
  # for explanation of %(extra)s syntax see:
  # https://github.com/pypa/setuptools/issues/1260#issuecomment-438187625
@@ -2043,7 +2043,7 @@ index 29a65497..cd82241d 100644
 @@ -166,6 +168,7 @@ build =
      ruff
      pyqt5
- 
+
 +
  [options.entry_points]
  console_scripts =
@@ -2051,10 +2051,10 @@ index 29a65497..cd82241d 100644
 @@ -213,6 +216,7 @@ layers=
      napari.qt
      napari.layers
- 
+
 +
  [importlinter:contract:3]
  name = "Block import from qt module in abstract ones"
  type = layers
--- 
+--
 2.34.1

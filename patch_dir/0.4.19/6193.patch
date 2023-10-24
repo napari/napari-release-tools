@@ -29,8 +29,8 @@ index 9f70a6f3..42e6ee6b 100644
  from typing import List
 @@ -1505,6 +1506,17 @@ def test_get_status_with_custom_index():
      )
- 
- 
+
+
 +def test_collision_warning():
 +    label = Labels(data=np.zeros((10, 10), dtype=np.uint8))
 +    with pytest.warns(
@@ -44,7 +44,7 @@ index 9f70a6f3..42e6ee6b 100644
 +
  def test_labels_features_event():
      event_emitted = False
- 
+
 diff --git a/napari/layers/labels/labels.py b/napari/layers/labels/labels.py
 index 086f5755..4a83196a 100644
 --- a/napari/layers/labels/labels.py
@@ -64,11 +64,11 @@ index 086f5755..4a83196a 100644
 +    Tuple,
 +    Union,
 +)
- 
+
  import numpy as np
  import pandas as pd
 @@ -532,8 +541,11 @@ class Labels(_ImageBase):
- 
+
          if self._background_label not in color:
              color[self._background_label] = 'transparent'
 -        if None not in color:
@@ -78,13 +78,13 @@ index 086f5755..4a83196a 100644
 +        self._validate_colors(color)
 +
 +        color[None] = none_color
- 
+
          colors = {
              label: transform_color(color_str)[0]
 @@ -557,6 +569,45 @@ class Labels(_ImageBase):
- 
+
          self.color_mode = color_mode
- 
+
 +    @classmethod
 +    def _validate_colors(cls, labels: Iterable[int]):
 +        """Check whether any of the given labels will be aliased together.
@@ -126,16 +126,16 @@ index 086f5755..4a83196a 100644
 +
      def _is_default_colors(self, color):
          """Returns True if color contains only default colors, otherwise False.
- 
+
 @@ -769,7 +820,8 @@ class Labels(_ImageBase):
              self.mode = Mode.PAN_ZOOM
              self._reset_history()
- 
+
 -    def _to_vispy_texture_dtype(self, data):
 +    @staticmethod
 +    def _to_vispy_texture_dtype(data):
          """Convert data to a dtype that can be used as a VisPy texture.
- 
+
          Labels layers allow all integer dtypes for data, but only a subset
--- 
+--
 2.34.1

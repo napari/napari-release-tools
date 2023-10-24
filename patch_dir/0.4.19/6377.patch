@@ -34,12 +34,12 @@ index 100849fe..275ee8c8 100644
 +++ b/napari/layers/utils/_link_layers.py
 @@ -7,6 +7,8 @@ from typing import TYPE_CHECKING, Callable, DefaultDict, Iterable, Set, Tuple
  from weakref import ReferenceType, ref
- 
+
  if TYPE_CHECKING:
 +    from collections import abc
 +
      from napari.layers import Layer
- 
+
  from napari.utils.events.event import WarningEmitter
 @@ -35,9 +37,10 @@ def get_linked_layers(*layers: Layer) -> Set[Layer]:
      directly linked to each other.  This is useful for context menu generation.
@@ -51,20 +51,20 @@ index 100849fe..275ee8c8 100644
 -    return {x() for x in refs if x() is not None}
 +    linked_layers = {x() for x in refs}
 +    return {x for x in linked_layers if x is not None}
- 
- 
+
+
  def link_layers(
 @@ -127,7 +130,7 @@ def link_layers(
              setter.__qualname__ = f"set_{attr}_on_layer_{id(l2)}"
              return setter
- 
+
 -        # acually make the connection
 +        # actually make the connection
          callback = _make_l2_setter()
          emitter_group = getattr(lay1.events, attribute)
          emitter_group.connect(callback)
 @@ -187,8 +190,8 @@ def layers_linked(layers: Iterable[Layer], attributes: Iterable[str] = ()):
- 
+
  def _get_common_evented_attributes(
      layers: Iterable[Layer],
 -    exclude: set[str] = frozenset(
@@ -81,14 +81,14 @@ index 20af93b9..4bff1fe6 100644
 @@ -90,7 +90,7 @@ def test_removed_linked_target():
      l1.opacity = 0.5
      assert l1.opacity == l2.opacity == l3.opacity == 0.5
- 
+
 -    # if we delete layer3 we shouldn't get an error when updating otherlayers
 +    # if we delete layer3 we shouldn't get an error when updating other layers
      del l3
      l1.opacity = 0.25
      assert l1.opacity == l2.opacity
 @@ -142,7 +142,7 @@ def test_unlink_single_layer():
- 
+
      link_layers([l1, l2, l3])
      assert len(l1.events.opacity.callbacks) == 2
 -    unlink_layers([l1], ('opacity',))  # just unlink L1 opacicity from others
@@ -114,5 +114,5 @@ index 20af93b9..4bff1fe6 100644
 +
 +    assert not l1.loaded
 +    assert l2.loaded
--- 
+--
 2.34.1

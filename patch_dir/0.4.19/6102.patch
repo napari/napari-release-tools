@@ -131,11 +131,11 @@ index f2a29335..9384db54 100644
  from enum import Enum
 -from typing import Optional
 +from typing import Optional, cast
- 
+
  import numpy as np
 -from pydantic import PrivateAttr, validator
 +from pydantic import Field, PrivateAttr, validator
- 
+
  from napari.utils.color import ColorArray
  from napari.utils.colormaps.colorbars import make_colorbar
 @@ -51,7 +51,7 @@ class Colormap(EventedModel):
@@ -144,12 +144,12 @@ index f2a29335..9384db54 100644
      interpolation: ColormapInterpolationMode = ColormapInterpolationMode.LINEAR
 -    controls: Array[np.float32, (-1,)] = None
 +    controls: Array = Field(default_factory=lambda: cast(Array, []))
- 
+
      def __init__(
          self, colors, display_name: Optional[str] = None, **data
 @@ -63,7 +63,7 @@ class Colormap(EventedModel):
          self._display_name = display_name
- 
+
      # controls validator must be called even if None for correct initialization
 -    @validator('controls', pre=True, always=True)
 +    @validator('controls', pre=True, always=True, allow_reuse=True)
@@ -198,8 +198,8 @@ index 169fe589..91e85579 100644
              name = colormap.name
 @@ -742,14 +759,18 @@ def ensure_colormap(colormap: ValidColormapArg) -> Colormap:
      return AVAILABLE_COLORMAPS[name]
- 
- 
+
+
 -def _colormap_from_colors(colors: ColorType) -> Optional[Colormap]:
 +def _colormap_from_colors(
 +    colors: ColorType,
@@ -214,8 +214,8 @@ index 169fe589..91e85579 100644
          color_array = np.array([[0, 0, 0, 1], color_array[0]])
 -    return Colormap(color_array)
 +    return Colormap(color_array, name=name, display_name=display_name)
- 
- 
+
+
  def make_default_color_array():
--- 
+--
 2.34.1

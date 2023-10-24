@@ -31,16 +31,16 @@ index e1b15d6a..e77be983 100644
  """
 -from enum import Enum
  from typing import NamedTuple, Optional
- 
+
 +from napari.utils.compat import StrEnum
  from napari.utils.translations import trans
- 
- 
+
+
  # fmt: off
 -class CommandId(str, Enum):
 +class CommandId(StrEnum):
      """Id representing a napari command."""
- 
+
      # View menubar
 diff --git a/napari/_app_model/constants/_menus.py b/napari/_app_model/constants/_menus.py
 index d033e357..0682c1f4 100644
@@ -49,15 +49,15 @@ index d033e357..0682c1f4 100644
 @@ -11,10 +11,10 @@ SOME of these (but definitely not all) will be exposed as "contributable"
  menus for plugins to contribute commands and submenu items to.
  """
- 
+
 -from enum import Enum
 +from napari.utils.compat import StrEnum
- 
- 
+
+
 -class MenuId(str, Enum):
 +class MenuId(StrEnum):
      """Id representing a menu somewhere in napari."""
- 
+
      MENUBAR_VIEW = 'napari/view'
 diff --git a/napari/components/_viewer_constants.py b/napari/components/_viewer_constants.py
 index 7e0fa081..031e6967 100644
@@ -66,21 +66,21 @@ index 7e0fa081..031e6967 100644
 @@ -1,7 +1,7 @@
 -from enum import Enum
 +from napari.utils.compat import StrEnum
- 
- 
+
+
 -class CanvasPosition(str, Enum):
 +class CanvasPosition(StrEnum):
      """Canvas overlay position.
- 
+
      Sets the position of an object in the canvas
 @@ -21,7 +21,7 @@ class CanvasPosition(str, Enum):
      BOTTOM_LEFT = 'bottom_left'
- 
- 
+
+
 -class CursorStyle(str, Enum):
 +class CursorStyle(StrEnum):
      """CursorStyle: Style on the cursor.
- 
+
      Sets the style of the cursor
 diff --git a/napari/layers/utils/_color_manager_constants.py b/napari/layers/utils/_color_manager_constants.py
 index c9049ee5..1bfea8cd 100644
@@ -89,8 +89,8 @@ index c9049ee5..1bfea8cd 100644
 @@ -1,7 +1,7 @@
 -from enum import Enum
 +from napari.utils.compat import StrEnum
- 
- 
+
+
 -class ColorMode(str, Enum):
 +class ColorMode(StrEnum):
      """
@@ -102,11 +102,11 @@ index 28c4dd19..c4e6c802 100644
 +++ b/napari/settings/_constants.py
 @@ -1,5 +1,6 @@
  from enum import auto
- 
+
 +from napari.utils.compat import StrEnum
  from napari.utils.misc import StringEnum
- 
- 
+
+
 @@ -20,3 +21,11 @@ class LoopMode(StringEnum):
      ONCE = auto()
      LOOP = auto()
@@ -147,22 +147,22 @@ index 9384db54..762debc5 100644
  from collections import defaultdict
 -from enum import Enum
  from typing import Optional, cast
- 
+
  import numpy as np
 @@ -7,12 +6,13 @@ from pydantic import Field, PrivateAttr, validator
- 
+
  from napari.utils.color import ColorArray
  from napari.utils.colormaps.colorbars import make_colorbar
 +from napari.utils.compat import StrEnum
  from napari.utils.events import EventedModel
  from napari.utils.events.custom_types import Array
  from napari.utils.translations import trans
- 
- 
+
+
 -class ColormapInterpolationMode(str, Enum):
 +class ColormapInterpolationMode(StrEnum):
      """INTERPOLATION: Interpolation mode for colormaps.
- 
+
      Selects an interpolation mode for the colormap.
 diff --git a/napari/utils/compat.py b/napari/utils/compat.py
 new file mode 100644
@@ -182,5 +182,5 @@ index 00000000..89fe7c6e
 +
 +    class StrEnum(str, Enum):
 +        pass
--- 
+--
 2.34.1

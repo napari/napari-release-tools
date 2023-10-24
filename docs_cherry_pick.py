@@ -11,9 +11,9 @@ from git import Repo
 from tqdm import tqdm
 
 from release_utils import (
+    PR_NUM_PATTERN,
     get_milestone,
     iter_pull_request,
-    PR_NUM_PATTERN,
     setup_cache,
 )
 

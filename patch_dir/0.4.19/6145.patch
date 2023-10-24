@@ -35,28 +35,28 @@ index 3733372c..eb5e8c0b 100644
 +            'napari:orient_plane_normal_along_view_direction_no_gen',
              self.planeNormalButtons.obliqueButton,
          )
- 
+
 diff --git a/napari/layers/base/base.py b/napari/layers/base/base.py
 index 8231e087..d5ca0e5c 100644
 --- a/napari/layers/base/base.py
 +++ b/napari/layers/base/base.py
 @@ -1365,7 +1365,7 @@ class Layer(KeymapProvider, MousemapProvider, ABC):
          return tuple(normalized_vector)
- 
+
      def _world_to_displayed_data_ray(
 -        self, vector_world, dims_displayed
 +        self, vector_world: npt.ArrayLike, dims_displayed: List[int]
      ) -> np.ndarray:
          """Convert an orientation from world to displayed data coordinates.
- 
+
 diff --git a/napari/layers/image/_image_key_bindings.py b/napari/layers/image/_image_key_bindings.py
 index 763f7f4e..e271363b 100644
 --- a/napari/layers/image/_image_key_bindings.py
 +++ b/napari/layers/image/_image_key_bindings.py
 @@ -55,18 +55,14 @@ def orient_plane_normal_along_view_direction(layer: Image):
      )
- 
- 
+
+
 -@Image.bind_key('Space', overwrite=True)
 -def hold_to_pan_zoom(layer):
 -    """Hold to pan and zoom in the viewer."""
@@ -77,17 +77,17 @@ index 763f7f4e..e271363b 100644
 +    layer.plane.normal = layer._world_to_displayed_data_ray(
 +        viewer.camera.view_direction, [-3, -2, -1]
 +    )
- 
- 
+
+
  @register_image_action(trans._('Transform'))
 @@ -76,7 +72,7 @@ def activate_image_transform_mode(layer):
- 
+
  @register_image_action(trans._('Pan/zoom'))
  def activate_image_pan_zoom_mode(layer: Image):
 -    layer.mode = Mode.PAN_ZOOM
 +    layer.mode = str(Mode.PAN_ZOOM)
- 
- 
+
+
  image_fun_to_mode = [
 diff --git a/napari/utils/_tests/test_action_manager.py b/napari/utils/_tests/test_action_manager.py
 index 877ed255..b3562cd1 100644
@@ -100,7 +100,7 @@ index 877ed255..b3562cd1 100644
 +from unittest.mock import Mock
 +
  import pytest
- 
+
  from napari.utils.action_manager import ActionManager
 @@ -48,3 +50,18 @@ def test_bind_unbind_existing_action(action_manager):
      assert action_manager.bind_shortcut('napari:test_action_1', 'X') is None
@@ -128,7 +128,7 @@ index 0dcc0684..e60d7739 100644
 @@ -216,7 +216,9 @@ class ActionManager:
          """
          self._validate_action_name(name)
- 
+
 -        if (action := self._actions.get(name)) and isgeneratorfunction(action):
 +        if (action := self._actions.get(name)) and isgeneratorfunction(
 +            getattr(action, "command", None)
@@ -139,7 +139,7 @@ index 0dcc0684..e60d7739 100644
 @@ -224,7 +226,10 @@ class ActionManager:
                  )
              )
- 
+
 -        button.clicked.connect(lambda: self.trigger(name))
 +        def _trigger():
 +            self.trigger(name)
@@ -148,5 +148,5 @@ index 0dcc0684..e60d7739 100644
          if name in self._actions:
              button.setToolTip(
                  f'{self._build_tooltip(name)} {extra_tooltip_text}'
--- 
+--
 2.34.1

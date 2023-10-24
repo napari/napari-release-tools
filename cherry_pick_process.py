@@ -33,9 +33,7 @@ def main():
     parser.add_argument(
         "--first-commits", help="file with list of first commits to cherry pick"
     )
-    parser.add_argument(
-        "--stop-after", help="Stop after this PR", default=0, type=int
-    )
+    parser.add_argument("--stop-after", help="Stop after this PR", default=0, type=int)
     parser.add_argument(
         "--git-main-branch",
         help="The git main branch",
@@ -46,7 +44,10 @@ def main():
         "--working-dir", help="path to repository", default=LOCAL_DIR, type=Path
     )
     parser.add_argument(
-        "--skip-commits", nargs="+", help="list of commits to skip as they are already cherry-picked", type=int
+        "--skip-commits",
+        nargs="+",
+        help="list of commits to skip as they are already cherry-picked",
+        type=int,
     )
 
     argcomplete.autocomplete(parser)
@@ -179,7 +180,6 @@ def perform_cherry_pick(
     for el in pr_list:
         if el.number in consumed_pr:
             print(el, el.number in consumed_pr)
-
 
     for pull in tqdm(pr_list):
         if pull.number in consumed_pr:

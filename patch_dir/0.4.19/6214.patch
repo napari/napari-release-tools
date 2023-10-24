@@ -674,7 +674,7 @@ index b034be78..6c36a17e 100644
 +    # via napari (napari_repo/setup.cfg)
 +zipp==3.17.0
      # via importlib-metadata
- 
+
  # The following packages are considered to be unsafe in a requirements file:
  pip==23.2.1
      # via napari-plugin-manager
@@ -1314,7 +1314,7 @@ index 4bf09eab..d1011933 100644
 +    # via napari (napari_repo/setup.cfg)
 +zipp==3.17.0
      # via importlib-metadata
- 
+
  # The following packages are considered to be unsafe in a requirements file:
  pip==23.2.1
      # via napari-plugin-manager
@@ -3327,8 +3327,7 @@ index f37ea199..39dffc1f 100644
 -    vispy>=0.13.0,<0.14
 +    vispy>=0.14.1,<0.15
      wrapt>=1.11.1
- 
- 
--- 
-2.34.1
 
+
+--
+2.34.1

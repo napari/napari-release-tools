@@ -45,7 +45,7 @@ index 798d8034..0e808867 100644
 @@ -123,6 +123,9 @@ class ActionType(StringEnum):
      Action types for layer.events.data of Shapes and Points layer.
      """
- 
+
 -    ADD = auto()
 -    REMOVE = auto()
 -    CHANGE = auto()
@@ -60,13 +60,13 @@ index fb638416..ee1e02bf 100644
 --- a/napari/layers/points/_points_mouse_bindings.py
 +++ b/napari/layers/points/_points_mouse_bindings.py
 @@ -2,6 +2,7 @@ from typing import Set, TypeVar
- 
+
  import numpy as np
- 
+
 +from napari.layers.base import ActionType
  from napari.layers.points._points_utils import _points_in_box_3d, points_in_box
- 
- 
+
+
 @@ -68,6 +69,16 @@ def select(layer, event):
          coordinates = layer.world_to_data(event.position)
          # If not holding modifying selection and points selected then drag them
@@ -91,7 +91,7 @@ index 00a52c35..1fd7abbc 100644
 @@ -457,6 +457,7 @@ def test_remove_selected_updates_value():
      data = 20 * np.random.random(shape)
      layer = Points(data)
- 
+
 +    old_data = layer.data
      layer.events.data = Mock()
      # set the value
@@ -137,11 +137,11 @@ index 00a52c35..1fd7abbc 100644
      layer = Points()
 +    old_data = layer.data
      assert len(getattr(layer, f'{attribute}_color')) == 0
- 
+
      layer.events.data = Mock()
 @@ -1155,9 +1163,15 @@ def test_add_point_direct(attribute: str):
      coord = [18, 18]
- 
+
      layer.add(coord)
 +    assert layer.events.data.call_args_list[0][1] == {
 +        "value": old_data,
@@ -162,8 +162,8 @@ index 00a52c35..1fd7abbc 100644
      layer.data = np.random.random((5, 2))
 -    emitted_events.assert_called_once()
 +    assert emitted_events.call_count == 2
- 
- 
+
+
 -def test_points_add_delete_only_emit_one_event():
 +def test_points_add_delete_only_emit_two_events():
      data = np.random.random((5, 2))
@@ -280,7 +280,7 @@ index 7ea27318..c713f188 100644
 +        else:
 +            kwargs["action"] = ActionType.REMOVED
 +        self.events.data(**kwargs)
- 
+
      def _set_data(self, data: Optional[np.ndarray]):
          """Set the .data array attribute, without emitting an event."""
 @@ -1928,10 +1953,16 @@ class Points(Layer):
@@ -368,7 +368,7 @@ index 07582367..244af715 100644
 @@ -526,6 +526,12 @@ def vertex_insert(layer: Shapes, event: MouseEvent) -> None:
          elif int(ind) == len(vertices) - 1 and loc > 1:
              ind = ind + 1
- 
+
 +    layer.events.data(
 +        value=layer.data,
 +        action=ActionType.CHANGING,
@@ -390,7 +390,7 @@ index 07582367..244af715 100644
 @@ -560,6 +566,13 @@ def vertex_remove(layer: Shapes, event: MouseEvent) -> None:
          # No vertex was clicked on so return
          return
- 
+
 +    layer.events.data(
 +        value=layer.data,
 +        action=ActionType.CHANGING,
@@ -441,12 +441,12 @@ index ae331378..6c64d08e 100644
      properties = {'shape_type': _make_cycled_properties(['A', 'B'], shape[0])}
      layer = Shapes(data, properties=properties)
 +    layer.events.data = Mock()
- 
+
      # test setting to data with fewer shapes
      n_new_shapes = 4
 @@ -949,10 +950,21 @@ def test_polygons(shape):
      assert np.all([s == 'polygon' for s in layer2.shape_type])
- 
+
      # Avoid a.any(), a.all()
 -    assert np.array_equal(layer2.events.data.call_args[1]["value"], layer.data)
 -    assert layer2.events.data.call_args[1]["action"] == ActionType.ADD.value
@@ -467,8 +467,8 @@ index ae331378..6c64d08e 100644
 +    )
 +    assert layer2.events.data.call_args_list[0][1]["data_indices"] == (-1,)
 +    assert layer2.events.data.call_args_list[0][1]["vertex_indices"] == ((),)
- 
- 
+
+
  def test_add_polygons_raises_error():
 @@ -1210,10 +1222,24 @@ def test_removing_all_shapes_empty_list():
      data = 20 * np.random.random((10, 4, 2))
@@ -477,7 +477,7 @@ index ae331378..6c64d08e 100644
 +    layer.events.data = Mock()
 +    old_data = layer.data
      assert layer.nshapes == 10
- 
+
      layer.data = []
      assert layer.nshapes == 0
 +    assert layer.events.data.call_args_list[0][1] == {
@@ -492,8 +492,8 @@ index ae331378..6c64d08e 100644
 +        "data_indices": (),
 +        "vertex_indices": ((),),
 +    }
- 
- 
+
+
  def test_removing_all_shapes_empty_array():
 @@ -1221,10 +1247,24 @@ def test_removing_all_shapes_empty_array():
      data = 20 * np.random.random((10, 4, 2))
@@ -502,7 +502,7 @@ index ae331378..6c64d08e 100644
 +    layer.events.data = Mock()
 +    old_data = layer.data
      assert layer.nshapes == 10
- 
+
      layer.data = np.empty((0, 2))
      assert layer.nshapes == 0
 +    assert layer.events.data.call_args_list[0][1] == {
@@ -517,8 +517,8 @@ index ae331378..6c64d08e 100644
 +        "data_indices": (),
 +        "vertex_indices": ((),),
 +    }
- 
- 
+
+
  def test_removing_selected_shapes():
 @@ -1236,17 +1276,27 @@ def test_removing_selected_shapes():
      shape_type = ['polygon'] * 5 + ['rectangle'] * 3 + ['ellipse'] * 2
@@ -529,7 +529,7 @@ index ae331378..6c64d08e 100644
      layer.remove_selected()
 +    layer.events.data.assert_not_called()
      assert len(layer.data) == len(data)
- 
+
      # Select three shapes and remove them
      selection = {1, 7, 8}
      layer.selected_data = selection
@@ -552,8 +552,8 @@ index ae331378..6c64d08e 100644
          ),
 @@ -2241,22 +2291,22 @@ def test_editing_4d():
      ]
- 
- 
+
+
 -def test_points_data_setter_emits_event():
 +def test_shapes_data_setter_emits_event():
      data = np.random.random((4, 2))
@@ -563,8 +563,8 @@ index ae331378..6c64d08e 100644
      layer.data = np.random.random((4, 2))
 -    emitted_events.assert_called_once()
 +    assert emitted_events.call_count == 2
- 
- 
+
+
 -def test_points_add_delete_only_emit_one_event():
 +def test_shapes_add_delete_only_emit_two_events():
      data = np.random.random((4, 2))
@@ -584,7 +584,7 @@ index c38e6b12..6653fdc2 100644
 +++ b/napari/layers/shapes/_tests/test_shapes_mouse_bindings.py
 @@ -52,6 +52,8 @@ def create_known_shapes_layer():
      n_shapes = len(data)
- 
+
      layer = Shapes(data)
 +    # very zoomed in, guaranteed no overlap between vertices
 +    layer.scale_factor = 0.001
@@ -662,11 +662,11 @@ index c38e6b12..6653fdc2 100644
 -    # Check new shape added at coordinates
      assert len(layer.data) == n_shapes
      assert len(layer.data[0]) == n_coord - 1
- 
+
 @@ -474,6 +478,7 @@ def test_drag_shape(create_known_shapes_layer, Event):
      layer, n_shapes, _ = create_known_shapes_layer
      layer.events.data = Mock()
- 
+
 +    old_data = layer.data
      layer.mode = 'select'
      # Zoom in so as to not select any vertices
@@ -694,7 +694,7 @@ index c38e6b12..6653fdc2 100644
      layer.selected_data = {0}
 -    position = tuple(layer.data[0][0])
 +    old_position = tuple(layer.data[0][0])
- 
+
      # Simulate click
      event = ReadOnlyWrapper(
 @@ -652,21 +663,23 @@ def test_drag_vertex(create_known_shapes_layer, Event):
@@ -708,7 +708,7 @@ index c38e6b12..6653fdc2 100644
          )
      )
      mouse_press_callbacks(layer, event)
- 
+
 -    position = [0, 0]
 +    new_position = [0, 0]
 +    assert np.all(new_position != old_position)
@@ -748,8 +748,8 @@ index c38e6b12..6653fdc2 100644
      }
 -    np.testing.assert_allclose(layer.data[0][-1], [0, 0])
 +    np.testing.assert_allclose(layer.data[0][0], [0, 0])
- 
- 
+
+
  @pytest.mark.parametrize(
 diff --git a/napari/layers/shapes/shapes.py b/napari/layers/shapes/shapes.py
 index 72eebfb3..0f00bb92 100644
@@ -785,7 +785,7 @@ index 72eebfb3..0f00bb92 100644
 +            kwargs["data_indices"] = tuple(i for i in range(len(data)))
 +        else:
 +            kwargs["action"] = ActionType.REMOVING
- 
+
 +        self.events.data(**kwargs)
          self._data_view = ShapeList(ndisplay=self._slice_input.ndisplay)
          self._data_view.slice_key = np.array(self._slice_indices)[
@@ -814,7 +814,7 @@ index 72eebfb3..0f00bb92 100644
 +        self.events.data(**kwargs)
 +
          self._reset_editable()
- 
+
      def _on_selection(self, selected: bool):
 @@ -1943,6 +1965,7 @@ class Shapes(Layer):
          edge_color=None,
@@ -823,7 +823,7 @@ index 72eebfb3..0f00bb92 100644
 +        gui=False,
      ):
          """Add shapes to the current layer.
- 
+
 @@ -1983,12 +2006,20 @@ class Shapes(Layer):
              same length as the length of `data` and each element will be
              applied to each shape otherwise the same value will be used for all
@@ -832,9 +832,9 @@ index 72eebfb3..0f00bb92 100644
 +            Whether the shape is drawn by drawing in the gui.
          """
          data, shape_type = extract_shape_type(data, shape_type)
- 
+
          n_new_shapes = number_of_shapes(data)
- 
+
          if n_new_shapes > 0:
 +            self.events.data(
 +                value=self.data,
@@ -863,7 +863,7 @@ index 72eebfb3..0f00bb92 100644
 +                    data_indices=(-1,),
 +                    vertex_indices=((),),
 +                )
- 
+
      def _init_shapes(
          self,
 @@ -2502,33 +2535,37 @@ class Shapes(Layer):
@@ -930,14 +930,14 @@ index 72eebfb3..0f00bb92 100644
 +            )
          self._is_creating = False
          self._update_dims()
- 
+
 @@ -2582,10 +2619,19 @@ class Shapes(Layer):
          """Remove any selected shapes."""
          index = list(self.selected_data)
          to_remove = sorted(index, reverse=True)
 -        for ind in to_remove:
 -            self._data_view.remove(ind)
- 
+
          if len(index) > 0:
 +            self.events.data(
 +                value=self.data,
@@ -976,8 +976,8 @@ index 72eebfb3..0f00bb92 100644
 -            ),
 -            vertex_indices=((),),
 -        )
- 
+
      def _rotate_box(self, angle, center=(0, 0)):
          """Perform a rotation on the selected box.
--- 
+--
 2.34.1

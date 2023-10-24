@@ -51,7 +51,6 @@ index e1487515..857938ba 100644
 +envlist = py{38,39,310,311}-{linux,macos,windows}-{pyqt5,pyside2,pyqt6,pyside6,headless},mypy
  isolated_build = true
  toxworkdir=/tmp/.tox
- 
--- 
-2.34.1
 
+--
+2.34.1

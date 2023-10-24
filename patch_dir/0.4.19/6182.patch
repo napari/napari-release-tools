@@ -39,7 +39,7 @@ index 0008adb1..24197b37 100644
 +    grid_position = hash2d_get(k + 1, keys)[0]
      # divide by shape and set to RG values like in shader (tex coords)
      texel_pos_img[:, k, :2] = (np.array(grid_position) + 0.5) / tex_shape
- 
+
 diff --git a/napari/_vispy/_tests/test_vispy_labels.py b/napari/_vispy/_tests/test_vispy_labels.py
 new file mode 100644
 index 00000000..10a46fa1
@@ -174,11 +174,11 @@ index 954fef39..bdc414f6 100644
 @@ -183,7 +183,7 @@ class VispyImageLayer(VispyBaseLayer):
          if isinstance(self.node, VolumeNode):
              self.node.raycasting_mode = str(self.layer.depiction)
- 
+
 -    def _on_colormap_change(self):
 +    def _on_colormap_change(self, event=None):
          self.node.cmap = VispyColormap(*self.layer.colormap)
- 
+
      def _update_mip_minip_cutoff(self):
 diff --git a/napari/_vispy/layers/labels.py b/napari/_vispy/layers/labels.py
 index e932c59d..d1d2dcd1 100644
@@ -194,7 +194,7 @@ index e932c59d..d1d2dcd1 100644
  from vispy.gloo import Texture2D
 @@ -7,7 +11,36 @@ from vispy.visuals.image import ImageVisual
  from vispy.visuals.shaders import Function, FunctionChain
- 
+
  from napari._vispy.layers.image import ImageLayerNode, VispyImageLayer
 +from napari._vispy.utils.gl import get_max_texture_sizes
  from napari._vispy.visuals.volume import Volume as VolumeNode
@@ -226,7 +226,7 @@ index e932c59d..d1d2dcd1 100644
 +MAX_TEXTURE_SIZE = None
 +
 +ColorTuple = Tuple[float, float, float, float]
- 
+
  low_disc_lookup_shader = """
  uniform sampler2D texture2D_LUT;
 @@ -39,6 +72,7 @@ direct_lookup_shader = """
@@ -234,8 +234,8 @@ index e932c59d..d1d2dcd1 100644
  uniform sampler2D texture2D_values;
  uniform vec2 LUT_shape;
 +uniform int color_count;
- 
- 
+
+
  vec4 sample_label_color(float t) {
 @@ -68,8 +102,14 @@ vec4 sample_label_color(float t) {
      // we get a different value:
@@ -272,19 +272,19 @@ index e932c59d..d1d2dcd1 100644
 +            .replace("$selection", str(selection))
 +            .replace("$collision", str(collision).lower())
 +        )
- 
- 
+
+
 -def idx_to_2D(idx, shape):
 +def idx_to_2d(idx, shape):
      """
      From a 1D index generate a 2D index that fits the given shape.
- 
+
      The 2D index will wrap around line by line and back to the beginning.
      """
 -    return (idx // shape[1]) % shape[0], (idx % shape[1])
 +    return int((idx // shape[1]) % shape[0]), int(idx % shape[1])
- 
- 
+
+
 -def hash2d_get(key, keys, values, empty_val=0):
 +def hash2d_get(key, keys, empty_val=0):
      """
@@ -302,8 +302,8 @@ index e932c59d..d1d2dcd1 100644
 -    return pos if keys[pos] == key else None
 +        pos = idx_to_2d(key, keys.shape)
 +    return pos if keys[pos] == initial_key else None
- 
- 
+
+
 -def hash2d_set(key, value, keys, values, empty_val=0):
 +def hash2d_set(
 +    key: Union[float, np.floating],
@@ -333,7 +333,7 @@ index e932c59d..d1d2dcd1 100644
 +        pos = idx_to_2d(key, keys.shape)
 +    keys[pos] = initial_key
      values[pos] = value
- 
+
 +    return collision
 +
 +
@@ -353,7 +353,7 @@ index e932c59d..d1d2dcd1 100644
 +    given keys, returning that combination.
 +
 +    If no combination can be found, returns None.
- 
+
 -def build_textures_from_dict(color_dict, empty_val=0, shape=(1000, 1000)):
 -    keys = np.full(shape, empty_val, dtype=np.float32)
 -    values = np.zeros(shape + (4,), dtype=np.float32)
@@ -528,19 +528,19 @@ index e932c59d..d1d2dcd1 100644
 +        collision |= hash2d_set(key_, value, keys, values)
 +
 +    return keys, values, collision
- 
- 
+
+
  class VispyLabelsLayer(VispyImageLayer):
 @@ -185,13 +420,13 @@ class VispyLabelsLayer(VispyImageLayer):
              layer_node_class=LabelLayerNode,
          )
- 
+
 -        self.layer.events.color_mode.connect(self._on_colormap_change)
 +        # self.layer.events.color_mode.connect(self._on_colormap_change)
          self.layer.events.labels_update.connect(self._on_partial_labels_update)
          self.layer.events.selected_label.connect(self._on_colormap_change)
          self.layer.events.show_selected_label.connect(self._on_colormap_change)
- 
+
      def _on_rendering_change(self):
 -        # overriding the Image method so we can maintain the same old rendering name
 +        # overriding the Image method, so we can maintain the same old rendering name
@@ -559,7 +559,7 @@ index e932c59d..d1d2dcd1 100644
 +            return
          colormap = self.layer.colormap
          mode = self.layer.color_mode
- 
+
 @@ -221,10 +462,16 @@ class VispyLabelsLayer(VispyImageLayer):
              color_dict = (
                  self.layer.color
@@ -618,7 +618,7 @@ index 4a83196a..6a1d801e 100644
 +        self.events.colormap()  # If remove this emitting, connect shader update to color_mode
          self.events.selected_label()
          self.refresh()
- 
+
 @@ -747,6 +748,7 @@ class Labels(_ImageBase):
      def show_selected_label(self, show_selected):
          self._show_selected_label = show_selected
@@ -633,17 +633,17 @@ index 4a83196a..6a1d801e 100644
          """
 -        return data.astype(np.float32)
 +        return vispy_texture_dtype(data)
- 
+
      def _partial_labels_refresh(self):
          """Prepares and displays only an updated part of the labels."""
 @@ -842,7 +844,7 @@ class Labels(_ImageBase):
- 
+
          # Keep only the dimensions that correspond to the current view
          updated_slice = tuple(
 -            [self._updated_slice[index] for index in dims_displayed]
 +            self._updated_slice[index] for index in dims_displayed
          )
- 
+
          offset = [axis_slice.start for axis_slice in updated_slice]
 diff --git a/napari/utils/_dtype.py b/napari/utils/_dtype.py
 index c77ae904..4f9d3516 100644
@@ -656,5 +656,5 @@ index c77ae904..4f9d3516 100644
 +
 +
 +vispy_texture_dtype = np.float32
--- 
+--
 2.34.1

@@ -155,15 +155,15 @@ index f8c4f9d3..9f70a6f3 100644
 +    mapped_colors1 = layer.colormap.map(
 +        layer._to_vispy_texture_dtype(layer._slice.image.raw)
 +    )
- 
+
      layer.new_colormap()
 -    mapped_colors2 = layer.colormap.map(layer._as_type(layer._slice.image.raw))
 +    mapped_colors2 = layer.colormap.map(
 +        layer._to_vispy_texture_dtype(layer._slice.image.raw)
 +    )
- 
+
      assert not np.allclose(mapped_colors1, mapped_colors2)
- 
+
 diff --git a/napari/layers/labels/labels.py b/napari/layers/labels/labels.py
 index 00873ae5..93a6d5fc 100644
 --- a/napari/layers/labels/labels.py
@@ -174,13 +174,13 @@ index 00873ae5..93a6d5fc 100644
  from contextlib import contextmanager
 -from typing import Dict, List, Optional, Tuple, Union
 +from typing import Callable, ClassVar, Dict, List, Optional, Tuple, Union
- 
+
  import numpy as np
 +import numpy.typing as npt
  import pandas as pd
  from scipy import ndimage as ndi
 +from skimage.draw import polygon2mask
- 
+
  from napari.layers.base import Layer, no_op
  from napari.layers.base._base_mouse_bindings import (
 @@ -13,13 +15,18 @@ from napari.layers.base._base_mouse_bindings import (
@@ -221,9 +221,9 @@ index 00873ae5..93a6d5fc 100644
  from napari.utils.status_messages import generate_layer_coords_status
  from napari.utils.translations import trans
 @@ -212,31 +218,36 @@ class Labels(_ImageBase):
- 
+
      _modeclass = Mode
- 
+
 -    _drag_modes = {
 +    _drag_modes: ClassVar[Dict[Mode, Callable[["Labels", Event], None]]] = {  # type: ignore[assignment]
          Mode.PAN_ZOOM: no_op,
@@ -234,7 +234,7 @@ index 00873ae5..93a6d5fc 100644
          Mode.ERASE: draw,
 +        Mode.POLYGON: no_op,  # the overlay handles mouse events in this mode
      }
- 
+
 -    _move_modes = {
 +    brush_size_on_mouse_move = BrushSizeOnMouseMove(min_brush_size=1)
 +
@@ -249,7 +249,7 @@ index 00873ae5..93a6d5fc 100644
 +        Mode.ERASE: brush_size_on_mouse_move,
 +        Mode.POLYGON: no_op,  # the overlay handles mouse events in this mode
      }
- 
+
 -    _cursor_modes = {
 +    _cursor_modes: ClassVar[Dict[Mode, str]] = {  # type: ignore[assignment]
          Mode.PAN_ZOOM: 'standard',
@@ -260,7 +260,7 @@ index 00873ae5..93a6d5fc 100644
          Mode.ERASE: 'circle',
 +        Mode.POLYGON: 'cross',
      }
- 
+
      _history_limit = 100
 @@ -278,8 +289,8 @@ class Labels(_ImageBase):
          self._color_mode = LabelColorMode.AUTO
@@ -270,13 +270,13 @@ index 00873ae5..93a6d5fc 100644
 -        self._cached_mapped_labels = None
 +        self._cached_labels: Optional[np.ndarray] = None
 +        self._cached_mapped_labels: Optional[np.ndarray] = None
- 
+
          data = self._ensure_int_labels(data)
- 
+
 @@ -325,6 +336,12 @@ class Labels(_ImageBase):
              labels_update=Event,
          )
- 
+
 +        from napari.components.overlays.labels_polygon import (
 +            LabelsPolygonOverlay,
 +        )
@@ -297,7 +297,7 @@ index 00873ae5..93a6d5fc 100644
 @@ -652,6 +670,7 @@ class Labels(_ImageBase):
          if selected_label == self.selected_label:
              return
- 
+
 +        self._prev_selected_label = self.selected_label
          self.colormap.selection = selected_label
          self._selected_label = selected_label
@@ -305,7 +305,7 @@ index 00873ae5..93a6d5fc 100644
 @@ -662,6 +681,13 @@ class Labels(_ImageBase):
              self._cached_labels = None  # invalidates labels cache
              self.refresh()
- 
+
 +    def swap_selected_and_background_labels(self):
 +        """Swap between the selected label and the background label."""
 +        if self.selected_label != self._background_label:
@@ -319,7 +319,7 @@ index 00873ae5..93a6d5fc 100644
 @@ -700,7 +726,8 @@ class Labels(_ImageBase):
          self._cached_labels = None
          self.refresh()
- 
+
 -    @Layer.mode.getter
 +    # Only overriding to change the docstring
 +    @property
@@ -337,20 +337,20 @@ index 00873ae5..93a6d5fc 100644
 +    @mode.setter
 +    def mode(self, mode):
 +        Layer.mode.fset(self, mode)
- 
+
      def _mode_setter_helper(self, mode):
          mode = super()._mode_setter_helper(mode)
          if mode == self._mode:
              return mode
- 
+
 +        self._overlays["polygon"].enabled = mode == Mode.POLYGON
          if mode in {Mode.PAINT, Mode.ERASE}:
              self.cursor_size = self._calculate_cursor_size()
- 
+
 @@ -769,32 +802,21 @@ class Labels(_ImageBase):
              self.mode = Mode.PAN_ZOOM
              self._reset_history()
- 
+
 -    def _lookup_with_low_discrepancy_image(self, im, selected_label=None):
 -        """Returns display version of im using low_discrepancy_image.
 -
@@ -358,7 +358,7 @@ index 00873ae5..93a6d5fc 100644
 -        selected_label if it's not None.
 +    def _to_vispy_texture_dtype(self, data):
 +        """Convert data to a dtype that can be used as a VisPy texture.
- 
+
 -        Parameters
 -        ----------
 -        im : array or int
@@ -382,7 +382,7 @@ index 00873ae5..93a6d5fc 100644
 -
 -    def _as_type(self, data, selected_label=None):
          return data.astype(np.float32)
- 
+
 +    def _update_slice_response(self, response: _ImageSliceResponse) -> None:
 +        """Override to convert raw slice data to displayed label colors."""
 +        response = response.to_displayed(self._raw_to_displayed)
@@ -390,17 +390,17 @@ index 00873ae5..93a6d5fc 100644
 +
      def _partial_labels_refresh(self):
          """Prepares and displays only an updated part of the labels."""
- 
+
 @@ -818,7 +840,9 @@ class Labels(_ImageBase):
          self.events.labels_update(data=colors_sliced, offset=offset)
          self._updated_slice = None
- 
+
 -    def _raw_to_displayed(self, raw, data_slice: Tuple[slice] = None):
 +    def _raw_to_displayed(
 +        self, raw, data_slice: Optional[Tuple[slice, ...]] = None
 +    ):
          """Determine displayed image from a saved raw image and a saved seed.
- 
+
          This function ensures that the 0 label gets mapped to the 0 displayed
 @@ -878,6 +902,7 @@ class Labels(_ImageBase):
          update_mask = None
@@ -423,18 +423,18 @@ index 00873ae5..93a6d5fc 100644
              )
 -            self._cached_labels[data_slice] = sliced_labels.copy()
              labels_to_map = sliced_labels
- 
+
          # If there are no changes, just return the cached image
          if labels_to_map.size == 0:
              return self._cached_mapped_labels[data_slice]
- 
+
 -        mapped_labels = self._as_type(labels_to_map)
 +        mapped_labels = self._to_vispy_texture_dtype(labels_to_map)
- 
+
          if update_mask is not None:
              self._cached_mapped_labels[data_slice][update_mask] = mapped_labels
 @@ -949,14 +975,14 @@ class Labels(_ImageBase):
- 
+
      def get_color(self, label):
          """Return the color corresponding to a specific label."""
 -        if label == 0:
@@ -449,7 +449,7 @@ index 00873ae5..93a6d5fc 100644
 +            val = self._to_vispy_texture_dtype(np.array([label]))
              col = self.colormap.map(val)[0]
          return col
- 
+
 @@ -999,8 +1025,15 @@ class Labels(_ImageBase):
                  start_point, end_point, n_points, endpoint=True
              )
@@ -489,11 +489,11 @@ index 00873ae5..93a6d5fc 100644
 -            shape = [shape[i] for i in dims_to_paint]
          else:
              coord_paint = coord
- 
+
 @@ -1291,6 +1317,71 @@ class Labels(_ImageBase):
              int
          )
- 
+
 +        self._paint_indices(
 +            mask_indices, new_label, shape, dims_to_paint, slice_coord, refresh
 +        )
@@ -561,11 +561,11 @@ index 00873ae5..93a6d5fc 100644
 +        )
          # discard candidate coordinates that are out of bounds
          mask_indices = indices_in_shape(mask_indices, shape)
- 
+
 @@ -1321,14 +1412,26 @@ class Labels(_ImageBase):
- 
+
          self.data_setitem(slice_coord, new_label, refresh)
- 
+
 +    def _get_shape_and_dims_to_paint(self) -> Tuple[list, list]:
 +        dims_to_paint = sorted(self._get_dims_to_paint())
 +        shape = self.data.shape
@@ -580,7 +580,7 @@ index 00873ae5..93a6d5fc 100644
 +
      def data_setitem(self, indices, value, refresh=True):
          """Set `indices` in `data` to `value`, while writing to edit history.
- 
+
          Parameters
          ----------
 -        indices : tuple of int, slice, or sequence of int
@@ -595,7 +595,7 @@ index 00873ae5..93a6d5fc 100644
 @@ -1356,6 +1459,21 @@ class Labels(_ImageBase):
          # update the labels image
          self.data[indices] = value
- 
+
 +        if not (  # if not a numpy array or numpy-backed xarray
 +            isinstance(self.data, np.ndarray)
 +            or isinstance(getattr(self.data, 'data', None), np.ndarray)
@@ -615,7 +615,7 @@ index 00873ae5..93a6d5fc 100644
          # np.ndarray format, so they need to be converted explicitly
          if not isinstance(self.data, np.ndarray):
 @@ -1389,9 +1507,9 @@ class Labels(_ImageBase):
- 
+
      def get_status(
          self,
 -        position: Optional[Tuple] = None,
@@ -628,7 +628,7 @@ index 00873ae5..93a6d5fc 100644
      ) -> dict:
 @@ -1427,14 +1545,16 @@ class Labels(_ImageBase):
              value = None
- 
+
          source_info = self._get_source_info()
 -        source_info['coordinates'] = generate_layer_coords_status(
 -            position[-self.ndim :], value
@@ -638,7 +638,7 @@ index 00873ae5..93a6d5fc 100644
 +        if pos is not None:
 +            pos = np.asarray(pos)[-self.ndim :]
 +        source_info['coordinates'] = generate_layer_coords_status(pos, value)
- 
+
          # if this labels layer has properties
          properties = self._get_properties(
              position,
@@ -649,8 +649,8 @@ index 00873ae5..93a6d5fc 100644
          )
 @@ -1518,13 +1638,6 @@ class Labels(_ImageBase):
          ]
- 
- 
+
+
 -if config.async_octree:
 -    from napari.layers.image.experimental.octree_image import _OctreeImageBase
 -
@@ -707,5 +707,5 @@ index 00000000..cba8fcd7
 +        for i, ix in enumerate(index)
 +        if i not in position_in_axes
 +    )
--- 
+--
 2.34.1

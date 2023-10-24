@@ -155,15 +155,15 @@ index f8c4f9d3..9f70a6f3 100644
 +    mapped_colors1 = layer.colormap.map(
 +        layer._to_vispy_texture_dtype(layer._slice.image.raw)
 +    )
- 
+
      layer.new_colormap()
 -    mapped_colors2 = layer.colormap.map(layer._as_type(layer._slice.image.raw))
 +    mapped_colors2 = layer.colormap.map(
 +        layer._to_vispy_texture_dtype(layer._slice.image.raw)
 +    )
- 
+
      assert not np.allclose(mapped_colors1, mapped_colors2)
- 
+
 diff --git a/napari/layers/labels/labels.py b/napari/layers/labels/labels.py
 index 00873ae5..086f5755 100644
 --- a/napari/layers/labels/labels.py
@@ -171,12 +171,12 @@ index 00873ae5..086f5755 100644
 @@ -769,30 +769,14 @@ class Labels(_ImageBase):
              self.mode = Mode.PAN_ZOOM
              self._reset_history()
- 
+
 -    def _lookup_with_low_discrepancy_image(self, im, selected_label=None):
 -        """Returns display version of im using low_discrepancy_image.
 +    def _to_vispy_texture_dtype(self, data):
 +        """Convert data to a dtype that can be used as a VisPy texture.
- 
+
 -        Passes the image through low_discrepancy_image, only coloring
 -        selected_label if it's not None.
 -
@@ -203,19 +203,19 @@ index 00873ae5..086f5755 100644
 -
 -    def _as_type(self, data, selected_label=None):
          return data.astype(np.float32)
- 
+
      def _partial_labels_refresh(self):
 @@ -897,7 +881,7 @@ class Labels(_ImageBase):
          if labels_to_map.size == 0:
              return self._cached_mapped_labels[data_slice]
- 
+
 -        mapped_labels = self._as_type(labels_to_map)
 +        mapped_labels = self._to_vispy_texture_dtype(labels_to_map)
- 
+
          if update_mask is not None:
              self._cached_mapped_labels[data_slice][update_mask] = mapped_labels
 @@ -949,14 +933,14 @@ class Labels(_ImageBase):
- 
+
      def get_color(self, label):
          """Return the color corresponding to a specific label."""
 -        if label == 0:
@@ -230,9 +230,9 @@ index 00873ae5..086f5755 100644
 +            val = self._to_vispy_texture_dtype(np.array([label]))
              col = self.colormap.map(val)[0]
          return col
- 
+
 @@ -1326,9 +1310,9 @@ class Labels(_ImageBase):
- 
+
          Parameters
          ----------
 -        indices : tuple of int, slice, or sequence of int
@@ -247,7 +247,7 @@ index 00873ae5..086f5755 100644
 @@ -1356,6 +1340,21 @@ class Labels(_ImageBase):
          # update the labels image
          self.data[indices] = value
- 
+
 +        if not (  # if not a numpy array or numpy-backed xarray
 +            isinstance(self.data, np.ndarray)
 +            or isinstance(getattr(self.data, 'data', None), np.ndarray)
@@ -312,5 +312,5 @@ index 00000000..cba8fcd7
 +        for i, ix in enumerate(index)
 +        if i not in position_in_axes
 +    )
--- 
+--
 2.34.1
