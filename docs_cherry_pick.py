@@ -12,6 +12,7 @@ from tqdm import tqdm
 
 from release_utils import (
     PR_NUM_PATTERN,
+    REPO_DIR_NAME,
     get_milestone,
     iter_pull_request,
     setup_cache,
@@ -67,7 +68,7 @@ if not patch_dir_path.exists():
     patch_dir_path.mkdir()
 
 
-repo = Repo(LOCAL_DIR / "napari_repo")
+repo = Repo(LOCAL_DIR / REPO_DIR_NAME)
 repo.git.checkout(f"docs_{milestone.title}")
 
 

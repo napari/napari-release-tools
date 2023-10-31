@@ -1,0 +1,303 @@
+From 572058286d9b4690360a8dc53ed9558f032e9634 Mon Sep 17 00:00:00 2001
+From: Peter Sobolewski <76622105+psobolewskiPhD@users.noreply.github.com>
+Date: Fri, 27 Oct 2023 05:23:30 -0400
+Subject: [PATCH] Bugfix: Account for multiscale for labels in 3d (#6317)
+
+Closes https://github.com/napari/napari/issues/6068
+In 3D viewer mode, only the lowest resolution of a multiscale image is
+supported.
+However, this wasn't being accounted for in the `get_value` method when
+mousing over a 3D labels layer.
+(Note: the Image layer simply doesn't do `get_value` in 3D at all,
+regardless of multiscale.)
+
+In this PR, thanks to Lorenzo, I make the following changes:
+1. the `data_level` is properly set to the lowest resolution level when
+in 3D. When it's not multiscale, the data_level will remain `0`.
+2. the bounding box is calculated using the `data_level` rather the full
+data extent
+3. the sample points for the ray are recomputed accounting for the
+downsampling. When it's not multiscale or it's 3D, the downsample factor
+is identity.
+
+---------
+
+Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.github.com>
+Co-authored-by: Grzegorz Bokota <bokota+github@gmail.com>
+---
+ napari/layers/base/base.py                    |   4 +
+ napari/layers/image/image.py                  |  10 +-
+ .../labels/_tests/test_labels_multiscale.py   | 117 ++++++++++++++++++
+ .../labels/_tests/test_labels_pyramid.py      |  48 -------
+ napari/layers/labels/labels.py                |  26 +++-
+ 5 files changed, 153 insertions(+), 52 deletions(-)
+ create mode 100644 napari/layers/labels/_tests/test_labels_multiscale.py
+ delete mode 100644 napari/layers/labels/_tests/test_labels_pyramid.py
+
+diff --git a/napari/layers/base/base.py b/napari/layers/base/base.py
+index 71274c53..c1ca5325 100644
+--- a/napari/layers/base/base.py
++++ b/napari/layers/base/base.py
+@@ -1664,6 +1664,10 @@ class Layer(KeymapProvider, MousemapProvider, ABC):
+                 self.refresh()
+
+         else:
++            # set the data_level so that it is the lowest resolution in 3d view
++            if self.multiscale is True:
++                self._data_level = len(self.level_shapes) - 1
++
+             # The stored corner_pixels attribute must contain valid indices.
+             corners = np.zeros((2, self.ndim), dtype=int)
+             # Some empty layers (e.g. Points) may have a data extent that only
+diff --git a/napari/layers/image/image.py b/napari/layers/image/image.py
+index a9ec8da7..c0733a5e 100644
+--- a/napari/layers/image/image.py
++++ b/napari/layers/image/image.py
+@@ -1021,7 +1021,15 @@ class _ImageBase(IntensityVisualizationMixin, Layer):
+         """
+         return [p + 0.5 for p in position]
+
+-    # For async we add an on_chunk_loaded() method.
++    def _display_bounding_box_at_level(
++        self, dims_displayed: List[int], data_level: int
++    ) -> npt.NDArray:
++        """An axis aligned (ndisplay, 2) bounding box around the data at a given level"""
++        shape = self.level_shapes[data_level]
++        extent_at_level = np.vstack([np.zeros(len(shape)), shape - 1])
++        return extent_at_level[:, dims_displayed].T
++
++# For async we add an on_chunk_loaded() method.
+     if config.async_loading:
+
+         def on_chunk_loaded(self, request: ChunkRequest) -> None:
+diff --git a/napari/layers/labels/_tests/test_labels_multiscale.py b/napari/layers/labels/_tests/test_labels_multiscale.py
+new file mode 100644
+index 00000000..d3a18586
+--- /dev/null
++++ b/napari/layers/labels/_tests/test_labels_multiscale.py
+@@ -0,0 +1,117 @@
++import numpy as np
++
++from napari.components.dims import Dims
++from napari.layers import Labels
++
++
++def test_random_multiscale():
++    """Test instantiating Labels layer with random 2D multiscale data."""
++    shapes = [(40, 20), (20, 10), (10, 5)]
++    np.random.seed(0)
++    data = [np.random.randint(20, size=s) for s in shapes]
++    layer = Labels(data, multiscale=True)
++    assert layer.data == data
++    assert layer.multiscale is True
++    assert layer.editable is False
++    assert layer.ndim == len(shapes[0])
++    np.testing.assert_array_equal(
++        layer.extent.data[1], [s for s in shapes[0]]
++    )
++    assert layer.rgb is False
++    assert layer._data_view.ndim == 2
++
++
++def test_infer_multiscale():
++    """Test instantiating Labels layer with random 2D multiscale data."""
++    shapes = [(40, 20), (20, 10), (10, 5)]
++    np.random.seed(0)
++    data = [np.random.randint(20, size=s) for s in shapes]
++    layer = Labels(data)
++    assert layer.data == data
++    assert layer.multiscale is True
++    assert layer.editable is False
++    assert layer.ndim == len(shapes[0])
++    np.testing.assert_array_equal(
++        layer.extent.data[1], [s for s in shapes[0]]
++    )
++    assert layer.rgb is False
++    assert layer._data_view.ndim == 2
++
++
++def test_3D_multiscale_labels_in_2D():
++    """Test instantiating Labels layer with 3D data, 2D dims."""
++    data_multiscale, layer = instantiate_3D_multiscale_labels()
++
++    assert layer.data == data_multiscale
++    assert layer.multiscale is True
++    assert layer.editable is False
++    assert layer.ndim == len(data_multiscale[0].shape)
++    np.testing.assert_array_equal(
++        layer.extent.data[1], np.array(data_multiscale[0].shape)
++    )
++    assert layer.rgb is False
++    assert layer._data_view.ndim == 2
++
++    # check corner pixels, should be tuple of highest resolution level
++    assert layer.get_value([0, 0, 0]) == (
++        layer.data_level,
++        data_multiscale[0][0, 0, 0],
++    )
++
++
++def test_3D_multiscale_labels_in_3D():
++    """Test instantiating Labels layer with 3D data, 3D dims."""
++    data_multiscale, layer = instantiate_3D_multiscale_labels()
++
++    # use 3D dims
++    layer._slice_dims(point=[0, 0, 0], ndisplay=3)
++    assert layer._data_view.ndim == 3
++
++    # check corner pixels, should be value of lowest resolution level
++    # [0,0,0] has value 0, which is transparent, so the ray will hit the next point
++    # which is [1, 0, 0] and has value 4
++    # the position array is in original data coords (no downsampling)
++    assert (
++        layer.get_value(
++            [0, 0, 0], view_direction=[1, 0, 0], dims_displayed=[0, 1, 2]
++        )
++        == 4
++    )
++    assert (
++        layer.get_value(
++            [0, 0, 0], view_direction=[-1, 0, 0], dims_displayed=[0, 1, 2]
++        )
++        == 4
++    )
++    assert (
++        layer.get_value(
++            [0, 1, 1], view_direction=[1, 0, 0], dims_displayed=[0, 1, 2]
++        )
++        == 4
++    )
++    assert (
++        layer.get_value(
++            [0, 5, 5], view_direction=[1, 0, 0], dims_displayed=[0, 1, 2]
++        )
++        == 3
++    )
++    assert (
++        layer.get_value(
++            [5, 0, 5], view_direction=[0, 0, -1], dims_displayed=[0, 1, 2]
++        )
++        == 5
++    )
++
++
++def instantiate_3D_multiscale_labels():
++    lowest_res_scale = np.arange(8).reshape(2, 2, 2)
++    middle_res_scale = (
++        lowest_res_scale.repeat(2, axis=0).repeat(2, axis=1).repeat(2, axis=2)
++    )
++    highest_res_scale = (
++        middle_res_scale.repeat(2, axis=0).repeat(2, axis=1).repeat(2, axis=2)
++    )
++
++    data_multiscale = [highest_res_scale, middle_res_scale, lowest_res_scale]
++
++    return data_multiscale, Labels(data_multiscale, multiscale=True)
+diff --git a/napari/layers/labels/_tests/test_labels_pyramid.py b/napari/layers/labels/_tests/test_labels_pyramid.py
+deleted file mode 100644
+index ffed191f..00000000
+--- a/napari/layers/labels/_tests/test_labels_pyramid.py
++++ /dev/null
+@@ -1,48 +0,0 @@
+-import numpy as np
+-
+-from napari.layers import Labels
+-
+-
+-def test_random_multiscale():
+-    """Test instantiating Labels layer with random 2D multiscale data."""
+-    shapes = [(40, 20), (20, 10), (10, 5)]
+-    np.random.seed(0)
+-    data = [np.random.randint(20, size=s) for s in shapes]
+-    layer = Labels(data, multiscale=True)
+-    assert layer.data == data
+-    assert layer.multiscale is True
+-    assert layer.editable is False
+-    assert layer.ndim == len(shapes[0])
+-    np.testing.assert_array_equal(layer.extent.data[1], shapes[0])
+-    assert layer.rgb is False
+-    assert layer._data_view.ndim == 2
+-
+-
+-def test_infer_multiscale():
+-    """Test instantiating Labels layer with random 2D multiscale data."""
+-    shapes = [(40, 20), (20, 10), (10, 5)]
+-    np.random.seed(0)
+-    data = [np.random.randint(20, size=s) for s in shapes]
+-    layer = Labels(data)
+-    assert layer.data == data
+-    assert layer.multiscale is True
+-    assert layer.editable is False
+-    assert layer.ndim == len(shapes[0])
+-    np.testing.assert_array_equal(layer.extent.data[1], shapes[0])
+-    assert layer.rgb is False
+-    assert layer._data_view.ndim == 2
+-
+-
+-def test_3D_multiscale():
+-    """Test instantiating Labels layer with 3D data."""
+-    shapes = [(8, 40, 20), (4, 20, 10), (2, 10, 5)]
+-    np.random.seed(0)
+-    data = [np.random.randint(20, size=s) for s in shapes]
+-    layer = Labels(data, multiscale=True)
+-    assert layer.data == data
+-    assert layer.multiscale is True
+-    assert layer.editable is False
+-    assert layer.ndim == len(shapes[0])
+-    np.testing.assert_array_equal(layer.extent.data[1], shapes[0])
+-    assert layer.rgb is False
+-    assert layer._data_view.ndim == 2
+diff --git a/napari/layers/labels/labels.py b/napari/layers/labels/labels.py
+index f23d25f1..44a64c72 100644
+--- a/napari/layers/labels/labels.py
++++ b/napari/layers/labels/labels.py
+@@ -8,6 +8,7 @@ from typing import (
+     Optional,
+     Tuple,
+     Union,
++    cast,
+ )
+
+ import numpy as np
+@@ -1069,8 +1070,18 @@ class Labels(_ImageBase):
+             # we use dims_displayed because the image slice
+             # has its dimensions  in th same order as the vispy
+             # Volume
+-            start_point = start_point[dims_displayed]
+-            end_point = end_point[dims_displayed]
++            # Account for downsampling in the case of multiscale
++            # -1 means lowest resolution here.
++            start_point = (
++                start_point[dims_displayed]
++                / self.downsample_factors[-1][dims_displayed]
++            )
++            end_point = (
++                end_point[dims_displayed]
++                / self.downsample_factors[-1][dims_displayed]
++            )
++            start_point = cast(np.ndarray, start_point)
++            end_point = cast(np.ndarray, end_point)
+             sample_ray = end_point - start_point
+             length_sample_vector = np.linalg.norm(sample_ray)
+             n_points = int(2 * length_sample_vector)
+@@ -1078,8 +1089,17 @@ class Labels(_ImageBase):
+                 start_point, end_point, n_points, endpoint=True
+             )
+             im_slice = self._slice.image.raw
++            # ensure the bounding box is for the proper multiscale level
++            bounding_box = self._display_bounding_box_at_level(
++                dims_displayed, self.data_level
++            )
++            # the display bounding box is returned as a closed interval
++            # (i.e. the endpoint is included) by the method, but we need
++            # open intervals in the code that follows, so we add 1.
++            bounding_box[:, 1] += 1
++
+             clamped = clamp_point_to_bounding_box(
+-                sample_points, self._display_bounding_box(dims_displayed)
++                sample_points, bounding_box
+             ).astype(int)
+             values = im_slice[tuple(clamped.T)]
+             nonzero_indices = np.flatnonzero(values)
+--
+2.34.1

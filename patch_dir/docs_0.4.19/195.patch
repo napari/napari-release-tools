@@ -1,0 +1,28 @@
+From c16a709c126bb5fa0acd8d7739e31f180d0f3830 Mon Sep 17 00:00:00 2001
+From: Sean Martin <seankieran.m@hotmail.com>
+Date: Wed, 12 Jul 2023 19:02:19 +0100
+Subject: [PATCH] Fix typo of points instead of shapes (#195)
+
+# Description
+A small typo fix, previously the "using the shapes layer" guide
+mentioned the points layer.
+
+## Type of change
+- [x] Fixes or improves existing content
+---
+ docs/howtos/layers/shapes.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/docs/howtos/layers/shapes.md b/docs/howtos/layers/shapes.md
+index d9b108d8..e7ec52cf 100644
+--- a/docs/howtos/layers/shapes.md
++++ b/docs/howtos/layers/shapes.md
+@@ -20,7 +20,7 @@ GUI and from the console.
+
+ ## When to use the shapes layer
+
+-The points layer allows you to display a list of an NxD arrays, where each array
++The `Shapes` layer allows you to display a list of an NxD arrays, where each array
+ corresponds to one shape, specified by N points in D coordinates. You can adjust
+ the position, size, face color, edge color, and opacity of all the shapes
+ independently, both programmatically and from the GUI.
