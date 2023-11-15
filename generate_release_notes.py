@@ -226,7 +226,7 @@ rendering), and the scientific Python stack (numpy, scipy).
 print(
     """
 For more information, examples, and documentation, please visit our website:
-https://github.com/napari/napari
+https://napari.org/stable/
 """,
     file=file_handle,
 )
