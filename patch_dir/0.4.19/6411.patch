@@ -1,0 +1,1013 @@
+From 41314da3da3de0660cd29593008784b17631fa1b Mon Sep 17 00:00:00 2001
+From: Grzegorz Bokota <bokota+github@gmail.com>
+Date: Tue, 14 Nov 2023 10:13:44 +0100
+Subject: [PATCH] Fix lagging 3d view for big data in auto color mode (#6411)
+
+closes #6397
+
+This array fixes fps performance issues in OpenGL introduced by #3308.
+In that PR, the texture type was changed to float32 in order to directly
+pass the labels values to the texture. It turns out that OpenGL
+performance for float32 textures is much worse than for uint8 textures.
+
+Here we change the code to use uint8 whenever the final number of colors
+is less than 255 in automatic coloring mode, or uint16 if the number is
+less than 65535.
+
+This is achieved by transforming original data using a modulo-like
+operation that avoids the background label landing on 0.
+
+This PR introduces numba dependency, which might not be a long-term
+solution. We may try to move this utility to some package that already
+contains compiled code. We can revisit the decision if it causes issues
+(such as a delay in supporting newer Python versions), and perhaps push
+such a function to a compiled dependency such as scikit-image.
+
+This PR also disables caching used for speedup painting until someone starts
+painting. It is a significant speedup and reduces memory usage.
+
+---------
+
+Co-authored-by: Juan Nunez-Iglesias <jni@fastmail.com>
+Co-authored-by: Matthias Bussonnier <bussonniermatthias@gmail.com>
+Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.github.com>
+---
+ napari/_qt/_tests/test_qt_viewer.py           |   3 +-
+ .../_qt/layer_controls/qt_labels_controls.py  |   2 +-
+ .../_vispy/_tests/test_vispy_labels_layer.py  |   2 +-
+ napari/_vispy/layers/image.py                 |  64 ++++++++-
+ napari/_vispy/layers/labels.py                |  81 ++++++-----
+ napari/_vispy/utils/visual.py                 |   2 +-
+ napari/_vispy/visuals/image.py                |   4 +-
+ napari/_vispy/visuals/labels.py               |  40 ++++++
+ napari/_vispy/visuals/util.py                 |  30 ++++
+ napari/_vispy/visuals/volume.py               |   4 +-
+ napari/layers/labels/_labels_utils.py         |  16 +--
+ napari/layers/labels/_tests/test_labels.py    |  42 ++++--
+ napari/layers/labels/labels.py                | 136 +++++++++++++-----
+ .../utils/colormaps/_tests/test_colormap.py   |  35 ++++-
+ napari/utils/colormaps/colormap.py            |  93 +++++++++++-
+ napari/utils/colormaps/colormap_utils.py      |   4 +-
+ setup.cfg                                     |   3 +-
+ 17 files changed, 448 insertions(+), 113 deletions(-)
+ create mode 100644 napari/_vispy/visuals/labels.py
+ create mode 100644 napari/_vispy/visuals/util.py
+
+diff --git a/napari/_qt/_tests/test_qt_viewer.py b/napari/_qt/_tests/test_qt_viewer.py
+index 5da35126..f9496ba1 100644
+--- a/napari/_qt/_tests/test_qt_viewer.py
++++ b/napari/_qt/_tests/test_qt_viewer.py
+@@ -732,7 +732,8 @@ def test_label_colors_matching_widget(qtbot, make_napari_viewer):
+         shape = np.array(screenshot.shape[:2])
+         middle_pixel = screenshot[tuple(shape // 2)]
+ 
+-        np.testing.assert_equal(color_box_color, middle_pixel)
++        assert np.allclose(color_box_color, middle_pixel, atol=1), label
++        # there is a difference of rounding between the QtColorBox and the screenshot
+ 
+ 
+ def test_axes_labels(make_napari_viewer):
+diff --git a/napari/_qt/layer_controls/qt_labels_controls.py b/napari/_qt/layer_controls/qt_labels_controls.py
+index 24e0dd76..342142b8 100644
+--- a/napari/_qt/layer_controls/qt_labels_controls.py
++++ b/napari/_qt/layer_controls/qt_labels_controls.py
+@@ -511,7 +511,7 @@ class QtColorBox(QWidget):
+ 
+     Parameters
+     ----------
+-    layer : napari.layers.Layer
++    layer : napari.layers.Labels
+         An instance of a napari layer.
+     """
+ 
+diff --git a/napari/_vispy/_tests/test_vispy_labels_layer.py b/napari/_vispy/_tests/test_vispy_labels_layer.py
+index 3540db9a..eb2e9099 100644
+--- a/napari/_vispy/_tests/test_vispy_labels_layer.py
++++ b/napari/_vispy/_tests/test_vispy_labels_layer.py
+@@ -68,7 +68,7 @@ def test_labels_fill_slice(make_napari_viewer, array_type, qtbot):
+     QCoreApplication.instance().processEvents()
+     layer.fill((1, 10, 10), 13, refresh=True)
+     visual = viewer.window._qt_viewer.layer_to_visual[layer]
+-    assert np.sum(visual.node._data) == 13
++    assert np.sum(visual.node._data) == 14
+ 
+ 
+ @skip_local_popups
+diff --git a/napari/_vispy/layers/image.py b/napari/_vispy/layers/image.py
+index bdc414f6..20779008 100644
+--- a/napari/_vispy/layers/image.py
++++ b/napari/_vispy/layers/image.py
+@@ -1,4 +1,7 @@
++from __future__ import annotations
++
+ import warnings
++from typing import Dict, Optional
+ 
+ import numpy as np
+ from vispy.color import Colormap as VispyColormap
+@@ -37,15 +40,25 @@ class ImageLayerNode:
+             texture_format=texture_format,
+         )
+ 
+-    def get_node(self, ndisplay: int) -> Node:
++    def get_node(
++        self, ndisplay: int, dtype: Optional[np.dtype] = None
++    ) -> Node:
+         # Return custom node if we have one.
+         if self._custom_node is not None:
+             return self._custom_node
+ 
+         # Return Image or Volume node based on 2D or 3D.
+-        if ndisplay == 2:
+-            return self._image_node
+-        return self._volume_node
++        res = self._image_node if ndisplay == 2 else self._volume_node
++        if (
++            res.texture_format != "auto"
++            and dtype is not None
++            and _VISPY_FORMAT_TO_DTYPE[res.texture_format] != dtype
++        ):
++            # it is a bug to hit this error — it is here to catch bugs
++            # early when we are creating the wrong nodes or
++            # textures for our data
++            raise ValueError("dtype does not match texture_format")
++        return res
+ 
+ 
+ class VispyImageLayer(VispyBaseLayer):
+@@ -103,10 +116,16 @@ class VispyImageLayer(VispyBaseLayer):
+         parent = self.node.parent
+         self.node.parent = None
+         ndisplay = self.layer._slice_input.ndisplay
+-        self.node = self._layer_node.get_node(ndisplay)
++        self.node = self._layer_node.get_node(
++            ndisplay, getattr(data, "dtype", None)
++        )
+ 
+         if data is None:
+-            data = np.zeros((1,) * ndisplay, dtype=np.float32)
++            texture_format = self.node.texture_format
++            data = np.zeros(
++                (1,) * ndisplay,
++                dtype=get_dtype_from_vispy_texture_format(texture_format),
++            )
+ 
+         if self.layer._empty:
+             self.node.visible = False
+@@ -135,6 +154,9 @@ class VispyImageLayer(VispyBaseLayer):
+ 
+         data = fix_data_dtype(data)
+         ndisplay = self.layer._slice_input.ndisplay
++        node = self._layer_node.get_node(
++            ndisplay, getattr(data, "dtype", None)
++        )
+ 
+         if ndisplay == 3 and self.layer.ndim == 2:
+             data = np.expand_dims(data, axis=0)
+@@ -147,7 +169,9 @@ class VispyImageLayer(VispyBaseLayer):
+ 
+         # Check if ndisplay has changed current node type needs updating
+         if (ndisplay == 3 and not isinstance(node, VolumeNode)) or (
+-            ndisplay == 2 and not isinstance(node, ImageNode)
++            ndisplay == 2
++            and not isinstance(node, ImageNode)
++            or node != self.node
+         ):
+             self._on_display_change(data)
+         else:
+@@ -301,3 +325,29 @@ class VispyImageLayer(VispyBaseLayer):
+             slices = tuple(slice(None, None, ds) for ds in downsample)
+             data = data[slices]
+         return data
++
++
++_VISPY_FORMAT_TO_DTYPE: Dict[Optional[str], np.dtype] = {
++    "r8": np.dtype(np.uint8),
++    "r16": np.dtype(np.uint16),
++    "r32f": np.dtype(np.float32),
++    None: np.dtype(np.float32),
++}
++
++_DTYPE_TO_VISPY_FORMAT = {v: k for k, v in _VISPY_FORMAT_TO_DTYPE.items()}
++
++
++def get_dtype_from_vispy_texture_format(format_str: str) -> np.dtype:
++    """Get the numpy dtype from a vispy texture format string.
++
++    Parameters
++    ----------
++    format_str : str
++        The vispy texture format string.
++
++    Returns
++    -------
++    dtype : numpy.dtype
++        The numpy dtype corresponding to the vispy texture format string.
++    """
++    return _VISPY_FORMAT_TO_DTYPE.get(format_str, np.dtype(np.float32))
+diff --git a/napari/_vispy/layers/labels.py b/napari/_vispy/layers/labels.py
+index 8e347a6e..14e4d910 100644
+--- a/napari/_vispy/layers/labels.py
++++ b/napari/_vispy/layers/labels.py
+@@ -6,14 +6,19 @@ import numpy as np
+ from vispy.color import Colormap as VispyColormap
+ from vispy.gloo import Texture2D
+ from vispy.scene.node import Node
+-from vispy.scene.visuals import create_visual_node
+-from vispy.visuals.image import ImageVisual
+-from vispy.visuals.shaders import Function, FunctionChain
+ 
+-from napari._vispy.layers.image import ImageLayerNode, VispyImageLayer
++from napari._vispy.layers.image import (
++    _DTYPE_TO_VISPY_FORMAT,
++    _VISPY_FORMAT_TO_DTYPE,
++    ImageLayerNode,
++    VispyImageLayer,
++    get_dtype_from_vispy_texture_format,
++)
+ from napari._vispy.utils.gl import get_max_texture_sizes
++from napari._vispy.visuals.labels import LabelNode
+ from napari._vispy.visuals.volume import Volume as VolumeNode
+ from napari.utils._dtype import vispy_texture_dtype
++from napari.utils.colormaps.colormap import minimum_dtype_for_labels
+ 
+ if TYPE_CHECKING:
+     from napari.layers import Labels
+@@ -56,9 +61,9 @@ auto_lookup_shader = """
+ uniform sampler2D texture2D_values;
+ 
+ vec4 sample_label_color(float t) {
+-    if (t == $background_value) {
+-        return vec4(0);
+-    }
++    // VisPy automatically scales uint8 and uint16 to [0, 1].
++    // this line fixes returns values to their original range.
++    t = t * $scale;
+ 
+     if (($use_selection) && ($selection != t)) {
+         return vec4(0);
+@@ -148,7 +153,7 @@ class LabelVispyColormap(VispyColormap):
+         colors,
+         use_selection=False,
+         selection=0.0,
+-        background_value=0.0,
++        scale=1.0,
+     ):
+         super().__init__(
+             colors=["w", "w"], controls=None, interpolation='zero'
+@@ -157,7 +162,7 @@ class LabelVispyColormap(VispyColormap):
+             auto_lookup_shader.replace('$color_map_size', str(len(colors)))
+             .replace('$use_selection', str(use_selection).lower())
+             .replace('$selection', str(selection))
+-            .replace('$background_value', str(background_value))
++            .replace('$scale', str(scale))
+         )
+ 
+ 
+@@ -434,7 +439,7 @@ def build_textures_from_dict(
+ class VispyLabelsLayer(VispyImageLayer):
+     layer: 'Labels'
+ 
+-    def __init__(self, layer, node=None, texture_format='r32f') -> None:
++    def __init__(self, layer, node=None, texture_format='r8') -> None:
+         super().__init__(
+             layer,
+             node=node,
+@@ -473,11 +478,16 @@ class VispyLabelsLayer(VispyImageLayer):
+         mode = self.layer.color_mode
+ 
+         if mode == 'auto':
++            dtype = minimum_dtype_for_labels(self.layer.num_colors + 1)
++            if issubclass(dtype.type, np.integer):
++                scale = np.iinfo(dtype).max
++            else:  # float32 texture
++                scale = 1.0
+             self.node.cmap = LabelVispyColormap(
+                 colors=colormap.colors,
+                 use_selection=colormap.use_selection,
+                 selection=colormap.selection,
+-                background_value=colormap.background_value,
++                scale=scale,
+             )
+             self.node.shared_program['texture2D_values'] = Texture2D(
+                 colormap.colors.reshape(
+@@ -534,47 +544,40 @@ class VispyLabelsLayer(VispyImageLayer):
+         self.node.update()
+ 
+ 
+-class LabelVisual(ImageVisual):
+-    def __init__(self, *args, **kwargs):
+-        super().__init__(*args, **kwargs)
+-
+-    def _build_color_transform(self):
+-        fun = FunctionChain(
+-            None,
+-            [
+-                Function(self._func_templates['red_to_luminance']),
+-                Function(self.cmap.glsl_map),
+-            ],
+-        )
+-        return fun
+-
+-
+ class LabelLayerNode(ImageLayerNode):
+     def __init__(self, custom_node: Node = None, texture_format=None):
+         self._custom_node = custom_node
++        self._setup_nodes(texture_format)
++
++    def _setup_nodes(self, texture_format):
+         self._image_node = LabelNode(
+             None
+             if (texture_format is None or texture_format == 'auto')
+-            else np.array([[0.0]], dtype=np.float32),
++            else np.array(
++                [[0.0]],
++                dtype=get_dtype_from_vispy_texture_format(texture_format),
++            ),
+             method='auto',
+             texture_format=texture_format,
+         )
+ 
+         self._volume_node = VolumeNode(
+-            np.zeros((1, 1, 1), dtype=np.float32),
++            np.zeros(
++                (1, 1, 1),
++                dtype=get_dtype_from_vispy_texture_format(texture_format),
++            ),
+             clim=[0, 2**23 - 1],
+             texture_format=texture_format,
+         )
+ 
++    def get_node(self, ndisplay: int, dtype=None) -> Node:
++        res = self._image_node if ndisplay == 2 else self._volume_node
+ 
+-BaseLabel = create_visual_node(LabelVisual)
+-
+-
+-class LabelNode(BaseLabel):  # type: ignore [valid-type,misc]
+-    def _compute_bounds(self, axis, view):
+-        if self._data is None:
+-            return None
+-        elif axis > 1:  # noqa: RET505
+-            return 0, 0
+-        else:
+-            return 0, self.size[axis]
++        if (
++            res.texture_format != "auto"
++            and dtype is not None
++            and _VISPY_FORMAT_TO_DTYPE[res.texture_format] != dtype
++        ):
++            self._setup_nodes(_DTYPE_TO_VISPY_FORMAT[dtype])
++            return self.get_node(ndisplay, dtype)
++        return res
+diff --git a/napari/_vispy/utils/visual.py b/napari/_vispy/utils/visual.py
+index 3ccf31f8..df48c0b8 100644
+--- a/napari/_vispy/utils/visual.py
++++ b/napari/_vispy/utils/visual.py
+@@ -183,7 +183,7 @@ def get_view_direction_in_scene_coordinates(
+     d2 = p1 - p0
+ 
+     # in 3D world coordinates
+-    d3 = d2[0:3]
++    d3 = d2[:3]
+     d4 = d3 / np.linalg.norm(d3)
+ 
+     # data are ordered xyz on vispy Volume
+diff --git a/napari/_vispy/visuals/image.py b/napari/_vispy/visuals/image.py
+index 533fb305..0dc3c771 100644
+--- a/napari/_vispy/visuals/image.py
++++ b/napari/_vispy/visuals/image.py
+@@ -1,8 +1,10 @@
+ from vispy.scene.visuals import Image as BaseImage
+ 
++from napari._vispy.visuals.util import TextureMixin
++
+ 
+ # If data is not present, we need bounds to be None (see napari#3517)
+-class Image(BaseImage):
++class Image(TextureMixin, BaseImage):
+     def _compute_bounds(self, axis, view):
+         if self._data is None:
+             return None
+diff --git a/napari/_vispy/visuals/labels.py b/napari/_vispy/visuals/labels.py
+new file mode 100644
+index 00000000..087773cd
+--- /dev/null
++++ b/napari/_vispy/visuals/labels.py
+@@ -0,0 +1,40 @@
++from typing import TYPE_CHECKING, Optional, Tuple
++
++from vispy.scene.visuals import create_visual_node
++from vispy.visuals.image import ImageVisual
++from vispy.visuals.shaders import Function, FunctionChain
++
++from napari._vispy.visuals.util import TextureMixin
++
++if TYPE_CHECKING:
++    from vispy.visuals.visual import VisualView
++
++
++class LabelVisual(TextureMixin, ImageVisual):
++    """Visual subclass displaying a 2D array of labels."""
++
++    def _build_color_transform(self) -> FunctionChain:
++        """Build the color transform function chain."""
++        funcs = [
++            Function(self._func_templates['red_to_luminance']),
++            Function(self.cmap.glsl_map),
++        ]
++
++        return FunctionChain(
++            funcs=funcs,
++        )
++
++
++BaseLabel = create_visual_node(LabelVisual)
++
++
++class LabelNode(BaseLabel):  # type: ignore [valid-type,misc]
++    def _compute_bounds(
++        self, axis: int, view: 'VisualView'
++    ) -> Optional[Tuple[float, float]]:
++        if self._data is None:
++            return None
++        elif axis > 1:  # noqa: RET505
++            return 0, 0
++        else:
++            return 0, self.size[axis]
+diff --git a/napari/_vispy/visuals/util.py b/napari/_vispy/visuals/util.py
+new file mode 100644
+index 00000000..a2e514a5
+--- /dev/null
++++ b/napari/_vispy/visuals/util.py
+@@ -0,0 +1,30 @@
++from typing import TYPE_CHECKING, Optional
++
++if TYPE_CHECKING:
++    from vispy.visuals.visual import Visual
++else:
++
++    class Visual:
++        pass
++
++
++class TextureMixin(Visual):
++    """Store texture format passed to VisPy classes.
++
++    We need to refer back to the texture format, but VisPy
++    stores it in a private attribute — ``node._texture.internalformat``.
++    This mixin is added to our Node subclasses to avoid having to
++    access private VisPy attributes.
++    """
++
++    def __init__(self, *args, texture_format: Optional[str], **kwargs) -> None:  # type: ignore [no-untyped-def]
++        super().__init__(*args, texture_format=texture_format, **kwargs)
++        # classes using this mixin may be frozen dataclasses.
++        # we save the texture format between unfreeze/freeze.
++        self.unfreeze()
++        self._texture_format = texture_format
++        self.freeze()
++
++    @property
++    def texture_format(self) -> Optional[str]:
++        return self._texture_format
+diff --git a/napari/_vispy/visuals/volume.py b/napari/_vispy/visuals/volume.py
+index 06f3956b..4e07cf6f 100644
+--- a/napari/_vispy/visuals/volume.py
++++ b/napari/_vispy/visuals/volume.py
+@@ -1,5 +1,7 @@
+ from vispy.scene.visuals import Volume as BaseVolume
+ 
++from napari._vispy.visuals.util import TextureMixin
++
+ FUNCTION_DEFINITIONS = """
+ // the tolerance for testing equality of floats with floatEqual and floatNotEqual
+ const float equality_tolerance = 1e-8;
+@@ -200,7 +202,7 @@ rendering_methods['iso_categorical'] = ISO_CATEGORICAL_SNIPPETS
+ rendering_methods['translucent_categorical'] = TRANSLUCENT_CATEGORICAL_SNIPPETS
+ 
+ 
+-class Volume(BaseVolume):
++class Volume(TextureMixin, BaseVolume):
+     # add the new rendering method to the snippets dict
+     _shaders = shaders
+     _rendering_methods = rendering_methods
+diff --git a/napari/layers/labels/_labels_utils.py b/napari/layers/labels/_labels_utils.py
+index fcdee234..a34b2d38 100644
+--- a/napari/layers/labels/_labels_utils.py
++++ b/napari/layers/labels/_labels_utils.py
+@@ -205,7 +205,7 @@ def mouse_event_to_labels_coordinate(layer, event):
+     return coordinates
+ 
+ 
+-def get_contours(labels, thickness: int, background_label: int):
++def get_contours(labels: np.ndarray, thickness: int, background_label: int):
+     """Computes the contours of a 2D label image.
+ 
+     Parameters
+@@ -243,12 +243,10 @@ def expand_slice(
+ ) -> Tuple[slice]:
+     """Expands or shrinks a provided multi-axis slice by a given offset"""
+     return tuple(
+-        [
+-            slice(
+-                max(0, min(max_size, s.start - offset)),
+-                max(0, min(max_size, s.stop + offset)),
+-                s.step,
+-            )
+-            for s, max_size in zip(axes_slice, shape)
+-        ]
++        slice(
++            max(0, min(max_size, s.start - offset)),
++            max(0, min(max_size, s.stop + offset)),
++            s.step,
++        )
++        for s, max_size in zip(axes_slice, shape)
+     )
+diff --git a/napari/layers/labels/_tests/test_labels.py b/napari/layers/labels/_tests/test_labels.py
+index 9df5d58b..e6c8f595 100644
+--- a/napari/layers/labels/_tests/test_labels.py
++++ b/napari/layers/labels/_tests/test_labels.py
+@@ -482,11 +482,11 @@ def test_n_edit_dimensions():
+                 [
+                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+-                    [0, 0, 0, 0, 0, 5, 5, 5, 0, 0],
+-                    [0, 0, 1, 1, 1, 5, 0, 5, 0, 0],
+-                    [0, 0, 1, 0, 1, 5, 0, 5, 0, 0],
+-                    [0, 0, 1, 1, 1, 5, 0, 5, 0, 0],
+-                    [0, 0, 0, 0, 0, 5, 5, 5, 0, 0],
++                    [0, 0, 0, 0, 0, 6, 6, 6, 0, 0],
++                    [0, 0, 2, 2, 2, 6, 0, 6, 0, 0],
++                    [0, 0, 2, 0, 2, 6, 0, 6, 0, 0],
++                    [0, 0, 2, 2, 2, 6, 0, 6, 0, 0],
++                    [0, 0, 0, 0, 0, 6, 6, 6, 0, 0],
+                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                 ],
+@@ -510,15 +510,15 @@ def test_n_edit_dimensions():
+             ),
+             np.array(
+                 [
+-                    [0, 1, 0, 0, 0, 0, 0, 2, 0, 0],
+-                    [1, 1, 0, 0, 0, 0, 0, 2, 2, 2],
++                    [0, 2, 0, 0, 0, 0, 0, 3, 0, 0],
++                    [2, 2, 0, 0, 0, 0, 0, 3, 3, 3],
+                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+-                    [0, 0, 0, 0, 0, 0, 4, 4, 4, 4],
+-                    [3, 3, 3, 0, 0, 0, 4, 0, 0, 0],
+-                    [0, 0, 3, 0, 0, 0, 4, 0, 0, 0],
+-                    [0, 0, 3, 0, 0, 0, 4, 0, 0, 0],
++                    [0, 0, 0, 0, 0, 0, 5, 5, 5, 5],
++                    [4, 4, 4, 0, 0, 0, 5, 0, 0, 0],
++                    [0, 0, 4, 0, 0, 0, 5, 0, 0, 0],
++                    [0, 0, 4, 0, 0, 0, 5, 0, 0, 0],
+                 ],
+                 dtype=np.int_,
+             ),
+@@ -528,6 +528,7 @@ def test_n_edit_dimensions():
+             np.zeros((9, 10), dtype=np.uint32),
+         ),
+     ],
++    ids=['touching objects', 'touching border', 'full array'],
+ )
+ def test_contour(input_data, expected_data_view):
+     """Test changing contour."""
+@@ -575,6 +576,23 @@ def test_contour(input_data, expected_data_view):
+         layer.contour = -1
+ 
+ 
++@pytest.mark.parametrize("background_num", [0, 1, 2])
++def test_background_label(background_num):
++    data = np.zeros((10, 10), dtype=np.uint32)
++    data[1:-1, 1:-1] = 1
++    data[2:-2, 2:-2] = 2
++
++    layer = Labels(data)
++    layer._background_label = background_num
++    layer.refresh()
++    np.testing.assert_array_equal(
++        layer._data_view == 0, data == background_num
++    )
++    np.testing.assert_array_equal(
++        layer._data_view != 0, data != background_num
++    )
++
++
+ def test_contour_large_new_labels():
+     """Check that new labels larger than the lookup table work in contour mode.
+ 
+@@ -1372,7 +1390,7 @@ def test_invalidate_cache_when_change_color_mode():
+     layer = Labels(data)
+     layer.selected_label = 0
+     gt_auto = layer._raw_to_displayed(layer._slice.image.raw)
+-    assert gt_auto.dtype == np.float32
++    assert gt_auto.dtype == np.uint8
+ 
+     layer.color_mode = 'direct'
+     layer._cached_labels = None
+diff --git a/napari/layers/labels/labels.py b/napari/layers/labels/labels.py
+index 44a64c72..267071a6 100644
+--- a/napari/layers/labels/labels.py
++++ b/napari/layers/labels/labels.py
+@@ -44,6 +44,10 @@ from napari.utils.colormaps import (
+     ensure_colormap,
+     label_colormap,
+ )
++from napari.utils.colormaps.colormap import (
++    cast_labels_to_minimum_type_auto,
++    minimum_dtype_for_labels,
++)
+ from napari.utils.events import EmitterGroup, Event
+ from napari.utils.events.custom_types import Array
+ from napari.utils.geometry import clamp_point_to_bounding_box
+@@ -295,7 +299,7 @@ class Labels(_ImageBase):
+         self._show_selected_label = False
+         self._contour = 0
+         self._cached_labels = None
+-        self._cached_mapped_labels = None
++        self._cached_mapped_labels = np.zeros((0, 4), dtype=np.uint8)
+ 
+         data = self._ensure_int_labels(data)
+ 
+@@ -506,6 +510,8 @@ class Labels(_ImageBase):
+         self.colormap = label_colormap(
+             num_colors, self.seed, self._background_label
+         )
++        self._cached_labels = None  # invalidate the cached color mapping
++        self._cached_mapped_labels = None
+         self.refresh()
+         self._selected_color = self.get_color(self.selected_label)
+         self.events.selected_label()
+@@ -894,11 +900,86 @@ class Labels(_ImageBase):
+         colors_sliced = self._raw_to_displayed(
+             raw_displayed, data_slice=updated_slice
+         )
++        # The next line is needed to make the following tests pass in
++        # napari/_vispy/_tests/:
++        # - test_vispy_labels_layer.py::test_labels_painting
++        # - test_vispy_labels_layer.py::test_labels_fill_slice
++        # See https://github.com/napari/napari/pull/6112/files#r1291613760
++        # and https://github.com/napari/napari/issues/6185
++        self._slice.image.view[updated_slice] = colors_sliced
+ 
+         self.events.labels_update(data=colors_sliced, offset=offset)
+         self._updated_slice = None
+ 
+-    def _raw_to_displayed(self, raw, data_slice: Tuple[slice] = None):
++    def _calculate_contour(
++        self, labels: np.ndarray, data_slice: Tuple[slice, ...]
++    ) -> Optional[np.ndarray]:
++        """Calculate the contour of a given label array within the specified data slice.
++
++        Parameters
++        ----------
++        labels : np.ndarray
++            The label array.
++        data_slice : Tuple[slice, ...]
++            The slice of the label array on which to calculate the contour.
++
++        Returns
++        -------
++        Optional[np.ndarray]
++            The calculated contour as a boolean mask array.
++            Returns None if the contour parameter is less than 1,
++            or if the label array has more than 2 dimensions.
++        """
++        if self.contour < 1:
++            return None
++        if labels.ndim > 2:
++            warnings.warn(
++                trans._(
++                    "Contours are not displayed during 3D rendering",
++                    deferred=True,
++                )
++            )
++            return None
++
++        expanded_slice = expand_slice(data_slice, labels.shape, 1)
++        sliced_labels = get_contours(
++            labels[expanded_slice],
++            self.contour,
++            self._background_label,
++        )
++
++        # Remove the latest one-pixel border from the result
++        delta_slice = tuple(
++            slice(s1.start - s2.start, s1.stop - s2.start)
++            for s1, s2 in zip(data_slice, expanded_slice)
++        )
++        return sliced_labels[delta_slice]
++
++    def _get_cache_dtype(self) -> np.dtype:
++        if self.color_mode == LabelColorMode.DIRECT:
++            return np.dtype(np.float32)
++        return minimum_dtype_for_labels(self.num_colors)
++
++    def _setup_cache(self, labels):
++        """
++        Initializes the cache for the Labels layer
++
++        Parameters
++        ----------
++        labels : numpy array
++            The labels data to be cached
++        """
++        if self._cached_labels is not None:
++            return
++
++        self._cached_labels = np.zeros_like(labels)
++        self._cached_mapped_labels = np.zeros_like(
++            labels, dtype=self._get_cache_dtype()
++        )
++
++    def _raw_to_displayed(
++        self, raw, data_slice: Optional[Tuple[slice, ...]] = None
++    ):
+         """Determine displayed image from a saved raw image and a saved seed.
+ 
+         This function ensures that the 0 label gets mapped to the 0 displayed
+@@ -920,36 +1001,14 @@ class Labels(_ImageBase):
+         """
+         if data_slice is None:
+             data_slice = tuple(slice(0, size) for size in raw.shape)
++        else:
++            self._setup_cache(raw)
+ 
+         labels = raw  # for readability
+-        sliced_labels = None
+ 
+-        # lookup function -> self._as_type
+-        if self.contour > 0:
+-            if labels.ndim == 2:
+-                # Add one more pixel for the correct borders computation
+-                expanded_slice = expand_slice(data_slice, labels.shape, 1)
+-                sliced_labels = get_contours(
+-                    labels[expanded_slice],
+-                    self.contour,
+-                    self._background_label,
+-                )
++        sliced_labels = self._calculate_contour(labels, data_slice)
+ 
+-                # Remove the latest one-pixel border from the result
+-                delta_slice = tuple(
+-                    [
+-                        slice(s1.start - s2.start, s1.stop - s2.start)
+-                        for s1, s2 in zip(data_slice, expanded_slice)
+-                    ]
+-                )
+-                sliced_labels = sliced_labels[delta_slice]
+-            elif labels.ndim > 2:
+-                warnings.warn(
+-                    trans._(
+-                        "Contours are not displayed during 3D rendering",
+-                        deferred=True,
+-                    )
+-                )
++        # lookup function -> self._as_type
+ 
+         if sliced_labels is None:
+             sliced_labels = labels[data_slice]
+@@ -977,14 +1036,23 @@ class Labels(_ImageBase):
+         if labels_to_map.size == 0:
+             return self._cached_mapped_labels[data_slice]
+ 
+-        mapped_labels = self._to_vispy_texture_dtype(labels_to_map)
++        if self.color_mode == LabelColorMode.AUTO:
++            mapped_labels = cast_labels_to_minimum_type_auto(
++                labels_to_map, self.num_colors, self._background_label
++            )
++        else:  # direct
++            mapped_labels = self._to_vispy_texture_dtype(labels_to_map)
+ 
+-        if update_mask is not None:
+-            self._cached_mapped_labels[data_slice][update_mask] = mapped_labels
+-        else:
+-            self._cached_mapped_labels[data_slice] = mapped_labels
++        if self._cached_labels is not None:
++            if update_mask is not None:
++                self._cached_mapped_labels[data_slice][
++                    update_mask
++                ] = mapped_labels
++            else:
++                self._cached_mapped_labels[data_slice] = mapped_labels
++            return self._cached_mapped_labels[data_slice]
+ 
+-        return self._cached_mapped_labels[data_slice]
++        return mapped_labels
+ 
+     def _update_thumbnail(self):
+         """Update the thumbnail with current data and colormap.
+diff --git a/napari/utils/colormaps/_tests/test_colormap.py b/napari/utils/colormaps/_tests/test_colormap.py
+index 7a39c037..81963545 100644
+--- a/napari/utils/colormaps/_tests/test_colormap.py
++++ b/napari/utils/colormaps/_tests/test_colormap.py
+@@ -1,7 +1,10 @@
++import importlib
++from unittest.mock import patch
++
+ import numpy as np
+ import pytest
+ 
+-from napari.utils.colormaps import Colormap
++from napari.utils.colormaps import Colormap, colormap
+ 
+ 
+ def test_linear_colormap():
+@@ -110,3 +113,33 @@ def test_mapped_shape(ndim):
+     cmap = Colormap(colors=['red'])
+     mapped = cmap.map(img)
+     assert mapped.shape == img.shape + (4,)
++
++
++@pytest.mark.parametrize(
++    "num,dtype", [(40, np.uint8), (1000, np.uint16), (80000, np.float32)]
++)
++def test_minimum_dtype_for_labels(num, dtype):
++    assert colormap.minimum_dtype_for_labels(num) == dtype
++
++
++@pytest.fixture()
++def disable_jit(monkeypatch):
++    with patch("numba.core.config.DISABLE_JIT", True):
++        importlib.reload(colormap)
++        yield
++    importlib.reload(colormap)  # revert to original state
++
++
++@pytest.mark.parametrize(
++    "num,dtype", [(40, np.uint8), (1000, np.uint16), (80000, np.float32)]
++)
++@pytest.mark.usefixtures("disable_jit")
++def test_cast_labels_to_minimum_type_auto(num, dtype, monkeypatch):
++    data = np.zeros(10, dtype=np.uint32)
++    data[1] = 10
++    data[2] = 10**6 + 5
++    cast_arr = colormap.cast_labels_to_minimum_type_auto(data, num, 0)
++    assert cast_arr.dtype == dtype
++    assert cast_arr[0] == 0
++    assert cast_arr[1] == 11
++    assert cast_arr[2] == 10**6 % num + 6
+diff --git a/napari/utils/colormaps/colormap.py b/napari/utils/colormaps/colormap.py
+index d48328a4..3d6ae287 100644
+--- a/napari/utils/colormaps/colormap.py
++++ b/napari/utils/colormaps/colormap.py
+@@ -1,6 +1,7 @@
+ from collections import defaultdict
+ from typing import Optional, cast
+ 
++import numba
+ import numpy as np
+ 
+ from napari._pydantic_compat import Field, PrivateAttr, validator
+@@ -159,12 +160,16 @@ class LabelColormap(Colormap):
+     use_selection: bool = False
+     selection: float = 0.0
+     interpolation: ColormapInterpolationMode = ColormapInterpolationMode.ZERO
+-    background_value: float = 0.0
++    background_value: int = 0
+ 
+     def map(self, values):
+         values = np.atleast_1d(values)
+ 
+-        mapped = self.colors[np.mod(values, len(self.colors)).astype(np.int64)]
++        mapped = self.colors[
++            cast_labels_to_minimum_type_auto(
++                values, len(self.colors) - 1, self.background_value
++            ).astype(np.int64)
++        ]
+ 
+         mapped[values == self.background_value] = 0
+ 
+@@ -224,7 +229,89 @@ class DirectLabelColormap(Colormap):
+     @property
+     def default_color(self):
+         if self.use_selection:
+-            return (0, 0, 0, 0)
++            return 0, 0, 0, 0
+         return self.color_dict.get(None, (0, 0, 0, 0))
+         # we provided here default color for backward compatibility
+         # if someone is using DirectLabelColormap directly, not through Label layer
++
++
++def cast_labels_to_minimum_type_auto(
++    data: np.ndarray, num_colors: int, background_value: int
++) -> np.ndarray:
++    """Perform modulo operation based on number of colors
++
++    Parameters
++    ----------
++    data : np.ndarray
++        Labels data to be casted.
++    num_colors : int
++        Number of unique colors in the data.
++    background_value : int
++        The value in ``values`` to be treated as the background.
++
++    Returns
++    -------
++    np.ndarray
++        Casted labels data.
++    """
++    dtype = minimum_dtype_for_labels(num_colors + 1)
++
++    return _modulo_plus_one(data, num_colors, dtype, background_value)
++
++
++@numba.njit(parallel=True)
++def _modulo_plus_one(
++    values: np.ndarray, n: int, dtype: np.dtype, to_zero: int = 0
++) -> np.ndarray:
++    """Like ``values % n + 1``, but with one specific value mapped to 0.
++
++    This ensures (1) an output value in [0, n] (inclusive), and (2) that
++    no nonzero values in the input are zero in the output, other than the
++    ``to_zero`` value.
++
++    Parameters
++    ----------
++    values : np.ndarray
++        The dividend of the modulo operator.
++    n : int
++        The divisor.
++    dtype : np.dtype
++        The desired dtype for the output array.
++    to_zero : int, optional
++        A specific value to map to 0. (By default, 0 itself.)
++
++    Returns
++    -------
++    np.ndarray
++        The result: 0 for the ``to_zero`` value, ``values % n + 1``
++        everywhere else.
++    """
++    result = np.empty_like(values, dtype=dtype)
++
++    for i in numba.prange(values.size):
++        if values.flat[i] == to_zero:
++            result.flat[i] = 0
++        else:
++            result.flat[i] = values.flat[i] % n + 1
++
++    return result
++
++
++def minimum_dtype_for_labels(num_colors: int) -> np.dtype:
++    """Return the minimum dtype that can hold the number of colors.
++
++    Parameters
++    ----------
++    num_colors : int
++        Number of unique colors in the data.
++
++    Returns
++    -------
++    np.dtype
++        Minimum dtype that can hold the number of colors.
++    """
++    if num_colors <= np.iinfo(np.uint8).max:
++        return np.dtype(np.uint8)
++    if num_colors <= np.iinfo(np.uint16).max:
++        return np.dtype(np.uint16)
++    return np.dtype(np.float32)
+diff --git a/napari/utils/colormaps/colormap_utils.py b/napari/utils/colormaps/colormap_utils.py
+index f338d382..061fefac 100644
+--- a/napari/utils/colormaps/colormap_utils.py
++++ b/napari/utils/colormaps/colormap_utils.py
+@@ -453,7 +453,9 @@ def label_colormap(
+         len(control_points) - 1,
+     )
+ 
+-    colors = colors[indices][:-2]
++    colors = np.concatenate(
++        (np.zeros((1, 4), dtype=colors.dtype), colors[indices][:-2])
++    )
+     # here is an ugly hack to restore classical napari color order.
+ 
+     return LabelColormap(
+diff --git a/setup.cfg b/setup.cfg
+index 5f5a88d2..de200f1a 100644
+--- a/setup.cfg
++++ b/setup.cfg
+@@ -56,6 +56,7 @@ install_requires =
+     napari-plugin-engine>=0.1.9
+     napari-svg>=0.1.8
+     npe2>=0.7.2
++    numba>=0.57.1
+     numpy>=1.21,<2
+     numpydoc>=0.9.2
+     pandas>=1.1.0 ; python_version < '3.9'
+@@ -120,7 +121,7 @@ testing =
+     fsspec
+     hypothesis>=6.8.0
+     lxml
+-    matplotlib
++    matplotlib >= 3.6.1
+     pooch>=1.6.0
+     pytest-cov
+     pytest-qt
+-- 
+2.34.1
+
