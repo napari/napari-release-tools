@@ -1,0 +1,49 @@
+From 1ae7b0f2b0fb4f7d6ba658f016794937cca13b9b Mon Sep 17 00:00:00 2001
+From: Grzegorz Bokota <bokota+github@gmail.com>
+Date: Sun, 19 Nov 2023 18:37:46 +0100
+Subject: [PATCH] remove main window from instances list only if close event is
+ accepted (#6468)
+
+closes #6466
+
+The source of the bug in #6466 is that we remove the Main Window from
+the instances list without checking if the event is accepted.
+
+In this PR I move this code block aster `super().event()` to be able to
+check if the event is accepted.
+---
+ napari/_qt/qt_main_window.py | 13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
+
+diff --git a/napari/_qt/qt_main_window.py b/napari/_qt/qt_main_window.py
+index ca7b57a1..38b812f2 100644
+--- a/napari/_qt/qt_main_window.py
++++ b/napari/_qt/qt_main_window.py
+@@ -214,17 +214,20 @@ class _QtMainWindow(QMainWindow):
+                 else e.globalPos()
+             )
+             QToolTip.showText(pnt, self._qt_viewer.viewer.tooltip.text, self)
+-        if e.type() == QEvent.Type.Close:
+-            # when we close the MainWindow, remove it from the instances list
+-            with contextlib.suppress(ValueError):
+-                _QtMainWindow._instances.remove(self)
+         if e.type() in {QEvent.Type.WindowActivate, QEvent.Type.ZOrderChange}:
+             # upon activation or raise_, put window at the end of _instances
+             with contextlib.suppress(ValueError):
+                 inst = _QtMainWindow._instances
+                 inst.append(inst.pop(inst.index(self)))
+ 
+-        return super().event(e)
++        res = super().event(e)
++
++        if e.type() == QEvent.Type.Close and e.isAccepted():
++            # when we close the MainWindow, remove it from the instance list
++            with contextlib.suppress(ValueError):
++                _QtMainWindow._instances.remove(self)
++
++        return res
+ 
+     def isFullScreen(self):
+         # Needed to prevent errors when going to fullscreen mode on Windows
+-- 
+2.34.1

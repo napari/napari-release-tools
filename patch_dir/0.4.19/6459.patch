@@ -1,0 +1,253 @@
+From 909a08ee041a7af7073022bb4bc115131872bc25 Mon Sep 17 00:00:00 2001
+From: Grzegorz Bokota <bokota+github@gmail.com>
+Date: Fri, 17 Nov 2023 09:39:21 +0100
+Subject: [PATCH] Fix thumbnail for auto color mode in labels (#6459)
+
+Changes from #6411 make the thumbnail not work correctly as the
+slice is storing cast values, not the original ones for thumbnail
+generation.
+
+Before this PR:
+
+![Zrzut ekranu z 2023-11-15
+12-24-56](https://github.com/napari/napari/assets/3826210/1d5942a9-22dc-4f70-8be0-3c9a7c8e1b9f)
+
+With this PR:
+
+![Zrzut ekranu z 2023-11-15
+12-23-32](https://github.com/napari/napari/assets/3826210/01c65497-6c8c-4bf0-8887-5c58db04052b)
+
+Code:
+
+```python
+import napari
+import numpy as np
+
+data = np.asarray([[0, 1], [2, 3]])
+
+viewer = napari.Viewer()
+viewer.add_labels(data, opacity=1)
+
+napari.run()
+```
+
+---------
+
+Co-authored-by: Juan Nunez-Iglesias <jni@fastmail.com>
+---
+ napari/_qt/_tests/test_qt_viewer.py | 42 ++++++++++++++++++++++
+ napari/_vispy/layers/image.py       |  5 ++-
+ napari/_vispy/layers/labels.py      |  6 ++--
+ napari/layers/labels/labels.py      |  5 ++-
+ napari/utils/colormaps/colormap.py  | 54 ++++++++++++++++++++++++-----
+ 5 files changed, 97 insertions(+), 15 deletions(-)
+
+diff --git a/napari/_qt/_tests/test_qt_viewer.py b/napari/_qt/_tests/test_qt_viewer.py
+index f9496ba1..3611c025 100644
+--- a/napari/_qt/_tests/test_qt_viewer.py
++++ b/napari/_qt/_tests/test_qt_viewer.py
+@@ -6,10 +6,12 @@ from typing import List
+ from unittest import mock
+ 
+ import numpy as np
++import numpy.testing
+ import pytest
+ from imageio import imread
+ from qtpy.QtGui import QGuiApplication
+ from qtpy.QtWidgets import QMessageBox
++from scipy import ndimage as ndi
+ 
+ from napari._qt.qt_viewer import QtViewer
+ from napari._tests.utils import (
+@@ -748,3 +750,43 @@ def test_axes_labels(make_napari_viewer):
+     layer_visual_size = vispy_image_scene_size(layer_visual)
+     assert tuple(layer_visual_size) == (8, 4, 2)
+     assert tuple(axes_visual.node.text.text) == ('2', '1', '0')
++
++
++@pytest.fixture()
++def qt_viewer(qtbot):
++    qt_viewer = QtViewer(ViewerModel())
++    qt_viewer.show()
++    qt_viewer.resize(400, 400)
++    yield qt_viewer
++    qt_viewer.close()
++    del qt_viewer
++    qtbot.wait(50)
++    gc.collect()
++
++
++@skip_local_popups
++@pytest.mark.parametrize('direct', [True, False], ids=["direct", "auto"])
++def test_thumbnail_labels(qtbot, direct, qt_viewer: QtViewer):
++    # Add labels to empty viewer
++    layer = qt_viewer.viewer.add_labels(np.array([[0, 1], [2, 3]]), opacity=1)
++    if direct:
++        layer.color = {0: 'red', 1: 'green', 2: 'blue', 3: 'yellow'}
++    qtbot.wait(100)
++
++    canvas_screenshot = qt_viewer.screenshot(flash=False)
++    # cut off black border
++    sh = canvas_screenshot.shape[:2]
++    short_side = min(sh)
++    margin1 = (sh[0] - short_side) // 2 + 20
++    margin2 = (sh[1] - short_side) // 2 + 20
++    canvas_screenshot = canvas_screenshot[margin1:-margin1, margin2:-margin2]
++    thumbnail = layer.thumbnail
++    scaled_thumbnail = ndi.zoom(
++        thumbnail,
++        np.array(canvas_screenshot.shape) / np.array(thumbnail.shape),
++        order=0,
++    )
++
++    numpy.testing.assert_almost_equal(
++        canvas_screenshot, scaled_thumbnail, decimal=1
++    )
+diff --git a/napari/_vispy/layers/image.py b/napari/_vispy/layers/image.py
+index 20779008..0d1f8338 100644
+--- a/napari/_vispy/layers/image.py
++++ b/napari/_vispy/layers/image.py
+@@ -331,11 +331,14 @@ _VISPY_FORMAT_TO_DTYPE: Dict[Optional[str], np.dtype] = {
+     "r8": np.dtype(np.uint8),
+     "r16": np.dtype(np.uint16),
+     "r32f": np.dtype(np.float32),
+-    None: np.dtype(np.float32),
+ }
+ 
+ _DTYPE_TO_VISPY_FORMAT = {v: k for k, v in _VISPY_FORMAT_TO_DTYPE.items()}
+ 
++# this is moved after reverse mapping is defined
++# to always have non None values in _DTYPE_TO_VISPY_FORMAT
++_VISPY_FORMAT_TO_DTYPE[None] = np.dtype(np.float32)
++
+ 
+ def get_dtype_from_vispy_texture_format(format_str: str) -> np.dtype:
+     """Get the numpy dtype from a vispy texture format string.
+diff --git a/napari/_vispy/layers/labels.py b/napari/_vispy/layers/labels.py
+index 14e4d910..471ff9bc 100644
+--- a/napari/_vispy/layers/labels.py
++++ b/napari/_vispy/layers/labels.py
+@@ -486,7 +486,7 @@ class VispyLabelsLayer(VispyImageLayer):
+             self.node.cmap = LabelVispyColormap(
+                 colors=colormap.colors,
+                 use_selection=colormap.use_selection,
+-                selection=colormap.selection,
++                selection=float(colormap.selection),
+                 scale=scale,
+             )
+             self.node.shared_program['texture2D_values'] = Texture2D(
+@@ -504,12 +504,12 @@ class VispyLabelsLayer(VispyImageLayer):
+             key_texture, val_texture, collision = build_textures_from_dict(
+                 color_dict,
+                 use_selection=colormap.use_selection,
+-                selection=colormap.selection,
++                selection=float(colormap.selection),
+             )
+ 
+             self.node.cmap = DirectLabelVispyColormap(
+                 use_selection=colormap.use_selection,
+-                selection=colormap.selection,
++                selection=float(colormap.selection),
+                 collision=collision,
+                 default_color=colormap.default_color,
+                 empty_value=_get_empty_val_from_dict(color_dict),
+diff --git a/napari/layers/labels/labels.py b/napari/layers/labels/labels.py
+index 267071a6..2af4c23e 100644
+--- a/napari/layers/labels/labels.py
++++ b/napari/layers/labels/labels.py
+@@ -1084,7 +1084,7 @@ class Labels(_ImageBase):
+ 
+         downsampled = ndi.zoom(image, zoom_factor, prefilter=False, order=0)
+         if self.color_mode == LabelColorMode.AUTO:
+-            color_array = self.colormap.map(downsampled.ravel())
++            color_array = self.colormap._map_precast(downsampled.ravel())
+         else:  # direct
+             color_array = self._direct_colormap.map(downsampled.ravel())
+         colormapped = color_array.reshape(downsampled.shape + (4,))
+@@ -1104,8 +1104,7 @@ class Labels(_ImageBase):
+         ):
+             col = self.colormap.map([0, 0, 0, 0])[0]
+         else:
+-            val = self._to_vispy_texture_dtype(np.array([label]))
+-            col = self.colormap.map(val)[0]
++            col = self.colormap.map([label])[0]
+         return col
+ 
+     def _get_value_ray(
+diff --git a/napari/utils/colormaps/colormap.py b/napari/utils/colormaps/colormap.py
+index 3d6ae287..3f45c189 100644
+--- a/napari/utils/colormaps/colormap.py
++++ b/napari/utils/colormaps/colormap.py
+@@ -158,24 +158,62 @@ class LabelColormap(Colormap):
+ 
+     seed: float = 0.5
+     use_selection: bool = False
+-    selection: float = 0.0
++    selection: int = 0
+     interpolation: ColormapInterpolationMode = ColormapInterpolationMode.ZERO
+     background_value: int = 0
+ 
+-    def map(self, values):
++    def map(self, values) -> np.ndarray:
++        """Map values to colors.
++
++        Parameters
++        ----------
++        values : np.ndarray or float
++            Values to be mapped.
++
++        Returns
++        -------
++        np.ndarray of same shape as values, but with last dimension of size 4
++            Mapped colors.
++        """
+         values = np.atleast_1d(values)
+ 
+-        mapped = self.colors[
+-            cast_labels_to_minimum_type_auto(
+-                values, len(self.colors) - 1, self.background_value
+-            ).astype(np.int64)
+-        ]
++        precast = cast_labels_to_minimum_type_auto(
++            values, len(self.colors) - 1, self.background_value
++        )
++
++        return self._map_precast(precast)
++
++    def _map_precast(self, values) -> np.ndarray:
++        """Map *precast* values to colors.
++
++        When mapping values, we first convert them to a smaller dtype for
++        performance reasons. This conversion changes the label values,
++        even for small labels. This method is used to map values that have
++        already been converted to the smaller dtype.
++
++        Parameters
++        ----------
++        values : np.ndarray
++            Values to be mapped. They must have already been downcast using
++            `cast_labels_to_minimum_type_auto`.
++
++        Returns
++        -------
++        np.ndarray of shape (N, M, 4)
++            Mapped colors.
++        """
++        mapped = self.colors[values.astype(np.int64)]
+ 
+         mapped[values == self.background_value] = 0
+ 
+         # If using selected, disable all others
+         if self.use_selection:
+-            mapped[~np.isclose(values, self.selection)] = 0
++            cast_selection = cast_labels_to_minimum_type_auto(
++                np.array([self.selection]),
++                len(self.colors) - 1,
++                self.background_value,
++            )[0]
++            mapped[values != cast_selection] = 0
+ 
+         return mapped
+ 
+-- 
+2.34.1
