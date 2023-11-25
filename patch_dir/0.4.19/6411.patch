@@ -1,4 +1,4 @@
-From 41314da3da3de0660cd29593008784b17631fa1b Mon Sep 17 00:00:00 2001
+From ceea7a4e854fbfe0a1c6d7560855b2b4b541e1c3 Mon Sep 17 00:00:00 2001
 From: Grzegorz Bokota <bokota+github@gmail.com>
 Date: Tue, 14 Nov 2023 10:13:44 +0100
 Subject: [PATCH] Fix lagging 3d view for big data in auto color mode (#6411)
@@ -35,21 +35,20 @@ Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.gi
  napari/_qt/_tests/test_qt_viewer.py           |   3 +-
  .../_qt/layer_controls/qt_labels_controls.py  |   2 +-
  .../_vispy/_tests/test_vispy_labels_layer.py  |   2 +-
- napari/_vispy/layers/image.py                 |  64 ++++++++-
- napari/_vispy/layers/labels.py                |  81 ++++++-----
- napari/_vispy/utils/visual.py                 |   2 +-
+ napari/_vispy/layers/image.py                 |  65 +++++++-
+ napari/_vispy/layers/labels.py                |  81 +++++-----
  napari/_vispy/visuals/image.py                |   4 +-
- napari/_vispy/visuals/labels.py               |  40 ++++++
+ napari/_vispy/visuals/labels.py               |  40 +++++
  napari/_vispy/visuals/util.py                 |  30 ++++
  napari/_vispy/visuals/volume.py               |   4 +-
- napari/layers/labels/_labels_utils.py         |  16 +--
+ napari/layers/labels/_labels_utils.py         |  16 +-
  napari/layers/labels/_tests/test_labels.py    |  42 ++++--
- napari/layers/labels/labels.py                | 136 +++++++++++++-----
+ napari/layers/labels/labels.py                | 141 +++++++++++++-----
  .../utils/colormaps/_tests/test_colormap.py   |  35 ++++-
  napari/utils/colormaps/colormap.py            |  93 +++++++++++-
  napari/utils/colormaps/colormap_utils.py      |   4 +-
  setup.cfg                                     |   3 +-
- 17 files changed, 448 insertions(+), 113 deletions(-)
+ 16 files changed, 448 insertions(+), 117 deletions(-)
  create mode 100644 napari/_vispy/visuals/labels.py
  create mode 100644 napari/_vispy/visuals/util.py
 
@@ -94,7 +93,7 @@ index 3540db9a..eb2e9099 100644
  
  @skip_local_popups
 diff --git a/napari/_vispy/layers/image.py b/napari/_vispy/layers/image.py
-index bdc414f6..20779008 100644
+index bdc414f6..b25f746e 100644
 --- a/napari/_vispy/layers/image.py
 +++ b/napari/_vispy/layers/image.py
 @@ -1,4 +1,7 @@
@@ -154,17 +153,18 @@ index bdc414f6..20779008 100644
  
          if self.layer._empty:
              self.node.visible = False
-@@ -135,6 +154,9 @@ class VispyImageLayer(VispyBaseLayer):
- 
+@@ -136,6 +155,10 @@ class VispyImageLayer(VispyBaseLayer):
          data = fix_data_dtype(data)
          ndisplay = self.layer._slice_input.ndisplay
+ 
 +        node = self._layer_node.get_node(
 +            ndisplay, getattr(data, "dtype", None)
 +        )
- 
++
          if ndisplay == 3 and self.layer.ndim == 2:
              data = np.expand_dims(data, axis=0)
-@@ -147,7 +169,9 @@ class VispyImageLayer(VispyBaseLayer):
+ 
+@@ -147,7 +170,9 @@ class VispyImageLayer(VispyBaseLayer):
  
          # Check if ndisplay has changed current node type needs updating
          if (ndisplay == 3 and not isinstance(node, VolumeNode)) or (
@@ -175,7 +175,7 @@ index bdc414f6..20779008 100644
          ):
              self._on_display_change(data)
          else:
-@@ -301,3 +325,29 @@ class VispyImageLayer(VispyBaseLayer):
+@@ -301,3 +326,29 @@ class VispyImageLayer(VispyBaseLayer):
              slices = tuple(slice(None, None, ds) for ds in downsample)
              data = data[slices]
          return data
@@ -360,19 +360,6 @@ index 8e347a6e..14e4d910 100644
 +            self._setup_nodes(_DTYPE_TO_VISPY_FORMAT[dtype])
 +            return self.get_node(ndisplay, dtype)
 +        return res
-diff --git a/napari/_vispy/utils/visual.py b/napari/_vispy/utils/visual.py
-index 3ccf31f8..df48c0b8 100644
---- a/napari/_vispy/utils/visual.py
-+++ b/napari/_vispy/utils/visual.py
-@@ -183,7 +183,7 @@ def get_view_direction_in_scene_coordinates(
-     d2 = p1 - p0
- 
-     # in 3D world coordinates
--    d3 = d2[0:3]
-+    d3 = d2[:3]
-     d4 = d3 / np.linalg.norm(d3)
- 
-     # data are ordered xyz on vispy Volume
 diff --git a/napari/_vispy/visuals/image.py b/napari/_vispy/visuals/image.py
 index 533fb305..0dc3c771 100644
 --- a/napari/_vispy/visuals/image.py
@@ -609,7 +596,7 @@ index 9df5d58b..e6c8f595 100644
      layer.color_mode = 'direct'
      layer._cached_labels = None
 diff --git a/napari/layers/labels/labels.py b/napari/layers/labels/labels.py
-index 44a64c72..267071a6 100644
+index 44a64c72..23c490f6 100644
 --- a/napari/layers/labels/labels.py
 +++ b/napari/layers/labels/labels.py
 @@ -44,6 +44,10 @@ from napari.utils.colormaps import (
@@ -623,15 +610,6 @@ index 44a64c72..267071a6 100644
  from napari.utils.events import EmitterGroup, Event
  from napari.utils.events.custom_types import Array
  from napari.utils.geometry import clamp_point_to_bounding_box
-@@ -295,7 +299,7 @@ class Labels(_ImageBase):
-         self._show_selected_label = False
-         self._contour = 0
-         self._cached_labels = None
--        self._cached_mapped_labels = None
-+        self._cached_mapped_labels = np.zeros((0, 4), dtype=np.uint8)
- 
-         data = self._ensure_int_labels(data)
- 
 @@ -506,6 +510,8 @@ class Labels(_ImageBase):
          self.colormap = label_colormap(
              num_colors, self.seed, self._background_label
@@ -645,6 +623,7 @@ index 44a64c72..267071a6 100644
          colors_sliced = self._raw_to_displayed(
              raw_displayed, data_slice=updated_slice
          )
+-
 +        # The next line is needed to make the following tests pass in
 +        # napari/_vispy/_tests/:
 +        # - test_vispy_labels_layer.py::test_labels_painting
@@ -652,7 +631,7 @@ index 44a64c72..267071a6 100644
 +        # See https://github.com/napari/napari/pull/6112/files#r1291613760
 +        # and https://github.com/napari/napari/issues/6185
 +        self._slice.image.view[updated_slice] = colors_sliced
- 
++        
          self.events.labels_update(data=colors_sliced, offset=offset)
          self._updated_slice = None
  
@@ -770,7 +749,18 @@ index 44a64c72..267071a6 100644
  
          if sliced_labels is None:
              sliced_labels = labels[data_slice]
-@@ -977,14 +1036,23 @@ class Labels(_ImageBase):
+@@ -966,25 +1025,29 @@ class Labels(_ImageBase):
+             # Update the cache
+             self._cached_labels[data_slice][update_mask] = labels_to_map
+         else:
+-            self._cached_labels = np.zeros_like(labels)
+-            self._cached_mapped_labels = np.zeros_like(
+-                labels, dtype=np.float32
+-            )
+-            self._cached_labels[data_slice] = sliced_labels.copy()
+             labels_to_map = sliced_labels
+ 
+         # If there are no changes, just return the cached image
          if labels_to_map.size == 0:
              return self._cached_mapped_labels[data_slice]
  

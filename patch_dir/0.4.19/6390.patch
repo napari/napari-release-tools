@@ -1,4 +1,4 @@
-From badd2a55bcde4badc6a94ea55e46c94e70cbc311 Mon Sep 17 00:00:00 2001
+From ebdf8e77cb85caf54dee2c695685703fe6ed8b16 Mon Sep 17 00:00:00 2001
 From: Grzegorz Bokota <bokota+github@gmail.com>
 Date: Fri, 17 Nov 2023 04:49:26 +0100
 Subject: [PATCH] Fix problem with transform box of multiscale image (#6390)
@@ -18,12 +18,14 @@ image layer.
 
 Co-authored-by: Peter Sobolewski <76622105+psobolewskiPhD@users.noreply.github.com>
 ---
- napari/_vispy/overlays/base.py            |  7 ++++-
- napari/_vispy/overlays/bounding_box.py    |  2 +-
- napari/_vispy/overlays/interaction_box.py |  2 +-
- napari/layers/base/base.py                | 20 ++++++++++++++
- napari/layers/image/image.py              | 32 ++++++++++++++++++++++-
- 5 files changed, 59 insertions(+), 4 deletions(-)
+ napari/_vispy/overlays/base.py             |  7 +++-
+ napari/_vispy/overlays/bounding_box.py     |  2 +-
+ napari/_vispy/overlays/interaction_box.py  |  2 +-
+ napari/layers/base/base.py                 | 34 ++++++++++++++++
+ napari/layers/image/image.py               | 30 +++++++++++++++
+ napari/layers/points/_tests/test_points.py |  6 +++
+ napari/layers/points/points.py             | 45 ++++++++++++++--------
+ 7 files changed, 107 insertions(+), 19 deletions(-)
 
 diff --git a/napari/_vispy/overlays/base.py b/napari/_vispy/overlays/base.py
 index 61a97d4e..be2055c9 100644
@@ -81,7 +83,7 @@ index bdf4ea84..d2f38262 100644
              )
              # invert axes for vispy
 diff --git a/napari/layers/base/base.py b/napari/layers/base/base.py
-index c1ca5325..e2be6e5a 100644
+index c1ca5325..8cc20a7c 100644
 --- a/napari/layers/base/base.py
 +++ b/napari/layers/base/base.py
 @@ -240,6 +240,7 @@ class Layer(KeymapProvider, MousemapProvider, ABC):
@@ -92,7 +94,28 @@ index c1ca5325..e2be6e5a 100644
  
      def __init__(
          self,
-@@ -1424,6 +1425,25 @@ class Layer(KeymapProvider, MousemapProvider, ABC):
+@@ -782,6 +783,20 @@ class Layer(KeymapProvider, MousemapProvider, ABC):
+         """
+         raise NotImplementedError
+ 
++
++    @property
++    def _extent_data_augmented(self) -> np.ndarray:
++        """Extent of layer in data coordinates.
++
++        Differently from Layer._extent_data, this also includes the "size" of
++        data points; for example, Point sizes and Image pixel width are included.
++
++        Returns
++        -------
++        extent_data : array, shape (2, D)
++        """
++        return self._extent_data
++
+     @property
+     def _extent_world(self) -> np.ndarray:
+         """Range of layer in world coordinates.
+@@ -1424,6 +1439,25 @@ class Layer(KeymapProvider, MousemapProvider, ABC):
          """An axis aligned (ndisplay, 2) bounding box around the data"""
          return self._extent_data[:, dims_displayed].T
  
@@ -119,16 +142,13 @@ index c1ca5325..e2be6e5a 100644
          self,
          click_position: np.ndarray,
 diff --git a/napari/layers/image/image.py b/napari/layers/image/image.py
-index b908af25..9176afce 100644
+index b908af25..9e7dcd12 100644
 --- a/napari/layers/image/image.py
 +++ b/napari/layers/image/image.py
-@@ -490,7 +490,28 @@ class _ImageBase(IntensityVisualizationMixin, Layer):
-         extent_data : array, shape (2, D)
-         """
+@@ -492,6 +492,27 @@ class _ImageBase(IntensityVisualizationMixin, Layer):
          shape = self.level_shapes[0]
--        return np.vstack([np.zeros(len(shape)), shape])
-+        return np.vstack([np.zeros(len(shape)), shape - 1])
-+
+         return np.vstack([np.zeros(len(shape)), shape])
+ 
 +    @property
 +    def _extent_data_augmented(self) -> np.ndarray:
 +        extent = self._extent_data
@@ -149,9 +169,10 @@ index b908af25..9176afce 100644
 +    def _extent_level_data_augmented(self) -> np.ndarray:
 +        extent = self._extent_level_data
 +        return extent + [[-0.5], [+0.5]]
- 
++
      @property
      def data_level(self):
+         """int: Current level of multiscale, or 0 if image."""
 @@ -1030,6 +1051,15 @@ class _ImageBase(IntensityVisualizationMixin, Layer):
          extent_at_level = np.vstack([np.zeros(len(shape)), shape - 1])
          return extent_at_level[:, dims_displayed].T
@@ -168,6 +189,93 @@ index b908af25..9176afce 100644
      # For async we add an on_chunk_loaded() method.
      if config.async_loading:
  
+diff --git a/napari/layers/points/_tests/test_points.py b/napari/layers/points/_tests/test_points.py
+index 83a3efed..65f7f136 100644
+--- a/napari/layers/points/_tests/test_points.py
++++ b/napari/layers/points/_tests/test_points.py
+@@ -18,6 +18,7 @@ from napari.layers import Points
+ from napari.layers.base._base_constants import ActionType
+ from napari.layers.points._points_constants import Mode
+ from napari.layers.points._points_utils import points_to_squares
++from napari.layers.utils._slice_input import _SliceInput
+ from napari.layers.utils._text_constants import Anchor
+ from napari.layers.utils.color_encoding import ConstantColorEncoding
+ from napari.layers.utils.color_manager import ColorProperties
+@@ -1666,6 +1667,11 @@ def test_message_3d():
+     np.random.seed(0)
+     data = 20 * np.random.random(shape)
+     layer = Points(data)
++    layer._slice_input = _SliceInput(
++        ndisplay=3,
++        point=(0,0, 0),
++        order=(0, 1, 2),
++    )
+     msg = layer.get_status(
+         (0, 0, 0), view_direction=[1, 0, 0], dims_displayed=[0, 1, 2]
+     )
+diff --git a/napari/layers/points/points.py b/napari/layers/points/points.py
+index 1b5e589f..fe907905 100644
+--- a/napari/layers/points/points.py
++++ b/napari/layers/points/points.py
+@@ -779,7 +779,20 @@ class Points(Layer):
+             maxs = np.max(self.data, axis=0)
+             mins = np.min(self.data, axis=0)
+             extrema = np.vstack([mins, maxs])
+-        return extrema
++        return extrema.astype(float)
++
++    @property
++    def _extent_data_augmented(self):
++        # _extent_data is a property that returns a new/copied array, which
++        # is safe to modify below
++        extent = self._extent_data
++        if len(self.size) == 0:
++            return extent
++
++        max_point_size = np.max(self.size)
++        extent[0] -= max_point_size / 2
++        extent[1] += max_point_size / 2
++        return extent
+ 
+     @property
+     def out_of_slice_display(self) -> bool:
+@@ -1736,21 +1749,21 @@ class Points(Layer):
+             selection = None
+         return selection
+ 
+-    def _display_bounding_box_augmented(self, dims_displayed: np.ndarray):
+-        """An augmented, axis-aligned (ndisplay, 2) bounding box.
+-
+-        This bounding box for includes the full size of displayed points
+-        and enables calculation of intersections in `Layer._get_value_3d()`.
+-        """
+-        if len(self._view_size) == 0:
+-            return None
+-        max_point_size = np.max(self._view_size)
+-        bounding_box = np.copy(
+-            self._display_bounding_box(dims_displayed)
+-        ).astype(float)
+-        bounding_box[:, 0] -= max_point_size / 2
+-        bounding_box[:, 1] += max_point_size / 2
+-        return bounding_box
++    # def _display_bounding_box_augmented(self, dims_displayed: np.ndarray):
++    #     """An augmented, axis-aligned (ndisplay, 2) bounding box.
++    #
++    #     This bounding box for includes the full size of displayed points
++    #     and enables calculation of intersections in `Layer._get_value_3d()`.
++    #     """
++    #     if len(self._view_size) == 0:
++    #         return None
++    #     max_point_size = np.max(self._view_size)
++    #     bounding_box = np.copy(
++    #         self._display_bounding_box(dims_displayed)
++    #     ).astype(float)
++    #     bounding_box[:, 0] -= max_point_size / 2
++    #     bounding_box[:, 1] += max_point_size / 2
++    #     return bounding_box
+ 
+     def get_ray_intersections(
+         self,
 -- 
 2.34.1
 
