@@ -1,0 +1,132 @@
+From a5d7be06ef9d492bc3ecdc653014ccf6d38e7a84 Mon Sep 17 00:00:00 2001
+From: jaimergp <jaimergp@users.noreply.github.com>
+Date: Fri, 10 Feb 2023 19:23:32 +0100
+Subject: [PATCH] Add 'html-live' make action to support live reload workflows
+ (#75)
+
+# Description
+This PR adds a `html-live` make action so we can write docs locally
+without having to rebuild and serve manually. This depends on
+`sphinx-autobuild`.
+
+This is all you need:
+
+```bash
+$ make html-live
+```
+
+The incremental builds are still a bit slow, so it's not exactly "live"
+but, it's indeed automated :) I've been using this in the background
+while live previewing the markdown files on VS Code directly. Then, I
+switch to the browser to double check.
+
+## Type of change
+- [X] Fixes or improves workflow, documentation build or deployment
+---
+ docs/conf.py                           |  6 ++--
+ docs/developers/documentation/index.md | 40 +++++++++++++++++++++++++-
+ docs/requirements.txt                  |  2 ++
+ requirements.txt                       |  2 ++
+ 5 files changed, 73 insertions(+), 13 deletions(-)
+
+
+diff --git a/docs/conf.py b/docs/conf.py
+index 77d3caa4..41db90c2 100644
+--- a/docs/conf.py
++++ b/docs/conf.py
+@@ -215,11 +215,11 @@ def reset_napari_theme(gallery_conf, fname):
+     'gallery_dirs': 'gallery',  # path to where to save gallery generated output
+     'filename_pattern': '/*.py',
+     'ignore_pattern': 'README.rst|/*_.py',
+     'default_thumb_file': Path(__file__).parent.parent
+     / 'napari'
+     / 'resources'
+     / 'logo.png',
+-    'plot_gallery': True,
++    'plot_gallery': "'True'",  # https://github.com/sphinx-gallery/sphinx-gallery/pull/304/files
+     'download_all_examples': False,
+     'min_reported_time': 10,
+     'only_warn_on_example_error': True,
+diff --git a/docs/developers/documentation/index.md b/docs/developers/documentation/index.md
+index 928d4fc1..a6b1d8ed 100644
+--- a/docs/developers/documentation/index.md
++++ b/docs/developers/documentation/index.md
+@@ -201,6 +201,8 @@ There are two ways you can preview the documentation website: by building
+ locally, or downloading the GitHub Actions built documentation when you submit
+ your pull request.
+
++### 3.1. Building locally
++
+ To build the documentation locally, run `make docs` from the root of your local
+ clone of the `napari/docs` repository (assuming you've installed the
+ [docs prerequisites](#prerequisites)).
+@@ -220,7 +222,7 @@ make docs GALLERY_PATH=<path-to-examples-folder>
+ ```
+
+ The `GALLERY_PATH` option must be given relative to the `docs` folder. If your
+-folder structure is
++folder structure is
+
+ ```
+ ├── napari-docs
+@@ -243,6 +245,33 @@ make docs GALLERY_PATH=../../napari/examples
+
+ The rendered HTML will be placed in `docs/_build`. Find `index.html` in this
+ folder and drag it into a browser to preview the website with your new document.
++You can also run this Python one-liner to deploy a quick local server on
++[http://localhost:8000](http://localhost:8000):
++
++```shell
++$ python3 -m http.server --directory docs/_build
++```
++
++````{tip}
++There's another `make` task you can use for live previews while editing docs:
++
++```shell
++$ make html-live
++# or for faster reloads:
++# make html-live SPHINXOPTS="-j4"
++```
++
++The first run will take a bit longer and a few napari instances will pop up
++here and there, but the successive ones (triggered automatically every time
++you save a file under `docs/`) will be faster!
++The browser preview will open up automatically at `http://127.0.0.1`,
++no need for further action! Edit the documents at will, and the browser will
++auto-reload.
++Once you are done with the live previews, you can exit via <kbd>Ctrl</kbd>+<kbd>C</kbd>
++on your terminal.
++````
++
++### 3.2. Use the CI artifacts
+
+ Alternatively, when you submit your pull request, the napari docs repository
+ continuous integration includes a GitHub action that builds the documentation
+@@ -263,6 +292,15 @@ then:
+
+ ![doc-continuous-integration-1](images/doc-ci-3.png)
+
++4. Extract the compressed archive and open the `docs/index.html` file on your preferred browser.
++   You can also use Python's `http.server` module to open a local server on
++   [http://localhost:8000](http://localhost:8000):
++
++```shell
++$ cd ~/Downloads/docs  # or the path where you extracted the 'docs' artifact
++$ python3 -m http.server
++```
++
+ ## 4. Submit your pull request
+
+ Once you have written and previewed your document, it's time to open a pull request to [napari's docs repository](https://github.com/napari/docs) and contribute it to our codebase.
+diff --git a/docs/requirements.txt b/docs/requirements.txt
+index 6c112435..0ea7e37b 100644
+--- a/docs/requirements.txt
++++ b/docs/requirements.txt
+@@ -1,4 +1,6 @@
+ sphinx<5
++sphinx-autobuild
++sphinx-tabs
+ sphinx-tags
+ sphinx-design
+ sphinx-external-toc

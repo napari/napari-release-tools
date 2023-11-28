@@ -1,0 +1,75 @@
+From f8c2ce7386318a7c07daee287ae08a5bea498918 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Melissa=20Weber=20Mendon=C3=A7a?= <melissawm@gmail.com>
+Date: Tue, 25 Apr 2023 15:38:32 -0300
+Subject: [PATCH] Add instructions on how to use docs-xvfb (#138)
+
+# Description
+Adds a note on how to use docs-xvfb for faster/less annoying docs builds
+:)
+
+## Type of change
+<!-- Please delete options that are not relevant. -->
+- [x] Fixes or improves existing content
+
+# References
+<!-- What resources, documentation, and guides were used in the creation
+of this PR? -->
+<!-- If this is a fix or otherwise resolves an issue, reference it here
+with "closes #(issue)" -->
+
+## Final checklist:
+- [x] My PR is the minimum possible work for the desired functionality
+
+---------
+
+Co-authored-by: Peter Sobolewski <76622105+psobolewskiPhD@users.noreply.github.com>
+---
+ docs/developers/documentation/index.md | 21 +++++++++++++++++----
+ 1 file changed, 17 insertions(+), 4 deletions(-)
+
+diff --git a/docs/developers/documentation/index.md b/docs/developers/documentation/index.md
+index bcf57c9a..d1f0f531 100644
+--- a/docs/developers/documentation/index.md
++++ b/docs/developers/documentation/index.md
+@@ -204,9 +204,9 @@ your pull request.
+
+ ### 3.1. Building locally
+
+-To build the documentation locally, run `make docs` from the root of your local
+-clone of the `napari/docs` repository (assuming you've installed the
+-[docs prerequisites](#prerequisites)).
++To build the documentation locally from scratch, run `make docs` from the root
++of your local clone of the `napari/docs` repository (assuming you've installed
++the [docs prerequisites](#prerequisites)).
+
+ ```bash
+ make docs
+@@ -259,7 +259,7 @@ There's another `make` task you can use for live previews while editing docs:
+ ```shell
+ $ make html-live
+ # or for faster reloads:
+-# make html-live SPHINXOPTS="-j4"
++$ make html-live SPHINXOPTS="-j4"
+ ```
+
+ The first run will take a bit longer and a few napari instances will pop up
+@@ -272,6 +272,19 @@ Once you are done with the live previews, you can exit via <kbd>Ctrl</kbd>+<kbd>
+ on your terminal.
+ ````
+
++````{tip}
++If you have [xvfb](https://www.x.org/releases/X11R7.6/doc/man/man1/Xvfb.1.xhtml)
++installed on your system, you can also run a "headless GUI" build by using the
++`docs-xvfb` command:
++
++```shell
++$ make docs-xvfb
++```
++
++This will prevent all but the first napari window from being shown during the docs
++build.
++````
++
+ ### 3.2. Use the CI artifacts
+
+ Alternatively, when you submit your pull request, the napari docs repository

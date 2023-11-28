@@ -1,0 +1,36 @@
+From 0b657a7d7621a016d221edd9f8940a80b8f8b40f Mon Sep 17 00:00:00 2001
+From: Peter Sobolewski <76622105+psobolewskiPhD@users.noreply.github.com>
+Date: Thu, 26 Oct 2023 21:01:13 -0400
+Subject: [PATCH] Installation guide: Mention slow first launch time (#253)
+
+# References and relevant issues
+Closes https://github.com/napari/docs/issues/222
+
+# Description
+This PR adds a `Note` that first launch may be slow on some platforms
+(macOS, Windows) and that anti-malware and security software may also
+result in slower launches.
+It's quite disconcerting when running `napari` doesn't visually do
+anything immediately!
+---
+ docs/tutorials/fundamentals/installation.md | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/docs/tutorials/fundamentals/installation.md b/docs/tutorials/fundamentals/installation.md
+index ada383d6..a75235e5 100644
+--- a/docs/tutorials/fundamentals/installation.md
++++ b/docs/tutorials/fundamentals/installation.md
+@@ -170,6 +170,13 @@ the current release {{ napari_version }}, using command: `napari --version` .
+ ````
+ ![macOS desktop with a napari viewer window without any image opened in the foreground, and a terminal in the background with the appropriate conda environment activated (if applicable) and the command to open napari entered.](../assets/tutorials/launch_cli_empty.png)
+
++````{note}
++On some platforms, particularly macOS and Windows, there may be a ~30 second
++delay before the viewer appears on first launch. This is expected and subsequent
++launches should be quick. However, anti-malware and other security software
++measures may further delay launches—even after the first launch.
++````
++
+ ## Choosing a different Qt backend
+
+ napari needs a library called [Qt](https://www.qt.io/) to run its user interface

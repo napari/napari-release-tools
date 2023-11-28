@@ -1,0 +1,23 @@
+From d1c287825d065a3d7511979f97f9194d63d6da7d Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Melissa=20Weber=20Mendon=C3=A7a?= <melissawm@gmail.com>
+Date: Thu, 5 Jan 2023 00:08:03 -0300
+Subject: [PATCH] Fixes formatting for the contributing documentation section
+ (#79)
+
+---
+ docs/developers/documentation/index.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/docs/developers/documentation/index.md b/docs/developers/documentation/index.md
+index 26adfc00..db838a08 100644
+--- a/docs/developers/documentation/index.md
++++ b/docs/developers/documentation/index.md
+@@ -34,7 +34,7 @@ cd napari-docs/
+ To reduce confusion and possible conflicts, the `docs` fork is being cloned into
+ a local repository folder named `napari-docs`. Alternately, you could also
+ rename the repository when forking `napari/docs`.
+-```
++````
+
+ - **If you wish to add/amend documentation that does not contain code, you will
+   require a clean conda environment with napari docs dependencies installed.**

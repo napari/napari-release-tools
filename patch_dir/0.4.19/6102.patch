@@ -1,0 +1,221 @@
+From cb91c14350b72e06dbe11082e403ae2f86be7009 Mon Sep 17 00:00:00 2001
+From: Egor Zindy <ezindy@gmail.com>
+Date: Fri, 4 Aug 2023 02:27:36 +0200
+Subject: [PATCH] Automatic recognition of hex colour strings in layer data
+ (#6102)
+
+This PR adds the automatic recognition of hex colour strings in layer
+data and if necessary, generates a linear colormap from black to that
+colour and adds it to the list of available colormaps. If the hex colour
+string defines a bright {white | red | green | blue | cyan | magenta |
+yellow} colour, then the corresponding colormap will be used instead of
+adding a new one.
+
+My goal with this fix is to simplify colour handling in reader plugins
+(I especially had
+[napari-czifile2](https://github.com/BodenmillerGroup/napari-czifile2)
+in mind) by being able to just specify a channel colour as a hex string
+and let napari generate (or reuse) a colormap for this particular
+colour.
+
+I first mentioned this work on the [image.sc
+forum](https://forum.image.sc/t/napari-development-question-about-colormaps-in-the-image-layer/84264)
+and got one favourable return (thanks Juan!).
+
+<!-- Please delete options that are not relevant. -->
+- [x] New feature (non-breaking change which adds functionality)
+
+I used
+[napari-czifile2](https://github.com/BodenmillerGroup/napari-czifile2)
+to check my addition with the following code (in Jupyter):
+
+```python
+import napari_czifile2
+import napari
+
+fn = 'somefile.czi'
+layer = napari_czifile2._reader.reader_function(fn)[0]
+
+layer[1]['colormap'] = ['#f0F','#fdff00fF']
+
+viewer = napari.Viewer()
+viewer.add_image(layer[0], **layer[1])
+napari.run()
+```
+
+- #rgb #rgba #rrggbb #rrggbbaa combinations
+- used in combination with `None` in the colormap list
+- case (in)sensitivity
+- one of the colours for which there is a colormap already
+(r,g,b,c,m,y,w)
+- custom colours and how their name look in the napari viewer colormap
+list
+- malformed hex colours
+- missing or extra elements in colormap (extra is fine, missing is not)
+
+```
+IndexError: Error adding multichannel image with data shape (1, 121, 2, 1024, 1024).
+Requested channel_axis (2) had length 2, but the 'colormap' argument only provided 1 values.
+```
+
+The existing exception error message should be enough to understand what
+happened (hex colour string used was `'#ff'`) :
+```
+KeyError: 'Colormap "#ff" not found in either vispy or matplotlib. Recognized colormaps are: "GrBu", "GrBu_d", "PiYG", "PuGr", "RdBu", "RdYeBuCy", "autumn", "blues", "cool", "coolwarm", "cubehelix", "diverging", "fire", "gist_earth", "gray", "gray_r", "grays", "greens", "hot", "hsl", "hsv", "husl", "ice", "inferno", "light_blues", "magma", "orange", "plasma", "reds", "single_hue", "spring", "summer", "turbo", "twilight", "twilight_shifted", "viridis", "winter"'
+```
+
+---------
+
+Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.github.com>
+Co-authored-by: Grzegorz Bokota <bokota+github@gmail.com>
+Co-authored-by: Lorenzo Gaifas <brisvag@gmail.com>
+---
+ .../utils/colormaps/_tests/test_colormaps.py  | 39 +++++++++++++++++++
+ napari/utils/colormaps/colormap.py            |  8 ++--
+ napari/utils/colormaps/colormap_utils.py      | 37 ++++++++++++++----
+ 3 files changed, 72 insertions(+), 12 deletions(-)
+
+diff --git a/napari/utils/colormaps/_tests/test_colormaps.py b/napari/utils/colormaps/_tests/test_colormaps.py
+index 77969eae..fe090c85 100644
+--- a/napari/utils/colormaps/_tests/test_colormaps.py
++++ b/napari/utils/colormaps/_tests/test_colormaps.py
+@@ -235,3 +235,42 @@ def test_ensure_colormap_with_multi_colors(colors):
+     expected_colors = transform_color(colors)
+     np.testing.assert_array_equal(colormap.colors, expected_colors)
+     assert re.match(r'\[unnamed colormap \d+\]', colormap.name) is not None
++
++
++@pytest.mark.parametrize('color', ['#abc', '#abcd', '#abcdef', '#00ABCDEF'])
++def test_ensure_colormap_with_hex_color_string(color):
++    """
++    Test all the accepted hex color representations (single/double digit rgb with/without alpha)
++    """
++    cmap = ensure_colormap(color)
++    assert isinstance(cmap, Colormap)
++    assert cmap.name == color.lower()
++
++
++@pytest.mark.parametrize('color', ['#f0f', '#f0fF', '#ff00ff', '#ff00ffFF'])
++def test_ensure_colormap_with_recognized_hex_color_string(color):
++    """
++    Test that a hex color string for magenta is associated with the existing magenta colormap
++    """
++    cmap = ensure_colormap(color)
++    assert isinstance(cmap, Colormap)
++    assert cmap.name == 'magenta'
++
++
++def test_ensure_colormap_error_with_invalid_hex_color_string():
++    """
++    Test that ensure_colormap errors when using an invalid hex color string
++    """
++    color = '#ff'
++    with pytest.raises(KeyError, match=rf"{color}.*Recognized colormaps are"):
++        ensure_colormap(color)
++
++
++@pytest.mark.parametrize('mpl_name', ['chartreuse', 'chocolate', 'lavender'])
++def test_ensure_colormap_with_recognized_mpl_color_name(mpl_name):
++    """
++    Test that the colormap name is identical to the the mpl color name passed to ensure_colormap
++    """
++    cmap = ensure_colormap(mpl_name)
++    assert isinstance(cmap, Colormap)
++    assert cmap.name == mpl_name
+diff --git a/napari/utils/colormaps/colormap.py b/napari/utils/colormaps/colormap.py
+index f2a29335..9384db54 100644
+--- a/napari/utils/colormaps/colormap.py
++++ b/napari/utils/colormaps/colormap.py
+@@ -1,9 +1,9 @@
+ from collections import defaultdict
+ from enum import Enum
+-from typing import Optional
++from typing import Optional, cast
+
+ import numpy as np
+-from pydantic import PrivateAttr, validator
++from pydantic import Field, PrivateAttr, validator
+
+ from napari.utils.color import ColorArray
+ from napari.utils.colormaps.colorbars import make_colorbar
+@@ -51,7 +51,7 @@ class Colormap(EventedModel):
+     name: str = 'custom'
+     _display_name: Optional[str] = PrivateAttr(None)
+     interpolation: ColormapInterpolationMode = ColormapInterpolationMode.LINEAR
+-    controls: Array[np.float32, (-1,)] = None
++    controls: Array = Field(default_factory=lambda: cast(Array, []))
+
+     def __init__(
+         self, colors, display_name: Optional[str] = None, **data
+@@ -63,7 +63,7 @@ class Colormap(EventedModel):
+         self._display_name = display_name
+
+     # controls validator must be called even if None for correct initialization
+-    @validator('controls', pre=True, always=True)
++    @validator('controls', pre=True, always=True, allow_reuse=True)
+     def _check_controls(cls, v, values):
+         # If no control points provided generate defaults
+         if v is None or len(v) == 0:
+diff --git a/napari/utils/colormaps/colormap_utils.py b/napari/utils/colormaps/colormap_utils.py
+index 169fe589..91e85579 100644
+--- a/napari/utils/colormaps/colormap_utils.py
++++ b/napari/utils/colormaps/colormap_utils.py
+@@ -618,12 +618,29 @@ def ensure_colormap(colormap: ValidColormapArg) -> Colormap:
+     """
+     with AVAILABLE_COLORMAPS_LOCK:
+         if isinstance(colormap, str):
+-            name = colormap
+-            if name not in AVAILABLE_COLORMAPS:
+-                cmap = vispy_or_mpl_colormap(
+-                    name
+-                )  # raises KeyError if not found
+-                AVAILABLE_COLORMAPS[name] = cmap
++            # Is a colormap with this name already available?
++            custom_cmap = AVAILABLE_COLORMAPS.get(colormap, None)
++            if custom_cmap is None:
++                name = (
++                    colormap.lower() if colormap.startswith('#') else colormap
++                )
++                custom_cmap = _colormap_from_colors(colormap, name)
++
++                if custom_cmap is None:
++                    custom_cmap = vispy_or_mpl_colormap(colormap)
++
++                for cmap_ in AVAILABLE_COLORMAPS.values():
++                    if (
++                        np.array_equal(cmap_.controls, custom_cmap.controls)
++                        and cmap_.colors.shape == custom_cmap.colors.shape
++                        and np.all(cmap_.colors == custom_cmap.colors)
++                        and cmap_.interpolation == custom_cmap.interpolation
++                    ):
++                        custom_cmap = cmap_
++                        break
++
++            name = custom_cmap.name
++            AVAILABLE_COLORMAPS[name] = custom_cmap
+         elif isinstance(colormap, Colormap):
+             AVAILABLE_COLORMAPS[colormap.name] = colormap
+             name = colormap.name
+@@ -742,14 +759,18 @@ def ensure_colormap(colormap: ValidColormapArg) -> Colormap:
+     return AVAILABLE_COLORMAPS[name]
+
+
+-def _colormap_from_colors(colors: ColorType) -> Optional[Colormap]:
++def _colormap_from_colors(
++    colors: ColorType,
++    name: Optional[str] = 'custom',
++    display_name: Optional[str] = None,
++) -> Optional[Colormap]:
+     try:
+         color_array = transform_color(colors)
+     except (ValueError, AttributeError, KeyError):
+         return None
+     if color_array.shape[0] == 1:
+         color_array = np.array([[0, 0, 0, 1], color_array[0]])
+-    return Colormap(color_array)
++    return Colormap(color_array, name=name, display_name=display_name)
+
+
+ def make_default_color_array():
+--
+2.34.1

@@ -1,0 +1,103 @@
+From 07ae62085f150fa14b18adda88205bd63eda35dd Mon Sep 17 00:00:00 2001
+From: Grzegorz Bokota <bokota+github@gmail.com>
+Date: Sun, 5 Nov 2023 23:05:29 +0100
+Subject: [PATCH] Do not repeat warnings in GUI (#6396)
+
+---
+ .../utils/_tests/test_notification_manager.py | 31 +++++++++++++++++--
+ napari/utils/notifications.py                 | 13 +++++---
+ 2 files changed, 38 insertions(+), 6 deletions(-)
+
+diff --git a/napari/utils/_tests/test_notification_manager.py b/napari/utils/_tests/test_notification_manager.py
+index a209a8f2..fa827284 100644
+--- a/napari/utils/_tests/test_notification_manager.py
++++ b/napari/utils/_tests/test_notification_manager.py
+@@ -80,7 +80,9 @@ def test_notification_manager_no_gui(monkeypatch):
+         # test that warnings that go through showwarning are catalogued
+         # again, pytest intercepts this, so just manually trigger:
+         assert warnings.showwarning == notification_manager.receive_warning
+-        warnings.showwarning('this is a warning', UserWarning, '', 0)
++        warnings.showwarning(
++            UserWarning('this is a warning'), UserWarning, __file__, 83
++        )
+         assert len(notification_manager.records) == 4
+         assert store[-1].type == 'warning'
+ 
+@@ -111,7 +113,9 @@ def test_notification_manager_no_gui_with_threading():
+     """
+ 
+     def _warn():
+-        warnings.showwarning('this is a warning', UserWarning, '', 0)
++        warnings.showwarning(
++            UserWarning('this is a warning'), UserWarning, __file__, 116
++        )
+ 
+     def _raise():
+         with pytest.raises(PurposefulException):
+@@ -155,3 +159,26 @@ def test_notification_manager_no_gui_with_threading():
+     assert threading.excepthook == previous_threading_exhook
+ 
+     assert all(isinstance(x, Notification) for x in store)
++
++
++def test_notification_manager_no_warning_duplication():
++    def fun():
++        warnings.showwarning(
++            UserWarning('This is a warning'),
++            category=UserWarning,
++            filename=__file__,
++            lineno=166,
++        )
++
++    with notification_manager:
++        notification_manager.records.clear()
++        # save all of the events that get emitted
++        store: List[Notification] = []
++        notification_manager.notification_ready.connect(store.append)
++
++        fun()
++        assert len(notification_manager.records) == 1
++        assert store[-1].type == 'warning'
++
++        fun()
++        assert len(notification_manager.records) == 1
+diff --git a/napari/utils/notifications.py b/napari/utils/notifications.py
+index 9bc7e344..782f2452 100644
+--- a/napari/utils/notifications.py
++++ b/napari/utils/notifications.py
+@@ -7,7 +7,7 @@ import warnings
+ from datetime import datetime
+ from enum import auto
+ from types import TracebackType
+-from typing import Callable, List, Optional, Sequence, Tuple, Type, Union
++from typing import Callable, List, Optional, Sequence, Set, Tuple, Type, Union
+ 
+ from napari.utils.events import Event, EventEmitter
+ from napari.utils.misc import StringEnum
+@@ -242,9 +242,10 @@ class NotificationManager:
+         self.notification_ready = self.changed = EventEmitter(
+             source=self, event_class=Notification
+         )
+-        self._originals_except_hooks = []
+-        self._original_showwarnings_hooks = []
+-        self._originals_thread_except_hooks = []
++        self._originals_except_hooks: List[Callable] = []
++        self._original_showwarnings_hooks: List[Callable] = []
++        self._originals_thread_except_hooks: List[Callable] = []
++        self._seen_warnings: Set[Tuple[str, Type, str, int]] = set()
+ 
+     def __enter__(self):
+         self.install_hooks()
+@@ -321,6 +322,10 @@ class NotificationManager:
+         file=None,
+         line=None,
+     ):
++        msg = message if isinstance(message, str) else message.args[0]
++        if (msg, category, filename, lineno) in self._seen_warnings:
++            return
++        self._seen_warnings.add((msg, category, filename, lineno))
+         self.dispatch(
+             Notification.from_warning(
+                 message, filename=filename, lineno=lineno
+-- 
+2.34.1

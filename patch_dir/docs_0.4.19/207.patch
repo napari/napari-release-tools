@@ -1,0 +1,160 @@
+From 37ebe2dcf873d4363a43cebd13ddc5fbe825f87c Mon Sep 17 00:00:00 2001
+From: Ashley Anderson <aganders3@gmail.com>
+Date: Mon, 24 Jul 2023 18:31:04 -0500
+Subject: [PATCH] Use napari_scraper instead of qtgallery (#207)
+
+# Description
+This is a CI change that removes `qtgallery` in favor of a
+napari-specific scraper. It's not that different but gives us a little
+more control and is not much code.
+
+This seems to fix the error seen in "Build PR Docs" for
+https://github.com/napari/napari/pull/4865 and also speeds up the docs
+build quite a bit (~11 min instead of ~25 min).
+
+I'm no Qt expert but suspect the main improvements here are related to
+adding `napari.Viewer.close_all()` (which maybe belongs in the reset fn)
+and calling `processEvents()` one more time after this.
+
+The main drawback right now is that this doesn't capture non-Viewer
+windows, but this could probably be added if needed.
+
+## Type of change
+- [x] Fixes or improves workflow, documentation build or deployment
+
+# References
+closes #174 (maybe?)
+fixes errors in docs build for
+https://github.com/napari/napari/pull/4865
+
+## Final checklist:
+- [x] My PR is the minimum possible work for the desired functionality
+- [x] I have commented my code, particularly in hard-to-understand areas
+---
+ docs/conf.py          | 62 ++++++++++++++++++++++++++++++++-----------
+ docs/requirements.txt |  1 -
+ requirements.txt      |  1 -
+ 3 files changed, 47 insertions(+), 17 deletions(-)
+
+diff --git a/docs/conf.py b/docs/conf.py
+index aa2a5806..bd9a60ff 100644
+--- a/docs/conf.py
++++ b/docs/conf.py
+@@ -19,9 +19,9 @@
+ from pathlib import Path
+ from urllib.parse import urlparse, urlunparse
+
+-import qtgallery
+ from jinja2.filters import FILTERS
++from sphinx_gallery import scrapers
+ from sphinx_gallery.sorting import ExampleTitleSortKey
+
+ import napari
+ from napari._version import __version_tuple__
+@@ -164,14 +165,14 @@
+ python_version_range = '3.8-3.10'
+ python_minimum_version = '3.8'
+
+ myst_substitutions = {
+-   "napari_conda_version": f"`napari={version_string}`",
+-   "napari_version": version_string,
+-   "python_version": python_version,
+-   "python_version_range": python_version_range,
+-   "python_minimum_version": python_minimum_version,
+-   "python_version_code": f"`python={python_version}`",
+-   "conda_create_env": f"```sh\nconda create -y -n napari-env -c conda-forge python={python_version}\nconda activate napari-env\n```",
++    "napari_conda_version": f"`napari={version_string}`",
++    "napari_version": version_string,
++    "python_version": python_version,
++    "python_version_range": python_version_range,
++    "python_minimum_version": python_minimum_version,
++    "python_version_code": f"`python={python_version}`",
++    "conda_create_env": f"```sh\nconda create -y -n napari-env -c conda-forge python={python_version}\nconda activate napari-env\n```",
+ }
+
+ myst_footnote_transition = False
+@@ -199,16 +200,48 @@
+ napoleon_custom_sections = [('Events', 'params_style')]
+
+
+-def reset_napari_theme(gallery_conf, fname):
++def reset_napari(gallery_conf, fname):
+     from napari.settings import get_settings
++    from qtpy.QtWidgets import QApplication
+
+     settings = get_settings()
+     settings.appearance.theme = 'dark'
+-    qtgallery.reset_qapp(gallery_conf, fname)
+
++    # Disabling `QApplication.exec_` means example scripts can call `exec_`
++    # (scripts work when run normally) without blocking example execution by
++    # sphinx-gallery. (from qtgallery)
++    QApplication.exec_ = lambda _: None
++
++
++def napari_scraper(block, block_vars, gallery_conf):
++    """Basic napari window scraper.
++
++    Looks for any QtMainWindow instances and takes a screenshot of them.
++
++    `app.processEvents()` allows Qt events to propagateo and prevents hanging.
++    """
++    imgpath_iter = block_vars['image_path_iterator']
++
++    if app := napari.qt.get_app():
++        app.processEvents()
++    else:
++        return ""
++
++    img_paths = []
++    for win, img_path in zip(
++        reversed(napari._qt.qt_main_window._QtMainWindow._instances),
++        imgpath_iter,
++    ):
++        img_paths.append(img_path)
++        win._window.screenshot(img_path, canvas_only=False)
++
++    napari.Viewer.close_all()
++    app.processEvents()
++
++    return scrapers.figure_rst(img_paths, gallery_conf['src_dir'])
+
+ sphinx_gallery_conf = {
+     'examples_dirs': '../examples',  # path to your example scripts
+     'gallery_dirs': 'gallery',  # path to where to save gallery generated output
+     'filename_pattern': '/*.py',
+     'ignore_pattern': 'README.rst|/*_.py',
+@@ -220,11 +252,8 @@ def reset_napari_theme(gallery_conf, fname):
+     'download_all_examples': False,
+     'min_reported_time': 10,
+     'only_warn_on_example_error': True,
+-    'image_scrapers': (
+-        "matplotlib",
+-        qtgallery.qtscraper,
+-    ),
+-    'reset_modules': (reset_napari_theme,),
++    'image_scrapers': ("matplotlib", napari_scraper,),
++    'reset_modules': (reset_napari,),
+     'reference_url': {'napari': None},
+     'within_subsection_order': ExampleTitleSortKey,
+ }
+@@ -264,7 +296,7 @@ def get_attributes(item, obj, modulename):
+     'https://napari.zulipchat.com/',
+     '../_tags',
+     'https://en.wikipedia.org/wiki/Napari#/media/File:Tabuaeran_Kiribati.jpg',
+-]
++]
+
+
+ def rewrite_github_anchor(app, uri: str):
+diff --git a/docs/requirements.txt b/docs/requirements.txt
+index 0ea7e37b..999be559 100644
+--- a/docs/requirements.txt
++++ b/docs/requirements.txt
+@@ -10,6 +10,5 @@ sphinx_autodoc_typehints==1.12.0
+ myst-nb
+ napari-sphinx-theme
+ matplotlib
+-qtgallery
+ lxml
+ imageio-ffmpeg

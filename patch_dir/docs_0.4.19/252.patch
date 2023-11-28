@@ -1,0 +1,34 @@
+From 0c6a12bf9b71d57feb0e01769b0e67911317b5e8 Mon Sep 17 00:00:00 2001
+From: Peter Sobolewski <76622105+psobolewskiPhD@users.noreply.github.com>
+Date: Thu, 26 Oct 2023 21:23:12 -0400
+Subject: [PATCH] [Fix error] Image layers can't have converted data type using
+ contextual menu, only Labels (#252)
+
+# References and relevant issues
+Related to https://github.com/napari/napari/issues/6349
+Note this doesn't close that, just makes it a true feature request.
+
+# Description
+
+Currently the viewer tutorial says the contextual menu can be used to
+convert Image data type.
+It cannot and not just because of the contextual menu setup, but because
+the conversions are not implemented for image layers.
+In this PR I fix this to say only Labels layers can be converted.
+---
+ docs/tutorials/fundamentals/viewer.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/docs/tutorials/fundamentals/viewer.md b/docs/tutorials/fundamentals/viewer.md
+index 874b72d3..82e64eda 100644
+--- a/docs/tutorials/fundamentals/viewer.md
++++ b/docs/tutorials/fundamentals/viewer.md
+@@ -453,7 +453,7 @@ The right side of the status bar contains some helpful tips depending on which l
+ * **Convert to Labels** - converts an **Image** layer to a **Labels** layer. This is useful for converting a binary image segmentation map to a labels layer with each segmented object denoted by its own integer. Can also be used on a **Shapes** layer.
+ * **Convert to Image** - converts a **Labels** layer into an **Image** layer.
+ * **Toggle visibility** - hides or shows the selected layer.
+-* **Convert datatype** - converts an **Image** or **Labels** layer into int8, int16, int32, int64, uint8, uint16, uint32, or uint64 data types. The initial data type is the data type of the data itself.
++* **Convert datatype** - converts a **Labels** layer into int8, int16, int32, int64, uint8, uint16, uint32, or uint64 data types. The initial data type is the data type of the data itself.
+ * **Make Projection** - can be used only on a layer with more than 2 dimensions, also known as a *stack*.  It creates a new layer that is a projection of the layer stack with the characteristic the user selects, reducing the number of dimensions by 1. More information about the types of projections is available [here](https://medium.com/@damiandn/an-intoduction-to-biological-image-processing-in-imagej-part-3-stacks-and-stack-projections-942aa789420f). The following projections are available:
+     * **Max** - maximum intensity projection. At each pixel position, we go  through the stacks, find the pixel with the maximum intensity, and that becomes the intensity of that pixel value in the projected image.
+    * **Min** - minimum intensity projection. Similar to the maximum intensity projection, except that the minimum pixel value is used for the projected image instead of the maximum pixel value.

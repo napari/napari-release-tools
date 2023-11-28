@@ -1,0 +1,49 @@
+From 7520c1b9b90a06bc7b47fd7c443c856f99926343 Mon Sep 17 00:00:00 2001
+From: jaimergp <jaimergp@users.noreply.github.com>
+Date: Fri, 28 Jul 2023 13:22:31 +0200
+Subject: [PATCH] Fix taskbar icon grouping in Windows bundle (add
+ `app_user_model_id` to bundle shortcut) (#6056)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+# Fixes/Closes
+
+Needed to consolidate changes in
+https://github.com/napari/packaging/pull/77. This culminates the fix for
+https://github.com/napari/packaging/issues/69, hopefully 🤞
+
+# Description
+
+This adds the metadata necessary to set an
+[AppUserModelId](https://learn.microsoft.com/en-us/windows/win32/properties/props-system-appusermodel-id)
+on the Windows shortcut, which helps Windows handle things like grouping
+taskbar icons and windows.
+
+
+# References
+
+* https://learn.microsoft.com/en-us/windows/win32/properties/props-system-appusermodel-id
+* https://github.com/conda/menuinst/pull/133
+* https://github.com/conda/menuinst/issues/127
+* https://github.com/spyder-ide/spyder/issues/20791#issuecomment-1505877877
+---
+ resources/conda_menu_config.json | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/resources/conda_menu_config.json b/resources/conda_menu_config.json
+index d0907e4f..579de9c9 100644
+--- a/resources/conda_menu_config.json
++++ b/resources/conda_menu_config.json
+@@ -18,7 +18,8 @@
+             "platforms": {
+                 "win": {
+                     "precommand": "set \"PYTHONHOME=\" & set \"PYTHONPATH=\"",
+-                    "desktop": true
++                    "desktop": true,
++                    "app_user_model_id": "napari.napari.viewer.__PKG_VERSION__"
+                 },
+                 "linux": {
+                     "Categories": [
+--
+2.34.1

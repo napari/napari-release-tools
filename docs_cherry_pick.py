@@ -11,9 +11,10 @@ from git import Repo
 from tqdm import tqdm
 
 from release_utils import (
+    PR_NUM_PATTERN,
+    REPO_DIR_NAME,
     get_milestone,
     iter_pull_request,
-    pr_num_pattern,
     setup_cache,
 )
 
@@ -44,7 +45,7 @@ def get_consumed_pr():
     base = repo.merge_base(f"docs_{milestone.title}", f"v{milestone.title}x")
 
     for commit in repo.iter_commits(f"{base[0].binsha.hex()}..docs_{milestone.title}"):
-        if (match := pr_num_pattern.search(commit.message)) is not None:
+        if (match := PR_NUM_PATTERN.search(commit.message)) is not None:
             pr_num = int(match[1])
             res.add(pr_num)
     return res
@@ -67,7 +68,7 @@ if not patch_dir_path.exists():
     patch_dir_path.mkdir()
 
 
-repo = Repo(LOCAL_DIR / "napari_repo")
+repo = Repo(LOCAL_DIR / REPO_DIR_NAME)
 repo.git.checkout(f"docs_{milestone.title}")
 
 

@@ -54,6 +54,12 @@ parser.add_argument(
     help="The file with the corrections",
     default=LOCAL_DIR / "name_corrections.yaml",
 )
+parser.add_argument(
+    "--with-pr",
+    help="Include PR numbers for not merged PRs",
+    type=int,
+    default=None,
+)
 
 args = parser.parse_args()
 
@@ -113,9 +119,8 @@ label_to_section = {
 }
 
 
-for pull in iter_pull_request(f"milestone:{args.milestone} is:merged"):
-    issue = pull.as_issue()
-    assert pull.merged
+def parse_pull(pull):
+    assert pull.merged or pull.number == args.with_pr
 
     commit = repo.get_commit(pull.merge_commit_sha)
 
@@ -142,6 +147,13 @@ for pull in iter_pull_request(f"milestone:{args.milestone} is:merged"):
     if not assigned_to_section:
         other_pull_requests[pull.number] = {"summary": summary, "repo": GH_REPO}
 
+
+for pull_ in iter_pull_request(f"milestone:{args.milestone} is:merged"):
+    parse_pull(pull_)
+
+if args.with_pr is not None:
+    pull = repo.get_pull(args.with_pr)
+    parse_pull(pull)
 
 for pull in iter_pull_request(
     f"milestone:{args.milestone} is:merged", repo=GH_DOCS_REPO
@@ -214,13 +226,18 @@ rendering), and the scientific Python stack (numpy, scipy).
 print(
     """
 For more information, examples, and documentation, please visit our website:
-https://github.com/napari/napari
+https://napari.org/stable/
 """,
     file=file_handle,
 )
+highlights_path = LOCAL_DIR / "highlight" / (args.milestone + ".md")
 
 for section, pull_request_dicts in highlights.items():
     print(f"## {section}\n", file=file_handle)
+    if section == "Highlights" and highlights_path.exists():
+        with open(highlights_path) as f:
+            print(f.read(), file=file_handle)
+
     for number, pull_request_info in pull_request_dicts.items():
         repo_str = pull_request_info["repo"]
         print(

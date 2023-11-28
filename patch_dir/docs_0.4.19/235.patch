@@ -1,0 +1,29 @@
+From 88d0e7d5d9a695bf966502fca8a42fc1599f2dbc Mon Sep 17 00:00:00 2001
+From: David Stansby <dstansby@gmail.com>
+Date: Tue, 5 Sep 2023 14:37:24 +0200
+Subject: [PATCH] Update ndisplay title (#235)
+
+# Description
+Update the section title to reflect changes in the main repository.
+
+Depends on https://github.com/napari/napari/pull/6192
+
+## Type of change
+- [x] Fixes or improves existing content
+---
+ docs/tutorials/fundamentals/viewer.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/docs/tutorials/fundamentals/viewer.md b/docs/tutorials/fundamentals/viewer.md
+index f63b066e..2430c3d4 100644
+--- a/docs/tutorials/fundamentals/viewer.md
++++ b/docs/tutorials/fundamentals/viewer.md
+@@ -340,7 +340,7 @@ The console (when available) appears at the bottom of the viewer as shown below:
+
+ +++
+
+-#### Toggle ndisplay (2D/3D) button
++#### Toggle 2D/3D button
+
+ The second button from the left is the 2D/3D button which toggles between `2D` and `3D` renderings of the data.
+ For example, run the following code:

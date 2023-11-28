@@ -1,0 +1,38 @@
+From e45e6b7ec13b4ce1caac563943cc1f73a3e7aa48 Mon Sep 17 00:00:00 2001
+From: David Stansby <dstansby@gmail.com>
+Date: Thu, 14 Sep 2023 03:59:59 +0200
+Subject: [PATCH] Remove sub-sub section heading from rendering guide (#236)
+
+# Description
+The block of text under this heading doesn't refer to time-series data.
+While it's applicable to time-series data, it's also applicable to 3D
+volume data, so it seemed easiest just to remove the heading.
+
+## Type of change
+- [x] Fixes or improves existing content
+---
+ docs/guides/rendering.md | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/docs/guides/rendering.md b/docs/guides/rendering.md
+index 75459542..04807afb 100644
+--- a/docs/guides/rendering.md
++++ b/docs/guides/rendering.md
+@@ -27,8 +27,6 @@ it will call {meth}`~napari.layers.Image.on_chunk_loaded` with
+ the loaded data. The next frame {class}`~napari.layers.Image`
+ can display the new data.
+
+-### Time-series data
+-
+ Without `NAPARI_ASYNC` napari will block when switching slices. Napari
+ will hang until the new slice has loaded. If the slice loads slowly enough
+ you might see the "spinning wheel of death" on a Mac indicating the process
+@@ -57,7 +55,7 @@ improvement, but working with slow-loading data is still slow. Most large
+ image viewers improve on this experience with chunks or tiles. With chunks
+ or tiles when the image is panned the existing tiles are translated and
+ re-used. Then the viewer only needs to fetch tiles which newly slid onto
+-the screen. This style of rendering what our `NAPARI_OCTREE` flag
++the screen. This style of rendering is what the `NAPARI_OCTREE` flag
+ enables.
+
+ ## NAPARI_OCTREE

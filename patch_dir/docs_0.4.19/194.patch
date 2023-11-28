@@ -1,0 +1,103 @@
+From 5dacc63c8425078721bcfe3375100cf27382cb35 Mon Sep 17 00:00:00 2001
+From: David Stansby <dstansby@gmail.com>
+Date: Tue, 18 Jul 2023 01:53:30 +0200
+Subject: [PATCH] Use python version range instead of min version (#194)
+
+# Description
+Where `python_minimum_version` was being used (one place), it was
+originaly saying that Python >= 3.8 was supported. This isn't correct,
+so I replaced this one instance with `python_range` and removed the
+`python_minimum_version` variable to avoid this happening in the future.
+
+## Type of change
+<!-- Please delete options that are not relevant. -->
+- [x] Fixes or improves existing content
+
+## Final checklist:
+- [x] My PR is the minimum possible work for the desired functionality
+---
+ docs/conf.py                                |  2 --
+ docs/tutorials/fundamentals/installation.md | 20 ++++++++++----------
+ 2 files changed, 10 insertions(+), 12 deletions(-)
+
+diff --git a/docs/conf.py b/docs/conf.py
+index b75f9ae2..ce8f59d7 100644
+--- a/docs/conf.py
++++ b/docs/conf.py
+@@ -162,14 +162,12 @@
+ version_string = '.'.join(str(x) for x in __version_tuple__[:3])
+ python_version = '3.9'
+ python_version_range = '3.8–3.10'
+-python_minimum_version = '3.8'
+
+ myst_substitutions = {
+    "napari_conda_version": f"`napari={version_string}`",
+    "napari_version": version_string,
+    "python_version": python_version,
+    "python_version_range": python_version_range,
+-   "python_minimum_version": python_minimum_version,
+    "python_version_code": f"`python={python_version}`",
+    "conda_create_env": f"```sh\nconda create -y -n napari-env -c conda-forge python={python_version}\nconda activate napari-env\n```",
+ }
+diff --git a/docs/tutorials/fundamentals/installation.md b/docs/tutorials/fundamentals/installation.md
+index 9a3c2070..48d98334 100644
+--- a/docs/tutorials/fundamentals/installation.md
++++ b/docs/tutorials/fundamentals/installation.md
+@@ -35,7 +35,7 @@ interact with the app. It is the best way to install napari and make full use of
+ all its features.
+
+ It requires:
+-- [Python >={{ python_minimum_version }}](https://www.python.org/downloads/)
++- [Python {{ python_version_range }}](https://www.python.org/downloads/)
+ - the ability to install python packages via [pip](https://pypi.org/project/pip/) OR [conda-forge](https://conda-forge.org/docs/user/introduction.html)
+
+ You may also want:
+@@ -119,13 +119,13 @@ In some cases, `conda`'s default solver can struggle to find out which packages
+ installed for napari. If it takes too long or you get the wrong version of napari
+ (see below), consider:
+ 1. Overriding your default channels to use only `conda-forge` by adding
+-`--override-channels` and specifying the napari and Python versions explicitly.
++`--override-channels` and specifying the napari and Python versions explicitly.
+ For example, use {{ python_version_code }} to get Python {{ python_version }} and
+-{{ napari_conda_version }} to specify the napari version as {{ napari_version }},
++{{ napari_conda_version }} to specify the napari version as {{ napari_version }},
+ the current release.
+
+-2. Switching to the new, faster [`libmamba` solver](https://conda.github.io/conda-libmamba-solver/libmamba-vs-classic/),
+-by updating your `conda` (>22.11), if needed, and then installing and activating
++2. Switching to the new, faster [`libmamba` solver](https://conda.github.io/conda-libmamba-solver/libmamba-vs-classic/),
++by updating your `conda` (>22.11), if needed, and then installing and activating
+ the solver, as follows:
+ ```
+ conda update -n base conda
+@@ -133,7 +133,7 @@ conda install -n base conda-libmamba-solver
+ conda config --set solver libmamba
+ ```
+ 3. Alternately, consider installing [`mamba`](https://github.com/mamba-org/mamba)
+-in your base environment with `conda install -n base -c conda-forge mamba`.
++in your base environment with `conda install -n base -c conda-forge mamba`.
+ Then you can use `mamba` by replacing `conda` with `mamba` in the installation instructions, for example:
+ ```
+ mamba install napari
+@@ -182,7 +182,7 @@ scientific packages such as Spyder or matplotlib. If neither is available,
+ running napari will result in an error message asking you to install one of
+ them.
+
+-Running `python -m pip install "napari[all]"` will install the default framework, which is currently
++Running `python -m pip install "napari[all]"` will install the default framework, which is currently
+ PyQt5--but this could change in the future. However, if you have a Mac with the newer arm64
+ architecture (Apple Silicon), this will not work--see {ref}`note-m1`.
+
+@@ -199,9 +199,9 @@ python -m pip install "napari[pyside2]"  # for PySide2
+ :name: note-m1
+
+ For arm64 macOS machines (Apple Silicon), pre-compiled PyQt5 or PySide2 packages
+-([wheels](https://realpython.com/python-wheels/)) are not available on
+-[PyPI](https://pypi.org), the repository used by `pip`, so trying to
+-`pip install napari[all]` or either of the variants above will fail. However,
++([wheels](https://realpython.com/python-wheels/)) are not available on
++[PyPI](https://pypi.org), the repository used by `pip`, so trying to
++`pip install napari[all]` or either of the variants above will fail. However,
+ you can install one of those libraries separately, for example from `conda-forge`,
+ and then use `pip install napari`.
+ ```

@@ -1,0 +1,56 @@
+From bb7e3a62d3ed2964254802f878cb51022d6206c3 Mon Sep 17 00:00:00 2001
+From: Grzegorz Bokota <bokota+github@gmail.com>
+Date: Fri, 18 Aug 2023 14:39:51 +0200
+Subject: [PATCH] Fix headless test (#6161)
+
+Fix the headless test by defining the headless environment in the tox
+configuration file
+---
+ .github/workflows/test_comprehensive.yml | 2 +-
+ .github/workflows/test_pull_requests.yml | 2 +-
+ tox.ini                                  | 4 ++--
+ 3 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/.github/workflows/test_comprehensive.yml b/.github/workflows/test_comprehensive.yml
+index 8681c2d0..1e646c8b 100644
+--- a/.github/workflows/test_comprehensive.yml
++++ b/.github/workflows/test_comprehensive.yml
+@@ -60,7 +60,7 @@ jobs:
+           # test without any Qt backends
+           - python: "3.8"
+             platform: ubuntu-20.04
+-            toxenv: headless-py38-linux
++            backend: headless
+           - python: "3.11"
+             platform: ubuntu-latest
+             backend: pyqt6
+diff --git a/.github/workflows/test_pull_requests.yml b/.github/workflows/test_pull_requests.yml
+index 748f90f0..03751041 100644
+--- a/.github/workflows/test_pull_requests.yml
++++ b/.github/workflows/test_pull_requests.yml
+@@ -81,7 +81,7 @@ jobs:
+           # test without any Qt backends
+           - python: 3.8
+             platform: ubuntu-20.04
+-            toxenv: headless-py38-linux
++            backend: headless
+           - python: 3.9
+             platform: ubuntu-latest
+             backend: pyqt6
+diff --git a/tox.ini b/tox.ini
+index e1487515..857938ba 100644
+--- a/tox.ini
++++ b/tox.ini
+@@ -14,8 +14,8 @@
+ # to run a specific test, use the "tox -e" option, for instance:
+ # "tox -e py38-macos-pyqt" will test python3.8 with pyqt on macos
+ # (even if a combination of factors is not in the default envlist
+-# you can run it manually... like py39-linux-pyside2-async)
+-envlist = py{38,39,310,311}-{linux,macos,windows}-{pyqt5,pyside2,pyqt6,pyside6},mypy
++# you can run it manually... like py39-linux-pyside2)
++envlist = py{38,39,310,311}-{linux,macos,windows}-{pyqt5,pyside2,pyqt6,pyside6,headless},mypy
+ isolated_build = true
+ toxworkdir=/tmp/.tox
+
+--
+2.34.1

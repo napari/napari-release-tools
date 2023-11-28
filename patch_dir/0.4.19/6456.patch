@@ -1,0 +1,106 @@
+From 22e5262a90a2e9c18bb7d949cbb5e817b439a322 Mon Sep 17 00:00:00 2001
+From: Grzegorz Bokota <bokota+github@gmail.com>
+Date: Sat, 18 Nov 2023 00:34:17 +0100
+Subject: [PATCH] Fix casting uint32 to vispy dtype for image layers (#6456)
+
+extracted from #6439
+
+Before this PR
+
+![Zrzut ekranu z 2023-11-15
+10-13-11](https://github.com/napari/napari/assets/3826210/34d16d83-5e36-4c95-8fd2-0527aae61370)
+
+After this PR
+
+![Zrzut ekranu z 2023-11-15
+10-20-24](https://github.com/napari/napari/assets/3826210/90f7f2ca-55dd-405b-9d22-05f6d79ddb77)
+
+Script to reproduce:
+
+```python
+import numpy as np
+
+import napari
+
+nb_steps = 2**17
+
+base = np.linspace(start=1, stop=nb_steps, num=nb_steps).astype('uint32')
+label_img = np.repeat(
+        base.reshape([1, base.shape[0]]), int(nb_steps/1000), axis=0
+        )
+
+viewer = napari.Viewer()
+viewer.add_image(label_img, colormap='viridis', contrast_limits=(0, nb_steps), scale=(100, 1))
+
+napari.run()
+```
+
+---------
+
+Co-authored-by: Juan Nunez-Iglesias <jni@fastmail.com>
+---
+ examples/dev/issue-6456.py | 22 ++++++++++++++++++++++
+ napari/_vispy/utils/gl.py  |  6 ++++--
+ 2 files changed, 26 insertions(+), 2 deletions(-)
+ create mode 100644 examples/dev/issue-6456.py
+
+diff --git a/examples/dev/issue-6456.py b/examples/dev/issue-6456.py
+new file mode 100644
+index 00000000..3f016701
+--- /dev/null
++++ b/examples/dev/issue-6456.py
+@@ -0,0 +1,22 @@
++import numpy as np
++
++import napari
++
++# Set the number of steps
++num_steps = 2**17
++
++base = np.linspace(start=1, stop=num_steps, num=num_steps).astype('uint32')
++label_img = np.repeat(
++        base.reshape([1, base.shape[0]]), int(num_steps/1000), axis=0
++        )
++
++viewer = napari.Viewer()
++viewer.add_image(
++        label_img,
++        scale=(100, 1),
++        colormap='viridis',
++        contrast_limits=(0, num_steps),
++        )
++
++if __name__ == '__main__':
++    napari.run()
+diff --git a/napari/_vispy/utils/gl.py b/napari/_vispy/utils/gl.py
+index 56fd395b..862bb593 100644
+--- a/napari/_vispy/utils/gl.py
++++ b/napari/_vispy/utils/gl.py
+@@ -96,12 +96,14 @@ def fix_data_dtype(data):
+         return data
+ 
+     try:
+-        dtype = {
++        dtype_ = {
+             "i": np.float32,
+             "f": np.float32,
+             "u": np.uint16,
+             "b": np.uint8,
+         }[dtype.kind]
++        if dtype_ == np.uint16 and dtype.itemsize > 2:
++            dtype_ = np.float32
+     except KeyError as e:  # not an int or float
+         raise TypeError(
+             trans._(
+@@ -111,7 +113,7 @@ def fix_data_dtype(data):
+                 textures=set(texture_dtypes),
+             )
+         ) from e
+-    return data.astype(dtype)
++    return data.astype(dtype_)
+ 
+ 
+ # blend_func parameters are multiplying:
+-- 
+2.34.1
+

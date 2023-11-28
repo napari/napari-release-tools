@@ -1,0 +1,31 @@
+From b92f030bf9724a3c0c8e02edbad1a908086b4118 Mon Sep 17 00:00:00 2001
+From: Sean Martin <seankieran.m@hotmail.com>
+Date: Wed, 2 Aug 2023 20:13:59 +0100
+Subject: [PATCH] Fix getting started in napari linking to the unittest getting
+ started page (#217)
+
+Clicking the Getting started grid in the below image pointed to
+https://docs.python.org/3/library/unittest.mock-examples.html#getting-started.
+
+![image](https://github.com/napari/docs/assets/21295664/6a799ff0-1672-40d5-b263-4276d43beb88)
+
+I've changed the link, so it *should* now link to
+https://napari.org/dev/tutorials/fundamentals/getting_started.html,
+which I assume was the intention here.
+---
+ docs/tutorials/start_index.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/docs/tutorials/start_index.md b/docs/tutorials/start_index.md
+index afddcbda..bf132c99 100644
+--- a/docs/tutorials/start_index.md
++++ b/docs/tutorials/start_index.md
+@@ -22,7 +22,7 @@ How to do a clean install of napari and launch the viewer.
+ :::
+
+ :::{grid-item-card} Getting started
+-:link: getting-started
++:link: getting_started
+ :link-type: ref
+
+ This tutorial will teach you all the different ways to launch napari.

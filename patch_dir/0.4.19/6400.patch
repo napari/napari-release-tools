@@ -1,0 +1,22 @@
+From f204a8e70ff3b1715ecfdd48a6aa6fb390c10507 Mon Sep 17 00:00:00 2001
+From: Grzegorz Bokota <bokota+github@gmail.com>
+Date: Tue, 31 Oct 2023 19:50:31 +0100
+Subject: [PATCH] fix drawing timer
+
+---
+ napari/_qt/perf/qt_performance.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/napari/_qt/perf/qt_performance.py b/napari/_qt/perf/qt_performance.py
+index 286e44b1d76..d708dd4377d 100644
+--- a/napari/_qt/perf/qt_performance.py
++++ b/napari/_qt/perf/qt_performance.py
+@@ -162,7 +162,7 @@ def _get_timer_info(self):
+         for name, timer in perf.timers.timers.items():
+             # The Qt Event "UpdateRequest" is the main "draw" event, so
+             # that's what we use for our progress bar.
+-            if name == "UpdateRequest":
++            if name.startswith("UpdateRequest"):
+                 average = timer.average
+ 
+             # Log any "long" events to the text window.

@@ -1,0 +1,107 @@
+From 9afb24e250f562707dda226305a7958c8857f60e Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Melissa=20Weber=20Mendon=C3=A7a?= <melissawm@gmail.com>
+Date: Wed, 2 Aug 2023 16:10:52 -0300
+Subject: [PATCH] Move contributing resources to top-level navbar (#208)
+
+# Description
+This PR moves the "Contributing" toctree to the top level navbar.
+
+This has been discussed before, but we don't have an issue for it.
+
+cc @jni @psobolewskiPhD
+
+## Type of change
+- [x] Fixes or improves existing content
+
+## Final checklist:
+- [x] My PR is the minimum possible work for the desired functionality
+---
+ docs/_toc.yml            | 52 ++++++++++++++++++++--------------------
+ docs/developers/index.md |  5 ++--
+ 2 files changed, 28 insertions(+), 29 deletions(-)
+
+diff --git a/docs/_toc.yml b/docs/_toc.yml
+index a3bcd938..57b3ecb8 100644
+--- a/docs/_toc.yml
++++ b/docs/_toc.yml
+@@ -112,33 +112,34 @@ subtrees:
+       - file: community/governance
+       - file: community/working_groups
+       - file: community/meeting_schedule
+-      - file: developers/index
++      - file: community/licensing
++  - file: developers/index
++    subtrees:
++    - entries:
++      - file: developers/contributing
++      - file: naps/index
++        subtrees:
++        - maxdepth: 1
++          entries:
++          - file: naps/0-nap-process
++          - file: naps/1-institutional-funding-partners
++          - file: naps/2-conda-based-packaging
++          - file: naps/3-spaces
++          - file: naps/4-async-slicing
++          - file: naps/5-new-logo
++          - file: naps/6-contributable-menus
++          - file: naps/7-key-binding-dispatch
++      - file: developers/documentation/index
+         subtrees:
+         - entries:
+-          - file: developers/contributing
+-          - file: naps/index
+-            subtrees:
+-            - maxdepth: 1
+-              entries:
+-              - file: naps/0-nap-process
+-              - file: naps/1-institutional-funding-partners
+-              - file: naps/2-conda-based-packaging
+-              - file: naps/3-spaces
+-              - file: naps/4-async-slicing
+-              - file: naps/5-new-logo
+-              - file: naps/6-contributable-menus
+-              - file: naps/7-key-binding-dispatch
+-          - file: developers/documentation/index
+-            subtrees:
+-            - entries:
+-              - file: developers/documentation/docs_template
+-          - file: developers/translations
+-          - file: developers/core_dev_guide
+-          - file: developers/release
+-          - file: developers/testing
+-          - file: developers/profiling
+-          - file: developers/benchmarks
+-          - file: developers/packaging
++          - file: developers/documentation/docs_template
++      - file: developers/translations
++      - file: developers/core_dev_guide
++      - file: developers/release
++      - file: developers/testing
++      - file: developers/profiling
++      - file: developers/benchmarks
++      - file: developers/packaging
+       - file: release/index
+         subtrees:
+         - entries:
+@@ -191,7 +192,6 @@ subtrees:
+           - file: roadmaps/0_4
+           - file: roadmaps/0_3_retrospective
+           - file: roadmaps/0_3
+-      - file: community/licensing
+   - file: api/index
+     subtrees:
+     - titlesonly: True
+diff --git a/docs/developers/index.md b/docs/developers/index.md
+index bebded92..917935b2 100644
+--- a/docs/developers/index.md
++++ b/docs/developers/index.md
+@@ -1,7 +1,6 @@
+-# Contributing resources
++# Contributing
+
+-Here you can find resources about the contributing workflow, governance of the
+-project and the onboarding of new contributors.
++Here you can find resources about the contributing workflow for both code to napari core and documentation of the project, as well as information for onboarding of new core developers.
+
+ ## For contributors

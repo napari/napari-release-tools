@@ -1,0 +1,32 @@
+From 0722b40aaa5ca0fea0fb09cbe4a9134d1540e6ce Mon Sep 17 00:00:00 2001
+From: Peter Sobolewski <76622105+psobolewskiPhD@users.noreply.github.com>
+Date: Tue, 24 Oct 2023 17:08:04 -0400
+Subject: [PATCH] Update docs to suggest python 3.10 install (#246)
+
+# References and relevant issues
+In discussion about python version support, Matthias mentioned that more
+napari downloads are 3.9 than 3.10
+https://github.com/napari/napari/pull/5768#issuecomment-1742691809
+
+# Description
+This PR updates the `python_version` variable in conf.py to `3.10` that
+is used for the myst substitution used in installation docs and
+contributing (developer env) guide.
+---
+ docs/conf.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/docs/conf.py b/docs/conf.py
+index b28d67d2..a14929e2 100644
+--- a/docs/conf.py
++++ b/docs/conf.py
+@@ -163,8 +163,8 @@
+ myst_heading_anchors = 4
+
+ version_string = '.'.join(str(x) for x in __version_tuple__[:3])
+-python_version = '3.9'
++python_version = '3.10'
+ python_version_range = '3.8-3.10'
+ python_minimum_version = '3.8'
+
+ myst_substitutions = {
