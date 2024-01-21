@@ -1,0 +1,199 @@
+From 9855a4dd81b9fc737246b92146746756945d8a9b Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Melissa=20Weber=20Mendon=C3=A7a?= <melissawm@gmail.com>
+Date: Wed, 17 Jan 2024 21:37:33 -0300
+Subject: [PATCH] Update to use napari-sphinx-theme 0.3.0 (#267)
+
+Prepares the docs repo to use the new napari-sphinx-theme, 0.3.0, which depends on pydata-sphinx-theme rather than forking it.
+
+# References and relevant issues
+
+Addresses napari/napari-sphinx-theme#113
+Depends on napari/napari-sphinx-theme#134
+---
+ docs/_templates/layout.html          |  2 +-
+ docs/_templates/sbt-sidebar-nav.html |  3 --
+ docs/_templates/sidebar-nav-bs.html  |  4 ++
+ docs/community/meeting_schedule.md   | 64 +++++++++++++++++++++++++---
+ docs/conf.py                         | 32 +++++++++++---
+ 8 files changed, 91 insertions(+), 20 deletions(-)
+ delete mode 100644 docs/_templates/sbt-sidebar-nav.html
+ create mode 100644 docs/_templates/sidebar-nav-bs.html
+
+diff --git a/docs/_templates/layout.html b/docs/_templates/layout.html
+index 4003c48f..c9c61519 100644
+--- a/docs/_templates/layout.html
++++ b/docs/_templates/layout.html
+@@ -1,4 +1,4 @@
+-{% extends "!layout.html" %}
++{% extends "!napari-layout.html" %}
+ {% block extrahead %}
+     <script async defer data-domain="napari.org" src="https://plausible.io/js/plausible.js"></script>
+     {{ super() }}
+diff --git a/docs/_templates/sbt-sidebar-nav.html b/docs/_templates/sbt-sidebar-nav.html
+deleted file mode 100644
+index a9c0e18a..00000000
+--- a/docs/_templates/sbt-sidebar-nav.html
++++ /dev/null
+@@ -1,3 +0,0 @@
+-<nav class="bd-links" id="bd-docs-nav" aria-label="Main navigation">
+-    {{ generate_nav_html(include_item_names=True, with_home_page=theme_home_page_in_toc) }}
+-</nav>
+\ No newline at end of file
+diff --git a/docs/_templates/sidebar-nav-bs.html b/docs/_templates/sidebar-nav-bs.html
+new file mode 100644
+index 00000000..ac8e5eab
+--- /dev/null
++++ b/docs/_templates/sidebar-nav-bs.html
+@@ -0,0 +1,4 @@
++<nav class="bd-docs-nav bd-links"
++     aria-label="{{ _('Section Navigation') }}">
++  <div class="bd-toc-item navbar-nav">{{ sidebar_nav_html }}</div>
++</nav>
+diff --git a/docs/community/meeting_schedule.md b/docs/community/meeting_schedule.md
+index 95239e34..ec6bf4ff 100644
+--- a/docs/community/meeting_schedule.md
++++ b/docs/community/meeting_schedule.md
+@@ -2,11 +2,61 @@
+ 
+ We hold regular meetings, the timings of which are available on our [public calendar](https://calendar.google.com/calendar/embed?src=c_35r93ec6vtp8smhm7dv5uot0v4%40group.calendar.google.com).
+ 
+-```{calendar}
+----
+-show-filters: true
+-calendar-id: c_35r93ec6vtp8smhm7dv5uot0v4@group.calendar.google.com
+----
+-```
+-
+ If you are using napari or interested in how napari could be used in your work, please join one of our regular community meetings. If you're interested in diving deep on particular topic you could join the closest working group meeting. We currently have four working groups 'Bundled Application', 'Plugins', 'Architecture', and 'Documentation' that meet on a semi-regular candence. You can learn more about our working groups and community meetings in the corresponding discussion streams on the [napari Zulip](https://napari.zulipchat.com/login/).
++
++<div id='community_calendar'></div>
++
++<div id='timezone'></div>
++
++<div id="myModal" class="modal">
++  <!-- Modal content -->
++  <div class="modal-content">
++    <div class="modal-header">
++      <span class="close">&times;</span>
++      <h3>Event details</h3>
++    </div>
++    <div id="details" class="modal-body">
++    </div>
++  </div>
++</div>
++
++<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/index.global.min.js'></script>
++<script src="https://cdn.jsdelivr.net/npm/@fullcalendar/google-calendar@6.1.9/index.global.min.js"></script>
++<script>
++  document.getElementById('timezone').innerHTML = "All times shown in "+Intl.DateTimeFormat().resolvedOptions().timeZone+".";
++  document.addEventListener('DOMContentLoaded', function () {
++    var community_calendar = document.getElementById('community_calendar');
++    var calendar = new FullCalendar.Calendar(community_calendar,
++    {
++      height: 650,
++      timeZone: 'local',
++      initialView: 'dayGridMonth',
++      headerToolbar: {
++        left: "prev,next today",
++        center: "title",
++        right: "dayGridMonth,listWeek",
++      },
++      googleCalendarApiKey: '{API_KEY}',
++      events: {
++          googleCalendarId: 'c_35r93ec6vtp8smhm7dv5uot0v4@group.calendar.google.com',
++      },
++      eventClick: function (info) {
++        info.jsEvent.preventDefault();
++        var eventObj = info.event;
++        // Get the <span> element that closes the modal
++        var span = document.getElementsByClassName("close")[0];
++        // Get the modal
++        var modal = document.getElementById("myModal");
++        modal.style.display = "block";
++        var eventTitle = eventObj.title.charAt(0).toUpperCase() + eventObj.title.slice(1);
++        document.getElementById("details").innerHTML = '<b>' + eventTitle + '</b>' + '<br>' + eventObj.extendedProps.description;
++        //When the user clicks on <span> (x), close the modal
++        span.onclick = function() {
++          modal.style.display = "none";
++        }
++      },
++      eventDisplay: 'block',
++    });
++    calendar.render();
++  });
++</script>
+diff --git a/docs/conf.py b/docs/conf.py
+index 12c21b03..6c70bd64 100644
+--- a/docs/conf.py
++++ b/docs/conf.py
+@@ -15,6 +15,7 @@
+ # sys.path.insert(0, os.path.abspath('.'))
+ 
+ import re
++import os
+ from importlib import import_module
+ from pathlib import Path
+ from urllib.parse import urlparse, urlunparse
+@@ -83,7 +84,7 @@
+ # The theme to use for HTML and HTML Help pages.  See the documentation for
+ # a list of builtin themes.
+ #
+-html_theme = 'napari'
++html_theme = 'napari_sphinx_theme'
+ 
+ # Define the json_url for our version switcher.
+ json_url = "https://napari.org/dev/_static/version_switcher.json"
+@@ -98,12 +99,17 @@
+         {"name": "napari hub", "url": "https://napari-hub.org"}
+     ],
+     "github_url": "https://github.com/napari/napari",
+-    "navbar_start": ["navbar-project"],
++    "navbar_start": ["navbar-logo", "navbar-project"],
+     "navbar_end": ["version-switcher", "navbar-icon-links"],
+     "switcher": {
+         "json_url": json_url,
+         "version_match": version_match,
+     },
++    "navbar_persistent": [],
++    "header_links_before_dropdown": 6,
++    "secondary_sidebar_items": ["page-toc"],
++    "pygment_light_style": "napari",
++    "pygment_dark_style": "napari",
+ }
+ 
+ # Add any paths that contain custom static files (such as style sheets) here,
+@@ -262,15 +268,31 @@ def napari_scraper(block, block_vars, gallery_conf):
+     'within_subsection_order': ExampleTitleSortKey,
+ }
+ 
++GOOGLE_CALENDAR_API_KEY = os.environ.get('GOOGLE_CALENDAR_API_KEY', '')
++
++
++def add_google_calendar_secrets(app, docname, source):
++    """Add google calendar api key to meeting schedule page.
++
++    The source argument is a list whose single element is the contents of the
++    source file. You can process the contents and replace this item to implement
++    source-level transformations.
++    """
++    if docname == 'community/meeting_schedule':
++        source[0] = source[0].replace('{API_KEY}', GOOGLE_CALENDAR_API_KEY)
++
+ 
+ def setup(app):
+-    """Ignore .ipynb files.
++    """Set up docs build.
+
+-    Prevents sphinx from complaining about multiple files found for document
+-    when generating the gallery.
++    * Ignores .ipynb files to prevent sphinx from complaining about multiple
++      files found for document when generating the gallery
++    * Rewrites github anchors to be comparable
++    * Adds google calendar api key to meetings schedule page
+ 
+     """
+     app.registry.source_suffix.pop(".ipynb", None)
++    app.connect('source-read', add_google_calendar_secrets)
+     app.connect('linkcheck-process-uri', rewrite_github_anchor)
+
+
