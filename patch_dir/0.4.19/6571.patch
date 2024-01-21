@@ -1,0 +1,152 @@
+From 59887e0fb8c80a9939f41ea2f2c9042144064546 Mon Sep 17 00:00:00 2001
+From: Grzegorz Bokota <bokota+github@gmail.com>
+Date: Mon, 8 Jan 2024 10:20:52 +0100
+Subject: [PATCH] Fix label direct mode for installation without numba (#6571)
+
+When working on fix bug in npe2 I spot that napari tests in npe2
+repository are failing because of lack of numba.
+
+In the context of one of the tests, it needs to be skipped when numba is
+not installed.
+
+However, the second failure reveals a real bug in codebase.
+
+This PR also modifies `pip` workflow to be used to test numbaless case.
+---
+ napari/_qt/_tests/test_qt_viewer.py           | 15 ++++++++----
+ napari/layers/labels/_tests/test_labels.py    |  1 +
+ .../utils/colormaps/_tests/test_colormap.py   | 23 +++++++++++++++++++
+ napari/utils/colormaps/colormap.py            | 16 ++++++++++---
+ 4 files changed, 47 insertions(+), 8 deletions(-)
+
+diff --git a/napari/_qt/_tests/test_qt_viewer.py b/napari/_qt/_tests/test_qt_viewer.py
+index 18299dbe..cdc9029f 100644
+--- a/napari/_qt/_tests/test_qt_viewer.py
++++ b/napari/_qt/_tests/test_qt_viewer.py
+@@ -782,7 +782,9 @@ def test_label_colors_matching_widget_auto(
+ 
+ @skip_local_popups
+ @skip_on_win_ci
+-@pytest.mark.parametrize("use_selection", [True, False])
++@pytest.mark.parametrize(
++    "use_selection", [True, False], ids=["selected", "all"]
++)
+ @pytest.mark.parametrize("dtype", [np.uint64, np.uint16, np.uint8, np.int16])
+ def test_label_colors_matching_widget_direct(
+     qtbot, qt_viewer_with_controls, use_selection, dtype
+@@ -819,12 +821,14 @@ def test_label_colors_matching_widget_direct(
+         color_box_color, middle_pixel = _update_data(
+             layer, label, qtbot, qt_viewer_with_controls, dtype
+         )
+-        assert np.allclose(color_box_color, middle_pixel, atol=1), label
+-        assert np.allclose(
++        npt.assert_almost_equal(
++            color_box_color, middle_pixel, err_msg=f"{label=}"
++        )
++        npt.assert_almost_equal(
+             color_box_color,
+             layer.color.get(label, layer.color[None]) * 255,
+-            atol=1,
+-        ), label
++            err_msg=f"{label=}",
++        )
+ 
+ 
+ def test_axes_labels(make_napari_viewer):
+@@ -1043,6 +1047,7 @@ def test_all_supported_dtypes(qt_viewer):
+ 
+ 
+ def test_more_than_uint16_colors(qt_viewer):
++    pytest.importorskip("numba")
+     # this test is slow (10s locally)
+     data = np.zeros((10, 10), dtype=np.uint32)
+     colors = {
+diff --git a/napari/layers/labels/_tests/test_labels.py b/napari/layers/labels/_tests/test_labels.py
+index b498fad4..b46f17a7 100644
+--- a/napari/layers/labels/_tests/test_labels.py
++++ b/napari/layers/labels/_tests/test_labels.py
+@@ -1396,6 +1396,7 @@ def test_is_default_color():
+ 
+ def test_large_labels_direct_color():
+     """Make sure direct color works with large label ranges"""
++    pytest.importorskip('numba')
+     data = np.array([[0, 1], [2**16, 2**20]], dtype=np.uint32)
+     colors = {1: 'white', 2**16: 'green', 2**20: 'magenta'}
+     layer = Labels(data)
+diff --git a/napari/utils/colormaps/_tests/test_colormap.py b/napari/utils/colormaps/_tests/test_colormap.py
+index 95200fa5..9c64d8dc 100644
+--- a/napari/utils/colormaps/_tests/test_colormap.py
++++ b/napari/utils/colormaps/_tests/test_colormap.py
+@@ -11,6 +11,7 @@ from napari.utils.colormaps import Colormap, colormap
+ from napari.utils.colormaps.colormap import (
+     MAPPING_OF_UNKNOWN_VALUE,
+     DirectLabelColormap,
++    _labels_raw_to_texture_direct_numpy,
+ )
+ from napari.utils.colormaps.colormap_utils import label_colormap
+ 
+@@ -430,3 +431,25 @@ def test_direct_colormap_negative_values():
+     # Map multiple values
+     mapped = cmap.map(np.array([-1, -2], dtype=np.int8))
+     npt.assert_array_equal(mapped, np.array([[1, 0, 0, 1], [0, 1, 0, 1]]))
++
++
++def test_direct_colormap_negative_values_numpy():
++    color_dict = {
++        -1: np.array([1, 0, 0, 1]),
++        -2: np.array([0, 1, 0, 1]),
++        None: np.array([0, 0, 0, 1]),
++    }
++    cmap = DirectLabelColormap(color_dict=color_dict)
++
++    res = _labels_raw_to_texture_direct_numpy(
++        np.array([-1, -2, 5], dtype=np.int8), cmap
++    )
++    npt.assert_array_equal(res, [1, 2, 0])
++
++    cmap.selection = -2
++    cmap.use_selection = True
++
++    res = _labels_raw_to_texture_direct_numpy(
++        np.array([-1, -2, 5], dtype=np.int8), cmap
++    )
++    npt.assert_array_equal(res, [0, 1, 0])
+diff --git a/napari/utils/colormaps/colormap.py b/napari/utils/colormaps/colormap.py
+index 89a31605..0d6d3485 100644
+--- a/napari/utils/colormaps/colormap.py
++++ b/napari/utils/colormaps/colormap.py
+@@ -534,7 +534,12 @@ class DirectLabelColormap(LabelColormapBase):
+     @cached_property
+     def _array_map(self):
+         """Create an array to map labels to texture values of smaller dtype."""
+-        max_value = max(x for x in self.color_dict if x is not None)
++
++        max_value = max(
++            (abs(x) for x in self.color_dict if x is not None), default=0
++        )
++        if any(x < 0 for x in self.color_dict if x is not None):
++            max_value *= 2
+         if max_value > 2**16:
+             raise RuntimeError(  # pragma: no cover
+                 "Cannot use numpy implementation for large values of labels "
+@@ -827,10 +832,15 @@ def _labels_raw_to_texture_direct_numpy(
+ 
+     See `_cast_labels_data_to_texture_dtype_direct` for more details.
+     """
++    if direct_colormap.use_selection:
++        return (data == direct_colormap.selection).astype(np.uint8)
+     mapper = direct_colormap._array_map
+-
+-    if data.dtype.itemsize > 2:
++    if any(x < 0 for x in direct_colormap.color_dict if x is not None):
++        half_shape = mapper.shape[0] // 2 - 1
++        data = np.clip(data, -half_shape, half_shape)
++    else:
+         data = np.clip(data, 0, mapper.shape[0] - 1)
++
+     return mapper[data]
+ 
+ 
+-- 
+2.34.1
+
