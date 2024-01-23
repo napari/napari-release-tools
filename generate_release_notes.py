@@ -59,6 +59,7 @@ parser.add_argument(
     help="Include PR numbers for not merged PRs",
     type=int,
     default=None,
+    nargs="+",
 )
 
 args = parser.parse_args()
@@ -120,7 +121,7 @@ label_to_section = {
 
 
 def parse_pull(pull):
-    assert pull.merged or pull.number == args.with_pr
+    assert pull.merged or pull.number in args.with_pr
 
     commit = repo.get_commit(pull.merge_commit_sha)
 
@@ -152,8 +153,9 @@ for pull_ in iter_pull_request(f"milestone:{args.milestone} is:merged"):
     parse_pull(pull_)
 
 if args.with_pr is not None:
-    pull = repo.get_pull(args.with_pr)
-    parse_pull(pull)
+    for pr_num in args.with_pr:
+        pull = repo.get_pull(pr_num)
+        parse_pull(pull)
 
 for pull in iter_pull_request(
     f"milestone:{args.milestone} is:merged", repo=GH_DOCS_REPO
