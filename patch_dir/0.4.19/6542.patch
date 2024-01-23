@@ -1,0 +1,2455 @@
+From 67e7488f6ad3b9c9790a5986f6854243a327d5fe Mon Sep 17 00:00:00 2001
+From: Juan Nunez-Iglesias <jni@fastmail.com>
+Date: Tue, 23 Jan 2024 11:02:26 +0100
+Subject: [PATCH] Initial deprecations for Labels API (#6542)
+
+Initial work towards resolving #6491.
+
+This deprecates the following attributes in the Labels layer:
+
+- num_colors: `layer.num_colors` becomes `len(layer.colormap)`.
+`layer.num_colors = n` becomes `layer.colormap = label_colormap(n)`.
+- `napari.utils.colormaps.LabelColormap` is deprecated and has been
+renamed to `napari.utils.colormaps.CyclicLabelColormap`.
+- color: `layer.color` becomes `layer.colormap.color_dict`. `layer.color
+= color_dict` becomes `layer.colormap =
+DirectLabelColormap(color_dict)`.
+- _background_label: `layer._background_label` is now at
+`layer.colormap.background_value`.
+- color_mode: `layer.color_mode` is set by setting the colormap using
+the corresponding colormap type (`CyclicLabelColormap` or
+`DirectLabelColormap`).
+- `seed_rng`: this was never released, it's just removed.
+- `seed`: this was only used for shifting labels around in [0, 1]. It
+was superseded by #6460 and is deprecated.
+
+---------
+
+Co-authored-by: Grzegorz Bokota <bokota+github@gmail.com>
+Co-authored-by: Peter Sobolewski <76622105+psobolewskiPhD@users.noreply.github.com>
+---
+ examples/add_labels_with_features.py          |   6 +-
+ napari/_qt/_tests/test_qt_viewer.py           |  73 +++--
+ .../_tests/test_qt_labels_layer.py            |  30 +-
+ .../_tests/test_qt_layer_controls.py          |  97 ++++---
+ .../_qt/layer_controls/qt_labels_controls.py  |  64 +++--
+ napari/_tests/utils.py                        |   2 +-
+ napari/_vispy/layers/labels.py                |  17 +-
+ napari/components/_tests/test_prune_kwargs.py |   2 -
+ napari/components/_tests/test_viewer_model.py |  10 +
+ napari/components/viewer_model.py             |   6 +-
+ napari/layers/labels/_labels_constants.py     |   1 +
+ .../layers/labels/_labels_mouse_bindings.py   |   2 +-
+ napari/layers/labels/_tests/test_labels.py    | 130 ++++++---
+ .../labels/_tests/test_labels_key_bindings.py |   4 +-
+ napari/layers/labels/labels.py                | 263 +++++++++++-------
+ napari/utils/__init__.py                      |  25 +-
+ napari/utils/_register.py                     |  57 ++--
+ napari/utils/_tests/test_migrations.py        |   4 +-
+ napari/utils/_tests/test_register.py          |  48 ++++
+ napari/utils/colormaps/__init__.py            |  48 ++--
+ .../utils/colormaps/_tests/test_colormap.py   |  81 ++++--
+ napari/utils/colormaps/colormap.py            | 114 +++++++-
+ napari/utils/colormaps/colormap_utils.py      |  33 ++-
+ napari/utils/migrations.py                    |  46 +++
+ 24 files changed, 782 insertions(+), 381 deletions(-)
+ create mode 100644 napari/utils/_tests/test_register.py
+
+diff --git a/examples/add_labels_with_features.py b/examples/add_labels_with_features.py
+index f0670ff1..e0dbbe09 100644
+--- a/examples/add_labels_with_features.py
++++ b/examples/add_labels_with_features.py
+@@ -16,6 +16,7 @@ from skimage.morphology import closing, remove_small_objects, square
+ from skimage.segmentation import clear_border
+ 
+ import napari
++from napari.utils.colormaps import DirectLabelColormap
+ 
+ image = data.coins()[50:-50, 50:-50]
+ 
+@@ -47,7 +48,8 @@ label_features = {
+     'size': ["none", *coin_sizes],  # background is size: none
+ }
+ 
+-color = {1: 'white', 2: 'blue', 3: 'green', 4: 'red', 5: 'yellow', None: 'magenta'}
++colors = {1: 'white', 2: 'blue', 3: 'green', 4: 'red', 5: 'yellow',
++          None: 'magenta'}
+ # Here we provide a dict with color mappings for a subset of labels;
+ # we also provide a default color (`None` key) which will be used by all other labels
+ 
+@@ -56,7 +58,7 @@ label_layer = viewer.add_labels(
+     label_image,
+     name='segmentation',
+     features=label_features,
+-    color=color,
++    colormap=DirectLabelColormap(color_dict=colors),
+ )
+ 
+ if __name__ == '__main__':
+diff --git a/napari/_qt/_tests/test_qt_viewer.py b/napari/_qt/_tests/test_qt_viewer.py
+index 9e545e9c..59021543 100644
+--- a/napari/_qt/_tests/test_qt_viewer.py
++++ b/napari/_qt/_tests/test_qt_viewer.py
+@@ -29,6 +29,7 @@ from napari._vispy.utils.gl import fix_data_dtype
+ from napari.components.viewer_model import ViewerModel
+ from napari.layers import Labels, Points
+ from napari.settings import get_settings
++from napari.utils.colormaps import DirectLabelColormap, label_colormap
+ from napari.utils.interactions import mouse_press_callbacks
+ from napari.utils.theme import available_themes
+ 
+@@ -755,7 +756,7 @@ def test_label_colors_matching_widget_auto(
+     layer = qt_viewer_with_controls.viewer.add_labels(data)
+     layer.show_selected_label = use_selection
+     layer.opacity = 1.0  # QtColorBox & single layer are blending differently
+-    n_c = layer.num_colors
++    n_c = len(layer.colormap)
+ 
+     test_colors = np.concatenate(
+         (
+@@ -791,9 +792,8 @@ def test_label_colors_matching_widget_direct(
+ ):
+     """Make sure the rendered label colors match the QtColorBox widget."""
+     data = np.ones((2, 2), dtype=dtype)
+-    layer = qt_viewer_with_controls.viewer.add_labels(data)
+-    layer.show_selected_label = use_selection
+-    layer.opacity = 1.0  # QtColorBox & single layer are blending differently
++
++    test_colors = (1, 2, 3, 8, 150, 50)
+     color = {
+         0: "transparent",
+         1: "yellow",
+@@ -802,14 +802,16 @@ def test_label_colors_matching_widget_direct(
+         150: "green",
+         None: "white",
+     }
+-    test_colors = (1, 2, 3, 8, 150, 50)
+-
+     if np.iinfo(dtype).min < 0:
+         color[-1] = "pink"
+         color[-2] = "orange"
+         test_colors = test_colors + (-1, -2, -10)
+ 
+-    layer.color = color
++    colormap = DirectLabelColormap(color_dict=color)
++    layer = qt_viewer_with_controls.viewer.add_labels(
++        data, opacity=1, colormap=colormap
++    )
++    layer.show_selected_label = use_selection
+ 
+     color_box_color, middle_pixel = _update_data(
+         layer, 0, qtbot, qt_viewer_with_controls, dtype
+@@ -826,7 +828,7 @@ def test_label_colors_matching_widget_direct(
+         )
+         npt.assert_almost_equal(
+             color_box_color,
+-            layer.color.get(label, layer.color[None]) * 255,
++            colormap.color_dict.get(label, colormap.color_dict[None]) * 255,
+             err_msg=f"{label=}",
+         )
+ 
+@@ -882,9 +884,17 @@ def test_thumbnail_labels(qtbot, direct, qt_viewer: QtViewer, tmp_path):
+         np.array([[0, 1], [2, 3]]), opacity=1.0
+     )
+     if direct:
+-        layer.color = {0: 'red', 1: 'green', 2: 'blue', 3: 'yellow'}
++        layer.colormap = DirectLabelColormap(
++            color_dict={
++                0: 'red',
++                1: 'green',
++                2: 'blue',
++                3: 'yellow',
++                None: 'black',
++            }
++        )
+     else:
+-        layer.num_colors = 49
++        layer.colormap = label_colormap(49)
+     qt_viewer.viewer.reset_view()
+     qt_viewer.canvas.native.paintGL()
+     QApplication.processEvents()
+@@ -927,10 +937,9 @@ def test_background_color(qtbot, qt_viewer: QtViewer, dtype):
+     backgrounds = (0, 2, -2)
+ 
+     for background in backgrounds:
+-        layer._background_label = background
+         data[:5] = background
+         layer.data = data
+-        layer.num_colors = 49
++        layer.colormap = label_colormap(49, background_value=background)
+         qtbot.wait(50)
+         canvas_screenshot = qt_viewer.screenshot(flash=False)
+         shape = np.array(canvas_screenshot.shape[:2])
+@@ -993,7 +1002,9 @@ def test_selection_collision(qt_viewer: QtViewer, mode):
+     layer = qt_viewer.viewer.add_labels(data, opacity=1)
+     layer.selected_label = 10
+     if mode == "direct":
+-        layer.color = {10: "red", 10 + 49: "red"}
++        layer.colormap = DirectLabelColormap(
++            color_dict={10: "red", 10 + 49: "red", None: "black"}
++        )
+ 
+     for dtype in np.sctypes['int'] + np.sctypes['uint']:
+         layer.data = data.astype(dtype)
+@@ -1033,20 +1044,23 @@ def test_all_supported_dtypes(qt_viewer):
+             midd_pixel, layer.colormap.map(i) * 255, err_msg=f"{dtype} {i}"
+         )
+ 
+-    layer.color = {
+-        0: 'red',
+-        1: 'green',
+-        2: 'blue',
+-        3: 'yellow',
+-        4: 'magenta',
+-        5: 'cyan',
+-        6: 'white',
+-        7: 'pink',
+-        8: 'orange',
+-        9: 'purple',
+-        10: 'brown',
+-        11: 'gray',
+-    }
++    layer.colormap = DirectLabelColormap(
++        color_dict={
++            0: 'red',
++            1: 'green',
++            2: 'blue',
++            3: 'yellow',
++            4: 'magenta',
++            5: 'cyan',
++            6: 'white',
++            7: 'pink',
++            8: 'orange',
++            9: 'purple',
++            10: 'brown',
++            11: 'gray',
++            None: 'black',
++        }
++    )
+ 
+     for i, dtype in enumerate(np.sctypes['int'] + np.sctypes['uint'], start=1):
+         data = np.full((10, 10), i, dtype=dtype)
+@@ -1072,7 +1086,10 @@ def test_more_than_uint16_colors(qt_viewer):
+             product(np.linspace(0, 1, 256, endpoint=True), repeat=3),
+         )
+     }
+-    layer = qt_viewer.viewer.add_labels(data, opacity=1, color=colors)
++    colors[None] = (0, 0, 0, 1)
++    layer = qt_viewer.viewer.add_labels(
++        data, opacity=1, colormap=DirectLabelColormap(color_dict=colors)
++    )
+     assert layer._slice.image.view.dtype == np.float32
+ 
+     for i in [1, 1000, 100000]:
+diff --git a/napari/_qt/layer_controls/_tests/test_qt_labels_layer.py b/napari/_qt/layer_controls/_tests/test_qt_labels_layer.py
+index eb9a148f..33dcaea4 100644
+--- a/napari/_qt/layer_controls/_tests/test_qt_labels_layer.py
++++ b/napari/_qt/layer_controls/_tests/test_qt_labels_layer.py
+@@ -3,17 +3,26 @@ import pytest
+ 
+ from napari._qt.layer_controls.qt_labels_controls import QtLabelsControls
+ from napari.layers import Labels
+-from napari.utils.colormaps import colormap_utils
++from napari.utils.colormaps import DirectLabelColormap, colormap_utils
+ 
+ np.random.seed(0)
+ _LABELS = np.random.randint(5, size=(10, 15), dtype=np.uint8)
+-_COLOR = {1: 'white', 2: 'blue', 3: 'green', 4: 'red', 5: 'yellow'}
++_COLOR = DirectLabelColormap(
++    color_dict={
++        1: 'white',
++        2: 'blue',
++        3: 'green',
++        4: 'red',
++        5: 'yellow',
++        None: "black",
++    }
++)
+ 
+ 
+ @pytest.fixture
+-def make_labels_controls(qtbot, color=None):
+-    def _make_labels_controls(color=color):
+-        layer = Labels(_LABELS, color=color)
++def make_labels_controls(qtbot, colormap=None):
++    def _make_labels_controls(colormap=colormap):
++        layer = Labels(_LABELS, colormap=colormap)
+         qtctrl = QtLabelsControls(layer)
+         qtbot.add_widget(qtctrl)
+         return layer, qtctrl
+@@ -23,13 +32,12 @@ def make_labels_controls(qtbot, color=None):
+ 
+ def test_changing_layer_color_mode_updates_combo_box(make_labels_controls):
+     """Updating layer color mode changes the combo box selection"""
+-    layer, qtctrl = make_labels_controls(color=_COLOR)
++    layer, qtctrl = make_labels_controls(colormap=_COLOR)
+ 
+-    original_color_mode = layer.color_mode
+-    assert original_color_mode == qtctrl.colorModeComboBox.currentText()
++    assert qtctrl.colorModeComboBox.currentText() == "direct"
+ 
+-    layer.color_mode = 'auto'
+-    assert layer.color_mode == qtctrl.colorModeComboBox.currentText()
++    layer.colormap = layer._random_colormap
++    assert qtctrl.colorModeComboBox.currentText() == "auto"
+ 
+ 
+ def test_rendering_combobox(make_labels_controls):
+@@ -47,7 +55,7 @@ def test_rendering_combobox(make_labels_controls):
+ 
+ def test_changing_colormap_updates_colorbox(make_labels_controls):
+     """Test that changing the colormap on a layer will update color swatch in the combo box"""
+-    layer, qtctrl = make_labels_controls(color=_COLOR)
++    layer, qtctrl = make_labels_controls(colormap=_COLOR)
+     color_box = qtctrl.colorBox
+ 
+     layer.selected_label = 1
+diff --git a/napari/_qt/layer_controls/_tests/test_qt_layer_controls.py b/napari/_qt/layer_controls/_tests/test_qt_layer_controls.py
+index f811c46b..a104405f 100644
+--- a/napari/_qt/layer_controls/_tests/test_qt_layer_controls.py
++++ b/napari/_qt/layer_controls/_tests/test_qt_layer_controls.py
+@@ -41,12 +41,13 @@ from napari.layers import (
+     Tracks,
+     Vectors,
+ )
++from napari.utils.colormaps import DirectLabelColormap
+ 
+ 
+ class LayerTypeWithData(NamedTuple):
+     type: Type[Layer]
+     data: np.ndarray
+-    color: Optional[dict]
++    colormap: Optional[DirectLabelColormap]
+     properties: Optional[dict]
+     expected_isinstance: Type[QtLayerControlsContainer]
+ 
+@@ -57,35 +58,44 @@ np.random.seed(0)
+ _IMAGE = LayerTypeWithData(
+     type=Image,
+     data=np.random.rand(8, 8),
+-    color=None,
++    colormap=None,
+     properties=None,
+     expected_isinstance=QtImageControls,
+ )
+-_LABELS_WITH_COLOR = LayerTypeWithData(
++_LABELS_WITH_DIRECT_COLORMAP = LayerTypeWithData(
+     type=Labels,
+     data=np.random.randint(5, size=(10, 15)),
+-    color={1: 'white', 2: 'blue', 3: 'green', 4: 'red', 5: 'yellow'},
++    colormap=DirectLabelColormap(
++        color_dict={
++            1: 'white',
++            2: 'blue',
++            3: 'green',
++            4: 'red',
++            5: 'yellow',
++            None: "black",
++        }
++    ),
+     properties=None,
+     expected_isinstance=QtLabelsControls,
+ )
+ _LABELS = LayerTypeWithData(
+     type=Labels,
+     data=np.random.randint(5, size=(10, 15)),
+-    color=None,
++    colormap=None,
+     properties=None,
+     expected_isinstance=QtLabelsControls,
+ )
+ _POINTS = LayerTypeWithData(
+     type=Points,
+     data=np.random.random((5, 2)),
+-    color=None,
++    colormap=None,
+     properties=None,
+     expected_isinstance=QtPointsControls,
+ )
+ _SHAPES = LayerTypeWithData(
+     type=Shapes,
+     data=np.random.random((10, 4, 2)),
+-    color=None,
++    colormap=None,
+     properties=None,
+     expected_isinstance=QtShapesControls,
+ )
+@@ -96,14 +106,14 @@ _SURFACE = LayerTypeWithData(
+         np.random.randint(10, size=(6, 3)),
+         np.random.random(10),
+     ),
+-    color=None,
++    colormap=None,
+     properties=None,
+     expected_isinstance=QtSurfaceControls,
+ )
+ _TRACKS = LayerTypeWithData(
+     type=Tracks,
+     data=np.zeros((2, 4)),
+-    color=None,
++    colormap=None,
+     properties={
+         'track_id': [0, 0],
+         'time': [0, 0],
+@@ -114,7 +124,7 @@ _TRACKS = LayerTypeWithData(
+ _VECTORS = LayerTypeWithData(
+     type=Vectors,
+     data=np.zeros((2, 2, 2)),
+-    color=None,
++    colormap=None,
+     properties=None,
+     expected_isinstance=QtVectorsControls,
+ )
+@@ -124,9 +134,10 @@ _LINES_DATA = np.random.random((6, 2, 2))
+ @pytest.fixture
+ def create_layer_controls(qtbot):
+     def _create_layer_controls(layer_type_with_data):
+-        if layer_type_with_data.color:
++        if layer_type_with_data.colormap:
+             layer = layer_type_with_data.type(
+-                layer_type_with_data.data, color=layer_type_with_data.color
++                layer_type_with_data.data,
++                colormap=layer_type_with_data.colormap,
+             )
+         elif layer_type_with_data.properties:
+             layer = layer_type_with_data.type(
+@@ -147,7 +158,7 @@ def create_layer_controls(qtbot):
+ @pytest.mark.parametrize(
+     'layer_type_with_data',
+     [
+-        _LABELS_WITH_COLOR,
++        _LABELS_WITH_DIRECT_COLORMAP,
+         _LABELS,
+         _IMAGE,
+         _POINTS,
+@@ -156,6 +167,16 @@ def create_layer_controls(qtbot):
+         _TRACKS,
+         _VECTORS,
+     ],
++    ids=[
++        "labels_with_direct_colormap",
++        "labels_with_auto_colormap",
++        "image",
++        "points",
++        "shapes",
++        "surface",
++        "tracks",
++        "vectors",
++    ],
+ )
+ @pytest.mark.qt_no_exception_capture
+ @pytest.mark.skipif(os.environ.get("MIN_REQ", "0") == "1", reason="min req")
+@@ -186,30 +207,38 @@ def test_create_layer_controls(
+             qcombobox.setCurrentIndex(qcombobox_initial_idx)
+ 
+ 
+-if sys.version_info[:2] == (3, 11) and (
++skip_predicate = sys.version_info >= (3, 11) and (
+     qtpy.API == 'pyqt5' or qtpy.API == 'pyqt6'
+-):
+-    test_data = []
+-else:
+-    # those 2 fail on 3.11 + pyqt5 and pyqt6 with a segfault that can't be caught by
+-    # pytest in qspinbox.setValue(value)
+-    # See: https://github.com/napari/napari/pull/5439
+-    test_data = [_LABELS_WITH_COLOR, _LABELS]
+-
+-
+-test_data += [
+-    _IMAGE,
+-    _POINTS,
+-    _SHAPES,
+-    _SURFACE,
+-    _TRACKS,
+-    _VECTORS,
+-]
++)
+ 
+ 
+ @pytest.mark.parametrize(
+     'layer_type_with_data',
+-    test_data,
++    [
++        # those 2 fail on 3.11 + pyqt5 and pyqt6 with a segfault that can't be caught by
++        # pytest in qspinbox.setValue(value)
++        # See: https://github.com/napari/napari/pull/5439
++        pytest.param(
++            _LABELS_WITH_DIRECT_COLORMAP,
++            marks=pytest.mark.skipif(
++                skip_predicate,
++                reason='segfault on Python 3.11+ and pyqt5 or Pyqt6',
++            ),
++        ),
++        pytest.param(
++            _LABELS,
++            marks=pytest.mark.skipif(
++                skip_predicate,
++                reason='segfault on Python 3.11+ and pyqt5 or Pyqt6',
++            ),
++        ),
++        _IMAGE,
++        _POINTS,
++        _SHAPES,
++        _SURFACE,
++        _TRACKS,
++        _VECTORS,
++    ],
+ )
+ @pytest.mark.qt_no_exception_capture
+ @pytest.mark.skipif(os.environ.get("MIN_REQ", "0") == "1", reason="min req")
+@@ -277,7 +306,7 @@ def test_create_layer_controls_spin(
+ @pytest.mark.parametrize(
+     'layer_type_with_data',
+     [
+-        _LABELS_WITH_COLOR,
++        _LABELS_WITH_DIRECT_COLORMAP,
+         _LABELS,
+         _IMAGE,
+         _POINTS,
+@@ -359,7 +388,7 @@ def test_create_layer_controls_qslider(
+ @pytest.mark.parametrize(
+     'layer_type_with_data',
+     [
+-        _LABELS_WITH_COLOR,
++        _LABELS_WITH_DIRECT_COLORMAP,
+         _LABELS,
+         _IMAGE,
+         _POINTS,
+diff --git a/napari/_qt/layer_controls/qt_labels_controls.py b/napari/_qt/layer_controls/qt_labels_controls.py
+index 689fd594..bae0225e 100644
+--- a/napari/_qt/layer_controls/qt_labels_controls.py
++++ b/napari/_qt/layer_controls/qt_labels_controls.py
+@@ -23,10 +23,12 @@ from napari._qt.widgets.qt_mode_buttons import (
+ )
+ from napari.layers.labels._labels_constants import (
+     LABEL_COLOR_MODE_TRANSLATIONS,
++    LabelColorMode,
+     LabelsRendering,
+     Mode,
+ )
+ from napari.layers.labels._labels_utils import get_dtype
++from napari.utils import CyclicLabelColormap
+ from napari.utils._dtype import get_dtype_limits
+ from napari.utils.action_manager import action_manager
+ from napari.utils.events import disconnect_events
+@@ -92,6 +94,7 @@ class QtLabelsControls(QtLayerControls):
+ 
+         self.layer.events.mode.connect(self._on_mode_change)
+         self.layer.events.rendering.connect(self._on_rendering_change)
++        self.layer.events.colormap.connect(self._on_colormap_change)
+         self.layer.events.selected_label.connect(
+             self._on_selected_label_change
+         )
+@@ -109,7 +112,6 @@ class QtLabelsControls(QtLayerControls):
+         self.layer.events.show_selected_label.connect(
+             self._on_show_selected_label_change
+         )
+-        self.layer.events.color_mode.connect(self._on_color_mode_change)
+         self.layer.events.data.connect(self._on_data_change)
+ 
+         # selection spinbox
+@@ -130,6 +132,15 @@ class QtLabelsControls(QtLayerControls):
+         self.brushSizeSlider = sld
+         self._on_brush_size_change()
+ 
++        color_mode_comboBox = QComboBox(self)
++        for data, text in LABEL_COLOR_MODE_TRANSLATIONS.items():
++            data = data.value
++            color_mode_comboBox.addItem(text, data)
++
++        self.colorModeComboBox = color_mode_comboBox
++        self._on_colormap_change()
++        color_mode_comboBox.activated.connect(self.change_color_mode)
++
+         contig_cb = QCheckBox()
+         contig_cb.setToolTip(trans._('contiguous editing'))
+         contig_cb.stateChanged.connect(self.change_contig)
+@@ -259,20 +270,6 @@ class QtLabelsControls(QtLayerControls):
+ 
+         self._on_ndisplay_changed()
+ 
+-        color_mode_comboBox = QComboBox(self)
+-        for index, (data, text) in enumerate(
+-            LABEL_COLOR_MODE_TRANSLATIONS.items()
+-        ):
+-            data = data.value
+-            color_mode_comboBox.addItem(text, data)
+-
+-            if self.layer.color_mode == data:
+-                color_mode_comboBox.setCurrentIndex(index)
+-
+-        color_mode_comboBox.activated.connect(self.change_color_mode)
+-        self.colorModeComboBox = color_mode_comboBox
+-        self._on_color_mode_change()
+-
+         color_layout = QHBoxLayout()
+         self.colorBox = QtColorBox(layer)
+         color_layout.addWidget(self.colorBox)
+@@ -295,6 +292,32 @@ class QtLabelsControls(QtLayerControls):
+             trans._('show\nselected:'), self.selectedColorCheckbox
+         )
+ 
++    def change_color_mode(self):
++        """Change color mode of label layer"""
++        if self.colorModeComboBox.currentData() == LabelColorMode.AUTO.value:
++            self.layer.colormap = self.layer._original_random_colormap
++        else:
++            self.layer.colormap = self.layer._direct_colormap
++
++    def _on_colormap_change(self):
++        enable_combobox = not self.layer._is_default_colors(
++            self.layer._direct_colormap.color_dict
++        )
++        self.colorModeComboBox.setEnabled(enable_combobox)
++        if not enable_combobox:
++            self.colorModeComboBox.setToolTip(
++                'Layer needs a user-set DirectLabelColormap to enable direct '
++                'mode.'
++            )
++        if isinstance(self.layer.colormap, CyclicLabelColormap):
++            self.colorModeComboBox.setCurrentIndex(
++                self.colorModeComboBox.findData(LabelColorMode.AUTO.value)
++            )
++        else:
++            self.colorModeComboBox.setCurrentIndex(
++                self.colorModeComboBox.findData(LabelColorMode.DIRECT.value)
++            )
++
+     def _on_data_change(self):
+         """Update label selection spinbox min/max when data changes."""
+         dtype_lims = get_dtype_limits(get_dtype(self.layer))
+@@ -430,10 +453,6 @@ class QtLabelsControls(QtLayerControls):
+             Qt.CheckState(state) == Qt.CheckState.Checked
+         )
+ 
+-    def change_color_mode(self):
+-        """Change color mode of label layer"""
+-        self.layer.color_mode = self.colorModeComboBox.currentData()
+-
+     def _on_contour_change(self):
+         """Receive layer model contour value change event and update spinbox."""
+         with self.layer.events.contour.blocker():
+@@ -478,13 +497,6 @@ class QtLabelsControls(QtLayerControls):
+                 self.layer.show_selected_label
+             )
+ 
+-    def _on_color_mode_change(self):
+-        """Receive layer model color."""
+-        with self.layer.events.color_mode.blocker():
+-            self.colorModeComboBox.setCurrentIndex(
+-                self.colorModeComboBox.findData(self.layer.color_mode)
+-            )
+-
+     def _on_editable_or_visible_change(self):
+         """Receive layer model editable/visible change event & enable/disable buttons."""
+         set_widgets_enabled_with_opacity(
+diff --git a/napari/_tests/utils.py b/napari/_tests/utils.py
+index 9a68f354..d9134b2c 100644
+--- a/napari/_tests/utils.py
++++ b/napari/_tests/utils.py
+@@ -102,7 +102,7 @@ layer2addmethod = {
+ good_layer_data = [
+     (np.random.random((10, 10)),),
+     (np.random.random((10, 10, 3)), {'rgb': True}),
+-    (np.random.randint(20, size=(10, 15)), {'seed_rng': 5}, 'labels'),
++    (np.random.randint(20, size=(10, 15)), {'opacity': 0.9}, 'labels'),
+     (np.random.random((10, 2)) * 20, {'face_color': 'blue'}, 'points'),
+     (np.random.random((10, 2, 2)) * 20, {}, 'vectors'),
+     (np.random.random((10, 4, 2)) * 20, {'opacity': 1}, 'shapes'),
+diff --git a/napari/_vispy/layers/labels.py b/napari/_vispy/layers/labels.py
+index f04bf480..2a937cb7 100644
+--- a/napari/_vispy/layers/labels.py
++++ b/napari/_vispy/layers/labels.py
+@@ -17,7 +17,7 @@ from napari._vispy.utils.gl import get_max_texture_sizes
+ from napari._vispy.visuals.labels import LabelNode
+ from napari._vispy.visuals.volume import Volume as VolumeNode
+ from napari.utils.colormaps.colormap import (
+-    LabelColormap,
++    CyclicLabelColormap,
+     _texture_dtype,
+ )
+ 
+@@ -94,7 +94,7 @@ vec4 sample_label_color(float t) {
+ class LabelVispyColormap(VispyColormap):
+     def __init__(
+         self,
+-        colormap: LabelColormap,
++        colormap: CyclicLabelColormap,
+         view_dtype: np.dtype,
+         raw_dtype: np.dtype,
+     ):
+@@ -178,7 +178,7 @@ def build_textures_from_dict(
+ 
+ 
+ def _select_colormap_texture(
+-    colormap: LabelColormap, view_dtype, raw_dtype
++    colormap: CyclicLabelColormap, view_dtype, raw_dtype
+ ) -> np.ndarray:
+     if raw_dtype.itemsize > 2:
+         color_texture = colormap._get_mapping_from_cache(view_dtype)
+@@ -203,7 +203,6 @@ class VispyLabelsLayer(VispyScalarFieldBaseLayer):
+             layer_node_class=LabelLayerNode,
+         )
+ 
+-        # self.layer.events.color_mode.connect(self._on_colormap_change)
+         self.layer.events.labels_update.connect(self._on_partial_labels_update)
+         self.layer.events.selected_label.connect(self._on_colormap_change)
+         self.layer.events.show_selected_label.connect(self._on_colormap_change)
+@@ -232,11 +231,11 @@ class VispyLabelsLayer(VispyScalarFieldBaseLayer):
+         ):
+             return
+         colormap = self.layer.colormap
+-        mode = self.layer.color_mode
++        auto_mode = isinstance(colormap, CyclicLabelColormap)
+         view_dtype = self.layer._slice.image.view.dtype
+         raw_dtype = self.layer._slice.image.raw.dtype
+-        if mode == 'auto' or (mode == "direct" and raw_dtype.itemsize <= 2):
+-            if raw_dtype.itemsize > 2 and isinstance(colormap, LabelColormap):
++        if auto_mode or raw_dtype.itemsize <= 2:
++            if raw_dtype.itemsize > 2:
+                 # If the view dtype is different from the raw dtype, it is possible
+                 # that background pixels are not the same value as the `background_value`.
+                 # For example, if raw_dtype is int8 and background_value is `-1`
+@@ -245,7 +244,7 @@ class VispyLabelsLayer(VispyScalarFieldBaseLayer):
+                 # to uint8 or uint16 and background_value is always 0 in a view array.
+                 # The LabelColormap is EventedModel, so we need to make
+                 # a copy instead of temporary overwrite the background_value
+-                colormap = LabelColormap(**colormap.dict())
++                colormap = CyclicLabelColormap(**colormap.dict())
+                 colormap.background_value = (
+                     colormap._background_as_minimum_dtype(raw_dtype)
+                 )
+@@ -262,7 +261,7 @@ class VispyLabelsLayer(VispyScalarFieldBaseLayer):
+             )
+             self.texture_data = color_texture
+ 
+-        elif mode == 'direct':  # only for raw_dtype.itemsize > 2
++        elif not auto_mode:  # only for raw_dtype.itemsize > 2
+             color_dict = colormap._values_mapping_to_minimum_values_set()[1]
+             max_size = get_max_texture_sizes()[0]
+             val_texture = build_textures_from_dict(color_dict, max_size)
+diff --git a/napari/components/_tests/test_prune_kwargs.py b/napari/components/_tests/test_prune_kwargs.py
+index 0737bac0..bdc7bcd6 100644
+--- a/napari/components/_tests/test_prune_kwargs.py
++++ b/napari/components/_tests/test_prune_kwargs.py
+@@ -5,7 +5,6 @@ from napari.components.viewer_model import prune_kwargs
+ TEST_KWARGS = {
+     'scale': (0.75, 1),
+     'blending': 'translucent',
+-    'num_colors': 10,
+     'edge_color': 'red',
+     'z_index': 20,
+     'edge_width': 2,
+@@ -29,7 +28,6 @@ EXPECTATIONS = [
+         'labels',
+         {
+             'scale': (0.75, 1),
+-            'num_colors': 10,
+             'multiscale': False,
+             'name': 'name',
+             'blending': 'translucent',
+diff --git a/napari/components/_tests/test_viewer_model.py b/napari/components/_tests/test_viewer_model.py
+index 66cc81c7..e3fc2ac1 100644
+--- a/napari/components/_tests/test_viewer_model.py
++++ b/napari/components/_tests/test_viewer_model.py
+@@ -130,6 +130,16 @@ def test_add_labels():
+     assert viewer.dims.ndim == 2
+ 
+ 
++def test_add_labels_warnings():
++    """Test adding labels image."""
++    viewer = ViewerModel()
++    np.random.seed(0)
++    with pytest.warns(
++        FutureWarning, match="Setting Labels.num_colors is deprecated since"
++    ):
++        viewer.add_labels(np.zeros((10, 15), dtype=np.uint8), num_colors=20)
++
++
+ def test_add_points():
+     """Test adding points."""
+     viewer = ViewerModel()
+diff --git a/napari/components/viewer_model.py b/napari/components/viewer_model.py
+index d651bb52..38251e1f 100644
+--- a/napari/components/viewer_model.py
++++ b/napari/components/viewer_model.py
+@@ -1550,14 +1550,14 @@ def prune_kwargs(kwargs: Dict[str, Any], layer_type: str) -> Dict[str, Any]:
+     >>> test_kwargs = {
+     ...     'scale': (0.75, 1),
+     ...     'blending': 'additive',
+-    ...     'num_colors': 10,
++    ...     'size': 10,
+     ... }
+     >>> prune_kwargs(test_kwargs, 'image')
+     {'scale': (0.75, 1), 'blending': 'additive'}
+ 
+     >>> # only labels has the ``num_colors`` argument
+-    >>> prune_kwargs(test_kwargs, 'labels')
+-    {'scale': (0.75, 1), 'blending': 'additive', 'num_colors': 10}
++    >>> prune_kwargs(test_kwargs, 'points')
++    {'scale': (0.75, 1), 'blending': 'additive', 'size': 10}
+     """
+     add_method = getattr(ViewerModel, 'add_' + layer_type, None)
+     if not add_method or layer_type == 'layer':
+diff --git a/napari/layers/labels/_labels_constants.py b/napari/layers/labels/_labels_constants.py
+index 72ca153c..68235757 100644
+--- a/napari/layers/labels/_labels_constants.py
++++ b/napari/layers/labels/_labels_constants.py
+@@ -55,6 +55,7 @@ class LabelColorMode(StringEnum):
+ 
+ BACKSPACE = 'delete' if sys.platform == 'darwin' else 'backspace'
+ 
++
+ LABEL_COLOR_MODE_TRANSLATIONS = OrderedDict(
+     [
+         (LabelColorMode.AUTO, trans._("auto")),
+diff --git a/napari/layers/labels/_labels_mouse_bindings.py b/napari/layers/labels/_labels_mouse_bindings.py
+index 315e744a..e3ac0a40 100644
+--- a/napari/layers/labels/_labels_mouse_bindings.py
++++ b/napari/layers/labels/_labels_mouse_bindings.py
+@@ -23,7 +23,7 @@ def draw(layer, event):
+     """
+     coordinates = mouse_event_to_labels_coordinate(layer, event)
+     if layer._mode == Mode.ERASE:
+-        new_label = layer._background_label
++        new_label = layer.colormap.background_value
+     else:
+         new_label = layer.selected_label
+ 
+diff --git a/napari/layers/labels/_tests/test_labels.py b/napari/layers/labels/_tests/test_labels.py
+index 04a0a1c3..9d5a5339 100644
+--- a/napari/layers/labels/_tests/test_labels.py
++++ b/napari/layers/labels/_tests/test_labels.py
+@@ -21,8 +21,30 @@ from napari.layers import Labels
+ from napari.layers.labels._labels_constants import LabelsRendering
+ from napari.layers.labels._labels_utils import get_contours
+ from napari.utils import Colormap
+-from napari.utils.colormaps import label_colormap
+-from napari.utils.colormaps.colormap import DirectLabelColormap
++from napari.utils.colormaps import (
++    CyclicLabelColormap,
++    DirectLabelColormap,
++    label_colormap,
++)
++
++
++@pytest.fixture
++def direct_colormap():
++    """Return a DirectLabelColormap."""
++    return DirectLabelColormap(
++        color_dict={
++            0: [0, 0, 0, 0],
++            1: [1, 0, 0, 1],
++            2: [0, 1, 0, 1],
++            None: [0, 0, 1, 1],
++        }
++    )
++
++
++@pytest.fixture
++def random_colormap():
++    """Return a LabelColormap."""
++    return label_colormap(50)
+ 
+ 
+ def test_random_labels():
+@@ -254,27 +276,31 @@ def test_seed():
+ 
+ 
+ def test_num_colors():
+-    """Test setting number of colors in colormap."""
++    """Test setting number of colors in colormap with deprecated API."""
+     np.random.seed(0)
+     data = np.random.randint(20, size=(10, 15))
+     layer = Labels(data)
+-    assert layer.num_colors == 49
+ 
+-    layer.num_colors = 80
+-    assert layer.num_colors == 80
++    with pytest.warns(FutureWarning, match='num_colors is deprecated'):
++        assert layer.num_colors == 50
+ 
+-    layer = Labels(data, num_colors=60)
+-    assert layer.num_colors == 60
++    with pytest.warns(FutureWarning, match='num_colors is deprecated'):
++        layer.num_colors = 80
+ 
+-    with pytest.raises(
+-        ValueError, match=r".*Only up to 2\*\*16=65535 colors are supported"
+-    ):
+-        layer.num_colors = 2**17
++    assert len(layer.colormap) == 80
+ 
+-    with pytest.raises(
+-        ValueError, match=r".*Only up to 2\*\*16=65535 colors are supported"
+-    ):
+-        Labels(data, num_colors=2**17)
++    with pytest.warns(FutureWarning, match='num_colors is deprecated'):
++        layer = Labels(data, num_colors=60)
++
++    assert len(layer.colormap) == 60
++
++    with pytest.raises(ValueError, match=r".*Only up to 2\*\*16=65535 colors"):
++        with pytest.warns(FutureWarning, match='num_colors is deprecated'):
++            layer.num_colors = 2**17
++
++    with pytest.raises(ValueError, match=r".*Only up to 2\*\*16=65535 colors"):
++        with pytest.warns(FutureWarning, match='num_colors is deprecated'):
++            Labels(data, num_colors=2**17)
+ 
+ 
+ def test_properties():
+@@ -413,9 +439,11 @@ def test_custom_color_dict():
+     """Test custom color dict."""
+     np.random.seed(0)
+     data = np.random.randint(20, size=(10, 15))
+-    layer = Labels(
+-        data, color={2: 'white', 4: 'red', 8: 'blue', 16: 'red', 32: 'blue'}
+-    )
++    with pytest.warns(FutureWarning, match='Labels.color is deprecated'):
++        layer = Labels(
++            data,
++            color={2: 'white', 4: 'red', 8: 'blue', 16: 'red', 32: 'blue'},
++        )
+ 
+     # test with custom color dict
+     assert type(layer.get_color(2)) == np.ndarray
+@@ -426,7 +454,8 @@ def test_custom_color_dict():
+ 
+     # test disable custom color dict
+     # should not initialize as white since we are using random.seed
+-    layer.color_mode = 'auto'
++    with pytest.warns(FutureWarning, match='Labels.color_mode is deprecated'):
++        layer.color_mode = 'auto'
+     assert not (layer.get_color(1) == np.array([1.0, 1.0, 1.0, 1.0])).all()
+ 
+ 
+@@ -596,8 +625,7 @@ def test_background_label(background_num):
+     data[4:-4, 4:-4] = -1
+ 
+     layer = Labels(data)
+-    layer._background_label = background_num
+-    layer.num_colors = 49
++    layer.colormap = label_colormap(49, background_value=background_num)
+     np.testing.assert_array_equal(
+         layer._data_view == 0, data == background_num
+     )
+@@ -702,14 +730,16 @@ def test_show_selected_label():
+     original_color = layer.get_color(1)
+ 
+     layer.show_selected_label = True
+-    original_background_color = layer.get_color(layer._background_label)
++    original_background_color = layer.get_color(
++        layer.colormap.background_value
++    )
+     none_color = layer.get_color(None)
+     layer.selected_label = 1
+ 
+     # color of selected label has not changed
+     assert np.allclose(layer.get_color(layer.selected_label), original_color)
+ 
+-    current_background_color = layer.get_color(layer._background_label)
++    current_background_color = layer.get_color(layer.colormap.background_value)
+     # color of background is background color
+     assert current_background_color == original_background_color
+ 
+@@ -1393,19 +1423,23 @@ def test_is_default_color():
+     layer = Labels(data)
+ 
+     # layer gets instantiated with defaults
+-    current_color = layer.color
++    current_color = layer._direct_colormap.color_dict
+     assert layer._is_default_colors(current_color)
+ 
+     # setting color to default colors doesn't update color mode
+-    layer.color = current_color
+-    assert layer.color_mode == 'auto'
++    layer.colormap = DirectLabelColormap(color_dict=current_color)
++    assert isinstance(layer.colormap, CyclicLabelColormap)
++    with pytest.warns(FutureWarning, match='Labels.color_mode is deprecated'):
++        assert layer.color_mode == 'auto'
+ 
+     # new colors are not default
+-    new_color = {0: 'white', 1: 'red', 3: 'green'}
++    new_color = {0: 'white', 1: 'red', 3: 'green', None: 'blue'}
+     assert not layer._is_default_colors(new_color)
+     # setting the color with non-default colors updates color mode
+-    layer.color = new_color
+-    assert layer.color_mode == 'direct'
++    layer.colormap = DirectLabelColormap(color_dict=new_color)
++    assert isinstance(layer.colormap, DirectLabelColormap)
++    with pytest.warns(FutureWarning, match='Labels.color_mode is deprecated'):
++        assert layer.color_mode == 'direct'
+ 
+ 
+ def test_large_labels_direct_color():
+@@ -1414,13 +1448,17 @@ def test_large_labels_direct_color():
+     data = np.array([[0, 1], [2**16, 2**20]], dtype=np.uint32)
+     colors = {1: 'white', 2**16: 'green', 2**20: 'magenta'}
+     layer = Labels(data)
+-    layer.color = colors
++    with pytest.warns(FutureWarning, match='Labels.color is deprecated'):
++        layer.color = colors
+ 
+-    assert layer.color_mode == 'direct'
++    with pytest.warns(FutureWarning, match='Labels.color_mode is deprecated'):
++        assert layer.color_mode == 'direct'
+     np.testing.assert_allclose(layer.get_color(2**20), [1.0, 0.0, 1.0, 1.0])
+ 
+ 
+-def test_invalidate_cache_when_change_color_mode():
++def test_invalidate_cache_when_change_color_mode(
++    direct_colormap, random_colormap
++):
+     """Checks if the cache is invalidated when color mode is changed."""
+     data = np.zeros((4, 10), dtype=np.int32)
+     data[1, :] = np.arange(0, 10)
+@@ -1430,11 +1468,11 @@ def test_invalidate_cache_when_change_color_mode():
+     gt_auto = layer._raw_to_displayed(layer._slice.image.raw)
+     assert gt_auto.dtype == np.uint8
+ 
+-    layer.color_mode = 'direct'
++    layer.colormap = direct_colormap
+     layer._cached_labels = None
+     assert layer._raw_to_displayed(layer._slice.image.raw).dtype == np.uint8
+ 
+-    layer.color_mode = 'auto'
++    layer.colormap = random_colormap
+     # If the cache is not invalidated, it returns colors for
+     # the direct color mode instead of the color for the auto mode
+     assert np.allclose(
+@@ -1447,12 +1485,24 @@ def test_color_mapping_when_color_is_changed():
+ 
+     data = np.zeros((4, 5), dtype=np.int32)
+     data[1, :] = np.arange(0, 5)
+-    layer = Labels(data, color={1: 'green', 2: 'red', 3: 'white'})
++    layer = Labels(
++        data,
++        colormap=DirectLabelColormap(
++            color_dict={1: 'green', 2: 'red', 3: 'white', None: 'black'}
++        ),
++    )
+     gt_direct_3colors = layer._raw_to_displayed(layer._slice.image.raw)
+ 
+-    layer = Labels(data, color={1: 'green', 2: 'red'})
++    layer = Labels(
++        data,
++        colormap=DirectLabelColormap(
++            color_dict={1: 'green', 2: 'red', None: 'black'}
++        ),
++    )
+     assert layer._raw_to_displayed(layer._slice.image.raw).dtype == np.uint8
+-    layer.color = {1: 'green', 2: 'red', 3: 'white'}
++    layer.colormap = DirectLabelColormap(
++        color_dict={1: 'green', 2: 'red', 3: 'white', None: 'black'}
++    )
+ 
+     assert np.allclose(
+         layer._raw_to_displayed(layer._slice.image.raw), gt_direct_3colors
+@@ -1507,8 +1557,8 @@ def test_color_shuffling_above_num_colors(num_colors):
+     Note that we don't support more than 2\ :sup:`16` colors, and behavior
+     with more colors is undefined, so we don't test it here.
+     """
+-    labels = np.arange(1, 1 + 2 * num_colors).reshape((2, num_colors))
+-    layer = Labels(labels, num_colors=num_colors)
++    labels = np.arange(1, 1 + 2 * (num_colors - 1)).reshape((2, -1))
++    layer = Labels(labels, colormap=label_colormap(num_colors - 1))
+     colors0 = layer.colormap.map(labels)
+     assert np.all(colors0[0] == colors0[1])
+     layer.new_colormap()
+diff --git a/napari/layers/labels/_tests/test_labels_key_bindings.py b/napari/layers/labels/_tests/test_labels_key_bindings.py
+index f9b8bede..00c51563 100644
+--- a/napari/layers/labels/_tests/test_labels_key_bindings.py
++++ b/napari/layers/labels/_tests/test_labels_key_bindings.py
+@@ -2,7 +2,9 @@ import numpy as np
+ import pytest
+ 
+ from napari.layers import Labels
+-from napari.layers.labels._labels_key_bindings import new_label
++from napari.layers.labels._labels_key_bindings import (
++    new_label,
++)
+ 
+ 
+ @pytest.fixture
+diff --git a/napari/layers/labels/labels.py b/napari/layers/labels/labels.py
+index 311b0ff6..32e77a4f 100644
+--- a/napari/layers/labels/labels.py
++++ b/napari/layers/labels/labels.py
+@@ -35,23 +35,23 @@ from napari.layers.labels._labels_utils import (
+     interpolate_coordinates,
+     sphere_indices,
+ )
+-from napari.layers.utils.color_transformations import transform_color
+ from napari.layers.utils.layer_utils import _FeatureTable
+ from napari.utils import config
+ from napari.utils._dtype import normalize_dtype, vispy_texture_dtype
+ from napari.utils._indexing import elements_in_slice, index_in_slice
+ from napari.utils.colormaps import (
+     direct_colormap,
+-    ensure_colormap,
+     label_colormap,
+ )
+ from napari.utils.colormaps.colormap import (
+-    LabelColormap,
++    CyclicLabelColormap,
++    DirectLabelColormap,
+     LabelColormapBase,
+ )
+ from napari.utils.colormaps.colormap_utils import shuffle_and_extend_colormap
+ from napari.utils.events import EmitterGroup, Event
+ from napari.utils.events.custom_types import Array
++from napari.utils.events.event import WarningEmitter
+ from napari.utils.geometry import clamp_point_to_bounding_box
+ from napari.utils.migrations import deprecated_constructor_arg_by_attr
+ from napari.utils.misc import _is_array_type
+@@ -85,9 +85,9 @@ class Labels(_ImageBase):
+     cache : bool
+         Whether slices of out-of-core datasets should be cached upon retrieval.
+         Currently, this only applies to dask arrays.
+-    color : dict of int or None to str or array
+-        Custom label to color mapping. Values must be valid color names or RGBA
+-        arrays. None is used when no color is specified for a label.
++    colormap : CyclicLabelColormap or DirectLabelColormap or None
++        Colormap to use for the labels. If None, a random colormap will be
++        used.
+     depiction : str
+         3D Depiction mode. Must be one of {'volume', 'plane'}.
+         The default value is 'volume'.
+@@ -110,8 +110,6 @@ class Labels(_ImageBase):
+         displayed.
+     name : str
+         Name of the layer.
+-    num_colors : int
+-        Number of unique colors to use in colormap.
+     opacity : float
+         Opacity of the layer visual, between 0.0 and 1.0.
+     plane : dict or SlicingPlane
+@@ -135,8 +133,6 @@ class Labels(_ImageBase):
+         np.degrees if needed.
+     scale : tuple of float
+         Scale factors for the layer.
+-    seed_rng : int
+-        Seed for colormap shuffle random generator.
+     shear : 1-D array or n-D array
+         Either a vector of upper triangular values, or an nD shear matrix with
+         ones along the main diagonal.
+@@ -162,7 +158,8 @@ class Labels(_ImageBase):
+     metadata : dict
+         Labels metadata.
+     num_colors : int
+-        Number of unique colors to use in colormap.
++        Number of unique colors to use in colormap. DEPRECATED: set
++        ``colormap`` directly, using `napari.utils.colormaps.label_colormap`.
+     features : Dataframe-like
+         Features table where each row corresponds to a label and each column
+         is a feature. The first row corresponds to the background label.
+@@ -174,9 +171,11 @@ class Labels(_ImageBase):
+         Custom label to color mapping. Values must be valid color names or RGBA
+         arrays. While there is no limit to the number of custom labels, the
+         the layer will render incorrectly if they map to more than 1024 distinct
+-        colors.
++        colors. DEPRECATED: set ``colormap`` directly, using
++        `napari.utils.colormaps.DirectLabelColormap`.
+     seed : float
+-        Seed for colormap random generator.
++        Seed for colormap random generator. DEPRECATED: set ``colormap``
++        directly, using `napari.utils.colormaps.label_colormap`.
+     opacity : float
+         Opacity of the labels, must be between 0 and 1.
+     contiguous : bool
+@@ -259,6 +258,8 @@ class Labels(_ImageBase):
+ 
+     _history_limit = 100
+ 
++    @deprecated_constructor_arg_by_attr("color")
++    @deprecated_constructor_arg_by_attr("num_colors")
+     @deprecated_constructor_arg_by_attr("seed")
+     def __init__(
+         self,
+@@ -267,21 +268,19 @@ class Labels(_ImageBase):
+         affine=None,
+         blending='translucent',
+         cache=True,
+-        color=None,
++        colormap=None,
+         depiction='volume',
+         experimental_clipping_planes=None,
+         features=None,
+         metadata=None,
+         multiscale=None,
+         name=None,
+-        num_colors=49,
+         opacity=0.7,
+         plane=None,
+         properties=None,
+         rendering='iso_categorical',
+         rotate=None,
+         scale=None,
+-        seed_rng=None,
+         shear=None,
+         translate=None,
+         visible=True,
+@@ -290,14 +289,16 @@ class Labels(_ImageBase):
+             name = magic_name(data)
+ 
+         self._seed = 0.5
+-        self._seed_rng: Optional[int] = seed_rng
+-        self._background_label = 0
+-        self._num_colors = num_colors
++        # We use 50 colors (49 + transparency) by default for historical
++        # consistency. This may change in future versions.
+         self._random_colormap = label_colormap(
+-            self.num_colors, self.seed, self._background_label
++            49, self._seed, background_value=0
+         )
+         self._original_random_colormap = self._random_colormap
+-        self._direct_colormap = direct_colormap()
++        self._direct_colormap = direct_colormap(
++            {0: 'transparent', None: 'black'}
++        )
++        self._colormap = self._random_colormap
+         self._color_mode = LabelColorMode.AUTO
+         self._show_selected_label = False
+         self._contour = 0
+@@ -327,7 +328,15 @@ class Labels(_ImageBase):
+         self.events.add(
+             brush_shape=Event,
+             brush_size=Event,
+-            color_mode=Event,
++            color_mode=WarningEmitter(
++                trans._(
++                    'Labels.events.color_mode is deprecated since 0.4.19 and '
++                    'will be removed in 0.5.0, please use '
++                    'Labels.events.colormap.',
++                    deferred=True,
++                ),
++                type_name='color_mode',
++            ),
+             colormap=Event,
+             contiguous=Event,
+             contour=Event,
+@@ -355,7 +364,8 @@ class Labels(_ImageBase):
+         self.colormap.use_selection = self._show_selected_label
+         self._selected_color = self.get_color(self._selected_label)
+         self._updated_slice = None
+-        self.color = color
++        if colormap is not None:
++            self._set_colormap(colormap)
+ 
+         self._status = self.mode
+         self._preserve_labels = False
+@@ -448,61 +458,50 @@ class Labels(_ImageBase):
+     @property
+     def seed(self):
+         """float: Seed for colormap random generator."""
+-        return self._seed
++        warnings.warn(
++            "seed is deprecated since 0.4.19 and will be removed in 0.5.0, "
++            "please check Labels.colormap directly.",
++            FutureWarning,
++            stacklevel=2,
++        )
++        return self._random_colormap.seed
+ 
+     @seed.setter
+     def seed(self, seed):
+         warnings.warn(
+-            "seed is deprecated since 0.4.19 and will be removed in 0.5.0, please use seed_rng instead",
++            "seed is deprecated since 0.4.19 and will be removed in 0.5.0, "
++            "please use the new_colormap method instead, or set the colormap "
++            "directly.",
+             FutureWarning,
+             stacklevel=2,
+         )
+ 
+-        self._seed = seed
+         self.colormap = label_colormap(
+-            self.num_colors, self.seed, self._background_label
++            len(self.colormap) - 1,
++            seed=seed,
++            background_value=self.colormap.background_value,
+         )
+-        self._selected_color = self.get_color(self.selected_label)
+-        self.events.colormap()  # Will update the LabelVispyColormap shader
+-        self.refresh()
+-        self.events.selected_label()
+ 
+-    @property
+-    def seed_rng(self) -> Optional[int]:
+-        return self._seed_rng
++    def new_colormap(self, seed: Optional[int] = None):
++        if seed is None:
++            seed = np.random.default_rng().integers(2**32 - 1)
+ 
+-    @seed_rng.setter
+-    def seed_rng(self, seed_rng: Optional[int]) -> None:
+-        if seed_rng == self._seed_rng:
+-            return
+-        self._seed_rng = seed_rng
+-
+-        if self._seed_rng is None:
+-            self.colormap = label_colormap(
+-                self.num_colors, self.seed, self._background_label
+-            )
+-        else:
+-            self._random_colormap = shuffle_and_extend_colormap(
+-                self._original_random_colormap, self._seed_rng
+-            )
+-        self._selected_color = self.get_color(self.selected_label)
+-        self.events.colormap()  # Will update the LabelVispyColormap shader
+-        self.events.selected_label()
+-
+-        self.refresh()
++        orig = self._original_random_colormap
++        self.colormap = shuffle_and_extend_colormap(
++            self._original_random_colormap, seed
++        )
++        self._original_random_colormap = orig
+ 
+     @property
+     def colormap(self) -> LabelColormapBase:
+-        if self.color_mode == LabelColorMode.AUTO:
+-            return self._random_colormap
+-        return self._direct_colormap
++        return self._colormap
+ 
+     @colormap.setter
+     def colormap(self, colormap: LabelColormapBase):
+         self._set_colormap(colormap)
+ 
+     def _set_colormap(self, colormap):
+-        if isinstance(colormap, LabelColormap):
++        if isinstance(colormap, CyclicLabelColormap):
+             self._random_colormap = colormap
+             self._original_random_colormap = colormap
+             self._colormap = self._random_colormap
+@@ -524,23 +523,43 @@ class Labels(_ImageBase):
+                 color_mode = LabelColorMode.DIRECT
+                 self._colormap = self._direct_colormap
+         self._selected_color = self.get_color(self.selected_label)
++        self._color_mode = color_mode
+         self.events.colormap()  # Will update the LabelVispyColormap shader
+-        self.color_mode = color_mode
++        self.events.selected_label()
++        self.refresh()
+ 
+     @property
+     def num_colors(self):
+         """int: Number of unique colors to use in colormap."""
+-        return self._num_colors
++        warnings.warn(
++            trans._(
++                'Labels.num_colors is deprecated since 0.4.19 and will be '
++                'removed in 0.5.0, please use len(Labels.colormap) '
++                'instead.',
++                deferred=True,
++            ),
++            FutureWarning,
++            stacklevel=2,
++        )
++        return len(self.colormap)
+ 
+     @num_colors.setter
+     def num_colors(self, num_colors):
+-        self.colormap = label_colormap(
+-            num_colors, self.seed, self._background_label
++        warnings.warn(
++            trans._(
++                'Setting Labels.num_colors is deprecated since 0.4.19 and '
++                'will be removed in 0.5.0, please set Labels.colormap '
++                'instead.',
++                deferred=True,
++            ),
++            FutureWarning,
++            stacklevel=2,
++        )
++        self.colormap = label_colormap(
++            num_colors - 1,
++            seed=self._random_colormap.seed,
++            background_value=self.colormap.background_value,
+         )
+-        self._num_colors = num_colors
+-        self.refresh()
+-        self._selected_color = self.get_color(self.selected_label)
+-        self.events.selected_label()
+ 
+     @property
+     def data(self):
+@@ -605,35 +624,37 @@ class Labels(_ImageBase):
+     @property
+     def color(self) -> dict:
+         """dict: custom color dict for label coloring"""
++        warnings.warn(
++            "Labels.color is deprecated since 0.4.19 and will be removed in "
++            "0.5.0, please use Labels.colormap.color_dict instead. Note: this"
++            "will only work when the colormap is a DirectLabelsColormap.",
++            FutureWarning,
++            stacklevel=2,
++        )
+         return {**self._direct_colormap.color_dict}
+ 
+     @color.setter
+-    def color(self, color):
+-        if not color:
+-            color = {}
++    def color(self, color: Dict[Optional[int], Union[str, np.ndarray]]):
++        warnings.warn(
++            "Labels.color is deprecated since 0.4.19 and will be removed in "
++            "0.5.0, please set Labels.colormap directly with an instance "
++            "of napari.utils.colormaps.DirectLabelColormap instead.",
++            FutureWarning,
++            stacklevel=2,
++        )
++        color = dict(color) if color else {}
+ 
+-        if self._background_label not in color:
+-            color[self._background_label] = 'transparent'
+-
+-        default_color = color.pop(None, 'black')
+-        # this is default color for label that is not in the color dict
+-        # is provided as None key
+-        # we pop it as `None` cannot be cast to float
+-
+-        color[None] = default_color
+-
+-        colors = {
+-            label: transform_color(color_str)[0]
+-            for label, color_str in color.items()
+-        }
+-        self._color = colors
+-        self.colormap = direct_colormap(colors)
++        color[self.colormap.background_value] = color.get(
++            self.colormap.background_value, 'transparent'
++        )
++        color[None] = color.get(None, 'black')
++        self.colormap = DirectLabelColormap(color_dict=color)
+ 
+     def _is_default_colors(self, color):
+         """Returns True if color contains only default colors, otherwise False.
+ 
+         Default colors are black for `None` and transparent for
+-        `self._background_label`.
++        `self.colormap.background_value`.
+ 
+         Parameters
+         ----------
+@@ -645,20 +666,16 @@ class Labels(_ImageBase):
+         bool
+             True if color contains only default colors, otherwise False.
+         """
+-        if len(color) != 2:
++        if {None, self.colormap.background_value} != set(color.keys()):
+             return False
+ 
+-        if not hasattr(self, '_color'):
++        if not np.allclose(color[None], [0, 0, 0, 1]):
+             return False
+-
+-        default_keys = [None, self._background_label]
+-        if set(default_keys) != set(color.keys()):
++        if not np.allclose(
++            color[self.colormap.background_value], [0, 0, 0, 0]
++        ):
+             return False
+ 
+-        for key in default_keys:
+-            if not np.allclose(self._color[key], color[key]):
+-                return False
+-
+         return True
+ 
+     def _ensure_int_labels(self, data):
+@@ -698,7 +715,6 @@ class Labels(_ImageBase):
+         state.update(
+             {
+                 'multiscale': self.multiscale,
+-                'num_colors': self.num_colors,
+                 'properties': self.properties,
+                 'rendering': self.rendering,
+                 'depiction': self.depiction,
+@@ -706,10 +722,9 @@ class Labels(_ImageBase):
+                 'experimental_clipping_planes': [
+                     plane.dict() for plane in self.experimental_clipping_planes
+                 ],
+-                'seed_rng': self.seed_rng,
+                 'data': self.data,
+-                'color': self.color,
+                 'features': self.features,
++                'colormap': self.colormap,
+             }
+         )
+         return state
+@@ -733,6 +748,13 @@ class Labels(_ImageBase):
+         if self.show_selected_label:
+             self.refresh()
+ 
++    def swap_selected_and_background_labels(self):
++        """Swap between the selected label and the background label."""
++        if self.selected_label != self.colormap.background_value:
++            self.selected_label = self.colormap.background_value
++        else:
++            self.selected_label = self._prev_selected_label
++
+     @property
+     def color_mode(self):
+         """Color mode to change how color is represented.
+@@ -741,16 +763,41 @@ class Labels(_ImageBase):
+ 
+         DIRECT allows color of each label to be set directly by a color dict.
+         """
++        warnings.warn(
++            trans._(
++                'Labels.color_mode is deprecated since 0.4.19 and will be '
++                'removed in 0.5.0. Please check type(Labels.colormap) '
++                'instead. napari.utils.colormaps.CyclicLabelColormap '
++                'corresponds to AUTO color mode, and '
++                'napari.utils.colormaps.DirectLabelColormap'
++                ' corresponds to DIRECT color mode.',
++                deferred=True,
++            ),
++            FutureWarning,
++            stacklevel=2,
++        )
+         return str(self._color_mode)
+ 
+     @color_mode.setter
+     def color_mode(self, color_mode: Union[str, LabelColorMode]):
++        warnings.warn(
++            trans._(
++                'Labels.color_mode is deprecated since 0.4.19 and will be '
++                'removed in 0.5.0. Please set Labels.colormap instead, to an'
++                'instance of napari.utils.colormaps.CyclicLabelColormap for '
++                '"auto" mode, or napari.utils.colormaps.DirectLabelColormap '
++                'for "direct" mode.',
++                deferred=True,
++            ),
++            FutureWarning,
++            stacklevel=2,
++        )
+         color_mode = LabelColorMode(color_mode)
+         self._color_mode = color_mode
+         if color_mode == LabelColorMode.AUTO:
+-            self._colormap = ensure_colormap(self._random_colormap)
++            self._colormap = self._random_colormap
+         else:
+-            self._colormap = ensure_colormap(self._direct_colormap)
++            self._colormap = self._direct_colormap
+         self._selected_color = self.get_color(self.selected_label)
+         self.events.color_mode()
+         self.events.colormap()  # If remove this emitting, connect shader update to color_mode
+@@ -907,7 +954,7 @@ class Labels(_ImageBase):
+         sliced_labels = get_contours(
+             labels[expanded_slice],
+             self.contour,
+-            self._background_label,
++            self.colormap.background_value,
+         )
+ 
+         # Remove the latest one-pixel border from the result
+@@ -988,17 +1035,14 @@ class Labels(_ImageBase):
+ 
+         self.thumbnail = color_array
+ 
+-    def new_colormap(self):
+-        self.seed_rng = np.random.default_rng().integers(2**32 - 1)
+-
+     def get_color(self, label):
+         """Return the color corresponding to a specific label."""
+-        if label == self._background_label:
++        if label == self.colormap.background_value:
+             col = None
+         elif label is None or (
+             self.show_selected_label and label != self.selected_label
+         ):
+-            col = self.colormap.map(self._background_label)
++            col = self.colormap.map(self.colormap.background_value)
+         else:
+             col = self.colormap.map(label)
+         return col
+@@ -1236,7 +1280,8 @@ class Labels(_ImageBase):
+         # If requested new label doesn't change old label then return
+         old_label = np.asarray(self.data[int_coord]).item()
+         if old_label == new_label or (
+-            self.preserve_labels and old_label != self._background_label
++            self.preserve_labels
++            and old_label != self.colormap.background_value
+         ):
+             return
+ 
+@@ -1375,10 +1420,12 @@ class Labels(_ImageBase):
+         # subset it if we want to only paint into background/only erase
+         # current label
+         if self.preserve_labels:
+-            if new_label == self._background_label:
++            if new_label == self.colormap.background_value:
+                 keep_coords = self.data[slice_coord] == self.selected_label
+             else:
+-                keep_coords = self.data[slice_coord] == self._background_label
++                keep_coords = (
++                    self.data[slice_coord] == self.colormap.background_value
++                )
+             slice_coord = tuple(sc[keep_coords] for sc in slice_coord)
+ 
+         self.data_setitem(slice_coord, new_label, refresh)
+diff --git a/napari/utils/__init__.py b/napari/utils/__init__.py
+index 4a365414..92714c06 100644
+--- a/napari/utils/__init__.py
++++ b/napari/utils/__init__.py
+@@ -1,17 +1,22 @@
+ from napari.utils._dask_utils import resize_dask_cache
+-from napari.utils.colormaps.colormap import Colormap, LabelColormap
++from napari.utils.colormaps.colormap import (
++    Colormap,
++    CyclicLabelColormap,
++    DirectLabelColormap,
++)
+ from napari.utils.info import citation_text, sys_info
+ from napari.utils.notebook_display import nbscreenshot
+ from napari.utils.progress import cancelable_progress, progrange, progress
+ 
+ __all__ = (
+-    "Colormap",
+-    "LabelColormap",
+-    "resize_dask_cache",
+-    "citation_text",
+-    "sys_info",
+-    "nbscreenshot",
+-    "cancelable_progress",
+-    "progrange",
+-    "progress",
++    'Colormap',
++    'DirectLabelColormap',
++    'CyclicLabelColormap',
++    'cancelable_progress',
++    'citation_text',
++    'nbscreenshot',
++    'progrange',
++    'progress',
++    'resize_dask_cache',
++    'sys_info',
+ )
+diff --git a/napari/utils/_register.py b/napari/utils/_register.py
+index b90e263a..279d6c4f 100644
+--- a/napari/utils/_register.py
++++ b/napari/utils/_register.py
+@@ -7,7 +7,13 @@ from napari.utils.translations import trans
+ template = """def {name}{signature}:
+     kwargs = locals()
+     kwargs.pop('self', None)
++    pos_kwargs = dict()
++    for name in getattr({cls_name}.__init__, "_deprecated_constructor_args", []):
++        pos_kwargs[name] = kwargs.pop(name, None)
+     layer = {cls_name}(**kwargs)
++    for name, value in pos_kwargs.items():
++        if value is not None:
++            setattr(layer, name, value)
+     self.layers.append(layer)
+     return layer
+ """
+@@ -44,10 +50,21 @@ def create_func(cls, name=None, doc=None, filename: str = '<string>'):
+         doc = doc.expandtabs(4)
+ 
+     sig = signature(cls)
++    additional_parameters = []
++    if hasattr(cls.__init__, "_deprecated_constructor_args"):
++        additional_parameters = [
++            Parameter(
++                name=arg,
++                kind=Parameter.KEYWORD_ONLY,
++                default=None,
++            )
++            for arg in cls.__init__._deprecated_constructor_args
++        ]
+     new_sig = sig.replace(
+         parameters=[
+             Parameter("self", Parameter.POSITIONAL_OR_KEYWORD),
+             *list(sig.parameters.values()),
++            *additional_parameters,
+         ],
+         return_annotation=cls,
+     )
+@@ -63,38 +80,12 @@ def create_func(cls, name=None, doc=None, filename: str = '<string>'):
+     func = execdict[name]
+ 
+     func.__doc__ = doc
++    func.__signature__ = sig.replace(
++        parameters=[
++            Parameter("self", Parameter.POSITIONAL_OR_KEYWORD),
++            *list(sig.parameters.values()),
++        ],
++        return_annotation=cls,
++    )
+ 
+     return func
+-
+-
+-def _register(cls, *, name=None, doc=None):
+-    from napari.components import ViewerModel
+-
+-    func = create_func(cls, name=name, doc=doc)
+-    setattr(ViewerModel, func.__name__, func)
+-    return cls
+-
+-
+-def add_to_viewer(cls=None, *, name=None, doc=None):
+-    """Adds a layer creation convenience method under viewers
+-    as ``add_{name}``.
+-
+-    Parameters
+-    ----------
+-    cls : type, optional
+-        Class to register.
+-        If None, this function is treated as a decorator.
+-    name : string, keyword-only
+-        Name in snake-case of the layer name.
+-        If None, is autogenerated from the class name.
+-    doc : string, keyword-only
+-        Docstring to use in the method.
+-        If None, is autogenerated from the existing docstring.
+-    """
+-    if cls is not None:
+-        return _register(cls, name=name, doc=doc)
+-
+-    def inner(cls):
+-        return _register(cls, name=name, doc=doc)
+-
+-    return inner
+diff --git a/napari/utils/_tests/test_migrations.py b/napari/utils/_tests/test_migrations.py
+index e7f67e85..3c67625a 100644
+--- a/napari/utils/_tests/test_migrations.py
++++ b/napari/utils/_tests/test_migrations.py
+@@ -1,6 +1,8 @@
+ import pytest
+ 
+-from napari.utils.migrations import rename_argument
++from napari.utils.migrations import (
++    rename_argument,
++)
+ 
+ 
+ def test_simple():
+diff --git a/napari/utils/_tests/test_register.py b/napari/utils/_tests/test_register.py
+new file mode 100644
+index 00000000..07faa129
+--- /dev/null
++++ b/napari/utils/_tests/test_register.py
+@@ -0,0 +1,48 @@
++from dataclasses import dataclass, field
++
++from napari.utils._register import create_func
++from napari.utils.migrations import deprecated_constructor_arg_by_attr
++
++
++@dataclass
++class DummyClass:
++    """Dummy class to test create_func"""
++
++    layers: list = field(default_factory=list)
++
++
++class SimpleClass:
++    """Simple class to test create_func"""
++
++    def __init__(self, a):
++        self.a = a
++
++
++class SimpleClassDeprecated:
++    """Simple class to test create_func"""
++
++    @deprecated_constructor_arg_by_attr("b")
++    def __init__(self, a=1):
++        self.a = a
++
++    @property
++    def b(self):
++        return self.a * 2
++
++    @b.setter
++    def b(self, value):
++        self.a = value // 2
++
++
++def test_create_func():
++    DummyClass.add_simple_class = create_func(SimpleClass)
++    dc = DummyClass()
++    dc.add_simple_class(a=1)
++    assert dc.layers[0].a == 1
++
++
++def test_create_func_deprecated():
++    DummyClass.add_simple_class_deprecated = create_func(SimpleClassDeprecated)
++    dc = DummyClass()
++    dc.add_simple_class_deprecated(b=4)
++    assert dc.layers[0].a == 2
+diff --git a/napari/utils/colormaps/__init__.py b/napari/utils/colormaps/__init__.py
+index be76af6a..e4abb55d 100644
+--- a/napari/utils/colormaps/__init__.py
++++ b/napari/utils/colormaps/__init__.py
+@@ -1,5 +1,10 @@
+ from napari.utils.colormaps.colorbars import make_colorbar
+-from napari.utils.colormaps.colormap import Colormap
++from napari.utils.colormaps.colormap import (
++    Colormap,
++    CyclicLabelColormap,
++    DirectLabelColormap,
++    LabelColormap,
++)
+ from napari.utils.colormaps.colormap_utils import (
+     ALL_COLORMAPS,
+     AVAILABLE_COLORMAPS,
+@@ -18,22 +23,25 @@ from napari.utils.colormaps.colormap_utils import (
+     matplotlib_colormaps,
+ )
+ 
+-__all__ = [
+-    "make_colorbar",
+-    "Colormap",
+-    "ALL_COLORMAPS",
+-    "AVAILABLE_COLORMAPS",
+-    "CYMRGB",
+-    "INVERSE_COLORMAPS",
+-    "MAGENTA_GREEN",
+-    "RGB",
+-    "SIMPLE_COLORMAPS",
+-    "ValidColormapArg",
+-    "color_dict_to_colormap",
+-    "display_name_to_name",
+-    "direct_colormap",
+-    "ensure_colormap",
+-    "label_colormap",
+-    "low_discrepancy_image",
+-    "matplotlib_colormaps",
+-]
++__all__ = (
++    'ALL_COLORMAPS',
++    'AVAILABLE_COLORMAPS',
++    'CYMRGB',
++    'Colormap',
++    'CyclicLabelColormap',
++    'DirectLabelColormap',
++    'LabelColormap',
++    'INVERSE_COLORMAPS',
++    'MAGENTA_GREEN',
++    'RGB',
++    'SIMPLE_COLORMAPS',
++    'ValidColormapArg',
++    'color_dict_to_colormap',
++    'direct_colormap',
++    'display_name_to_name',
++    'ensure_colormap',
++    'label_colormap',
++    'low_discrepancy_image',
++    'make_colorbar',
++    'matplotlib_colormaps',
++)
+diff --git a/napari/utils/colormaps/_tests/test_colormap.py b/napari/utils/colormaps/_tests/test_colormap.py
+index 71bbb264..4c978cf6 100644
+--- a/napari/utils/colormaps/_tests/test_colormap.py
++++ b/napari/utils/colormaps/_tests/test_colormap.py
+@@ -159,11 +159,11 @@ def direct_label_colormap():
+     return DirectLabelColormap(
+         color_dict={
+             0: np.array([0, 0, 0, 0]),
+-            1: np.array([255, 0, 0, 255]),
+-            2: np.array([0, 255, 0, 255]),
+-            3: np.array([0, 0, 255, 255]),
+-            12: np.array([0, 0, 255, 255]),
+-            None: np.array([255, 255, 255, 255]),
++            1: np.array([1, 0, 0, 1]),
++            2: np.array([0, 1, 0, 1]),
++            3: np.array([0, 0, 1, 1]),
++            12: np.array([0, 0, 1, 1]),
++            None: np.array([1, 1, 1, 1]),
+         },
+     )
+ 
+@@ -171,7 +171,7 @@ def direct_label_colormap():
+ def test_direct_label_colormap_simple(direct_label_colormap):
+     np.testing.assert_array_equal(
+         direct_label_colormap.map([0, 2, 7]),
+-        np.array([[0, 0, 0, 0], [0, 255, 0, 255], [255, 255, 255, 255]]),
++        np.array([[0, 0, 0, 0], [0, 1, 0, 1], [1, 1, 1, 1]]),
+     )
+     assert direct_label_colormap._num_unique_colors == 5
+ 
+@@ -198,7 +198,7 @@ def test_direct_label_colormap_selection(direct_label_colormap):
+ 
+     np.testing.assert_array_equal(
+         direct_label_colormap.map([0, 2, 7]),
+-        np.array([[0, 0, 0, 0], [0, 255, 0, 255], [0, 0, 0, 0]]),
++        np.array([[0, 0, 0, 0], [0, 1, 0, 1], [0, 0, 0, 0]]),
+     )
+ 
+     (
+@@ -249,11 +249,16 @@ def test_cast_direct_labels_to_minimum_type(direct_label_colormap):
+ def test_test_cast_direct_labels_to_minimum_type_no_jit(num, dtype):
+     cmap = DirectLabelColormap(
+         color_dict={
+-            k: np.array([*v, 255])
+-            for k, v in zip(range(num), product(range(256), repeat=3))
++            None: np.array([1, 1, 1, 1]),
++            **{
++                k: np.array([*v, 1])
++                for k, v in zip(
++                    range(num), product(np.linspace(0, 1, num=256), repeat=3)
++                )
++            },
+         },
+     )
+-    cmap.color_dict[None] = np.array([255, 255, 255, 255])
++    cmap.color_dict[None] = np.array([1, 1, 1, 1])
+     data = np.arange(10, dtype=np.uint32)
+     data[2] = 80005
+     cast = colormap._labels_raw_to_texture_direct(data, cmap)
+@@ -272,7 +277,7 @@ def test_zero_preserving_modulo_naive():
+     'dtype', [np.uint8, np.uint16, np.int8, np.int16, np.float32, np.float64]
+ )
+ def test_label_colormap_map_with_uint8_values(dtype):
+-    cmap = colormap.LabelColormap(
++    cmap = colormap.CyclicLabelColormap(
+         colors=ColorArray(np.array([[0, 0, 0, 0], [1, 0, 0, 1], [0, 1, 0, 1]]))
+     )
+     values = np.array([0, 1, 2], dtype=dtype)
+@@ -283,7 +288,7 @@ def test_label_colormap_map_with_uint8_values(dtype):
+ @pytest.mark.parametrize("selection", [1, -1])
+ @pytest.mark.parametrize("dtype", [np.int8, np.int16, np.int32, np.int64])
+ def test_label_colormap_map_with_selection(selection, dtype):
+-    cmap = colormap.LabelColormap(
++    cmap = colormap.CyclicLabelColormap(
+         colors=ColorArray(
+             np.array([[0, 0, 0, 0], [1, 0, 0, 1], [0, 1, 0, 1]])
+         ),
+@@ -298,7 +303,7 @@ def test_label_colormap_map_with_selection(selection, dtype):
+ @pytest.mark.parametrize("background", [1, -1])
+ @pytest.mark.parametrize("dtype", [np.int8, np.int16, np.int32, np.int64])
+ def test_label_colormap_map_with_background(background, dtype):
+-    cmap = colormap.LabelColormap(
++    cmap = colormap.CyclicLabelColormap(
+         colors=ColorArray(
+             np.array([[0, 0, 0, 0], [1, 0, 0, 1], [0, 1, 0, 1]])
+         ),
+@@ -311,7 +316,7 @@ def test_label_colormap_map_with_background(background, dtype):
+ 
+ @pytest.mark.parametrize("dtype", [np.uint8, np.uint16])
+ def test_label_colormap_using_cache(dtype, monkeypatch):
+-    cmap = colormap.LabelColormap(
++    cmap = colormap.CyclicLabelColormap(
+         colors=ColorArray(np.array([[0, 0, 0, 0], [1, 0, 0, 1], [0, 1, 0, 1]]))
+     )
+     values = np.array([0, 1, 2], dtype=dtype)
+@@ -330,8 +335,14 @@ def test_cast_direct_labels_to_minimum_type_naive(size):
+     dtype = colormap.minimum_dtype_for_labels(size)
+     cmap = DirectLabelColormap(
+         color_dict={
+-            k: np.array([*v, 255])
+-            for k, v in zip(range(size - 2), product(range(256), repeat=3))
++            None: np.array([1, 1, 1, 1]),
++            **{
++                k: np.array([*v, 1])
++                for k, v in zip(
++                    range(size - 2),
++                    product(np.linspace(0, 1, num=256), repeat=3),
++                )
++            },
+         },
+     )
+     cmap.color_dict[None] = np.array([255, 255, 255, 255])
+@@ -344,7 +355,11 @@ def test_cast_direct_labels_to_minimum_type_naive(size):
+ 
+ def test_direct_colormap_with_no_selection():
+     # Create a DirectLabelColormap with a simple color_dict
+-    color_dict = {1: np.array([1, 0, 0, 1]), 2: np.array([0, 1, 0, 1])}
++    color_dict = {
++        1: np.array([1, 0, 0, 1]),
++        2: np.array([0, 1, 0, 1]),
++        None: np.array([0, 0, 0, 0]),
++    }
+     cmap = DirectLabelColormap(color_dict=color_dict)
+ 
+     # Map a single value
+@@ -358,7 +373,11 @@ def test_direct_colormap_with_no_selection():
+ 
+ def test_direct_colormap_with_selection():
+     # Create a DirectLabelColormap with a simple color_dict and a selection
+-    color_dict = {1: np.array([1, 0, 0, 1]), 2: np.array([0, 1, 0, 1])}
++    color_dict = {
++        1: np.array([1, 0, 0, 1]),
++        2: np.array([0, 1, 0, 1]),
++        None: np.array([0, 0, 0, 0]),
++    }
+     cmap = DirectLabelColormap(
+         color_dict=color_dict, use_selection=True, selection=1
+     )
+@@ -374,7 +393,11 @@ def test_direct_colormap_with_selection():
+ 
+ def test_direct_colormap_with_invalid_values():
+     # Create a DirectLabelColormap with a simple color_dict
+-    color_dict = {1: np.array([1, 0, 0, 1]), 2: np.array([0, 1, 0, 1])}
++    color_dict = {
++        1: np.array([1, 0, 0, 1]),
++        2: np.array([0, 1, 0, 1]),
++        None: np.array([0, 0, 0, 0]),
++    }
+     cmap = DirectLabelColormap(color_dict=color_dict)
+ 
+     # Map a value that is not in the color_dict
+@@ -384,16 +407,17 @@ def test_direct_colormap_with_invalid_values():
+ 
+ def test_direct_colormap_with_empty_color_dict():
+     # Create a DirectLabelColormap with an empty color_dict
+-    cmap = DirectLabelColormap(color_dict={})
+-
+-    # Map a value
+-    mapped = cmap.map(1)
+-    npt.assert_array_equal(mapped[0], np.array([0, 0, 0, 0]))
++    with pytest.raises(ValueError, match='color_dict must contain None'):
++        DirectLabelColormap(color_dict={})
+ 
+ 
+ def test_direct_colormap_with_non_integer_values():
+     # Create a DirectLabelColormap with a simple color_dict
+-    color_dict = {1: np.array([1, 0, 0, 1]), 2: np.array([0, 1, 0, 1])}
++    color_dict = {
++        1: np.array([1, 0, 0, 1]),
++        2: np.array([0, 1, 0, 1]),
++        None: np.array([0, 0, 0, 0]),
++    }
+     cmap = DirectLabelColormap(color_dict=color_dict)
+ 
+     # Map a float value
+@@ -411,6 +435,7 @@ def test_direct_colormap_with_collision():
+         1: np.array([1, 0, 0, 1]),
+         12: np.array([0, 1, 0, 1]),
+         23: np.array([0, 0, 1, 1]),
++        None: np.array([0, 0, 0, 0]),
+     }
+     cmap = DirectLabelColormap(color_dict=color_dict)
+ 
+@@ -421,7 +446,11 @@ def test_direct_colormap_with_collision():
+ 
+ def test_direct_colormap_negative_values():
+     # Create a DirectLabelColormap with a simple color_dict
+-    color_dict = {-1: np.array([1, 0, 0, 1]), -2: np.array([0, 1, 0, 1])}
++    color_dict = {
++        -1: np.array([1, 0, 0, 1]),
++        -2: np.array([0, 1, 0, 1]),
++        None: np.array([0, 0, 0, 0]),
++    }
+     cmap = DirectLabelColormap(color_dict=color_dict)
+ 
+     # Map a single value
+diff --git a/napari/utils/colormaps/colormap.py b/napari/utils/colormaps/colormap.py
+index d24d29c6..e6c40105 100644
+--- a/napari/utils/colormaps/colormap.py
++++ b/napari/utils/colormaps/colormap.py
+@@ -6,6 +6,7 @@ from typing import (
+     DefaultDict,
+     Dict,
+     List,
++    Literal,
+     Optional,
+     Tuple,
+     Union,
+@@ -18,9 +19,11 @@ import numpy as np
+ from napari._pydantic_compat import Field, PrivateAttr, validator
+ from napari.utils.color import ColorArray
+ from napari.utils.colormaps.colorbars import make_colorbar
++from napari.utils.colormaps.standardize_color import transform_color
+ from napari.utils.compat import StrEnum
+ from napari.utils.events import EventedModel
+ from napari.utils.events.custom_types import Array
++from napari.utils.migrations import deprecated_class_name
+ from napari.utils.translations import trans
+ 
+ if TYPE_CHECKING:
+@@ -132,6 +135,9 @@ class Colormap(EventedModel):
+     def __iter__(self):
+         yield from (self.colors, self.controls, self.interpolation)
+ 
++    def __len__(self):
++        return len(self.colors)
++
+     def map(self, values):
+         values = np.atleast_1d(values)
+         if self.interpolation == ColormapInterpolationMode.LINEAR:
+@@ -169,7 +175,9 @@ class LabelColormapBase(Colormap):
+     use_selection: bool = False
+     selection: int = 0
+     background_value: int = 0
+-    interpolation: ColormapInterpolationMode = ColormapInterpolationMode.ZERO
++    interpolation: Literal[ColormapInterpolationMode.ZERO] = Field(
++        ColormapInterpolationMode.ZERO, frozen=True
++    )
+     _cache_mapping: Dict[Tuple[np.dtype, np.dtype], np.ndarray] = PrivateAttr(
+         default={}
+     )
+@@ -249,14 +257,28 @@ class LabelColormapBase(Colormap):
+         return int(self._data_to_texture(dtype.type(self.selection)))
+ 
+ 
+-class LabelColormap(LabelColormapBase):
+-    """Colormap that shuffles values before mapping to colors.
++class CyclicLabelColormap(LabelColormapBase):
++    """Color cycle with a background value.
+ 
+     Attributes
+     ----------
+-    seed : float
++    colors : ColorArray
++        Colors to be used for mapping.
++        For values above the number of colors,
++        the colors will be cycled.
+     use_selection : bool
++        Whether map only selected label.
++        If `True` only selected label will be mapped to not transparent color.
+     selection : int
++        The selected label.
++    background_value : int
++        Which value should be treated as a background
++        and mapped to transparent color.
++    interpolation : Literal['zero']
++        required by implementation, please do not set value
++    seed : float
++        seed used for random color generation. Used for reproducibility.
++        It will be removed in the future release.
+     """
+ 
+     seed: float = 0.5
+@@ -350,6 +372,14 @@ class LabelColormap(LabelColormapBase):
+         self.events.colors(value=self.colors)
+ 
+ 
++LabelColormap = deprecated_class_name(
++    CyclicLabelColormap,
++    'LabelColormap',
++    version='0.5.0',
++    since_version='0.4.19',
++)
++
++
+ class DirectLabelColormap(LabelColormapBase):
+     """Colormap using a direct mapping from labels to color using a dict.
+ 
+@@ -357,10 +387,14 @@ class DirectLabelColormap(LabelColormapBase):
+     ----------
+     color_dict: dict from int to (3,) or (4,) array
+         The dictionary mapping labels to colors.
++
+     use_selection : bool
+-        Whether to color using the selected label.
++        Whether to map only the selected label to a color.
++        If `True` only selected label will be not transparent.
+     selection : int
+         The selected label.
++    colors : ColorArray
++        Exist because of implementation details. Please do not use it.
+     """
+ 
+     color_dict: DefaultDict[Optional[int], np.ndarray] = Field(
+@@ -374,6 +408,60 @@ class DirectLabelColormap(LabelColormapBase):
+             kwargs["colors"] = np.zeros(3)
+         super().__init__(*args, **kwargs)
+ 
++    def __len__(self):
++        """Overwrite from base class because .color is a dummy array.
++
++        This returns the number of colors in the colormap, including
++        background and unmapped labels.
++        """
++        return self._num_unique_colors + 2
++
++    @validator("color_dict", pre=True, always=True, allow_reuse=True)
++    def _validate_color_dict(cls, v, values):
++        """Ensure colors are RGBA arrays, not strings.
++
++        Parameters
++        ----------
++        cls : type
++            The class of the object being instantiated.
++        v : MutableMapping
++            A mapping from integers to colors. It *may* have None as a key,
++            which indicates the color to map items not in the dictionary.
++            Alternatively, it could be a defaultdict.
++        values : dict[str, Any]
++            A dictionary mapping previously-validated attributes to their
++            validated values. Attributes are validated in the order in which
++            they are defined.
++
++        Returns
++        -------
++        res : (default)dict[int, np.ndarray[float]]
++            A properly-formatted dictionary mapping labels to RGBA arrays.
++        """
++        if not isinstance(v, defaultdict) and None not in v:
++            raise ValueError(
++                "color_dict must contain None or be defaultdict instance"
++            )
++        res = {
++            label: transform_color(color_str)[0]
++            for label, color_str in v.items()
++        }
++        if (
++            'background_value' in values
++            and (bg := values['background_value']) not in res
++        ):
++            res[bg] = transform_color('transparent')[0]
++        if isinstance(v, defaultdict):
++            res = defaultdict(v.default_factory, res)
++        return res
++
++    def _selection_as_minimum_dtype(self, dtype: np.dtype) -> int:
++        return int(
++            _cast_labels_data_to_texture_dtype_direct(
++                dtype.type(self.selection), self
++            )
++        )
++
+     @overload
+     def _data_to_texture(self, values: np.ndarray) -> np.ndarray:
+         ...
+@@ -455,7 +543,11 @@ class DirectLabelColormap(LabelColormapBase):
+ 
+     @cached_property
+     def _num_unique_colors(self) -> int:
+-        """Count the number of unique colors in the colormap."""
++        """Count the number of unique colors in the colormap.
++
++        This number does not include background or the default color for
++        unmapped labels.
++        """
+         return len({tuple(x) for x in self.color_dict.values()})
+ 
+     def _clear_cache(self):
+@@ -644,7 +736,7 @@ def _convert_small_ints_to_unsigned(
+ @overload
+ def _cast_labels_data_to_texture_dtype_auto(
+     data: np.ndarray,
+-    colormap: LabelColormap,
++    colormap: CyclicLabelColormap,
+ ) -> np.ndarray:
+     ...
+ 
+@@ -652,14 +744,14 @@ def _cast_labels_data_to_texture_dtype_auto(
+ @overload
+ def _cast_labels_data_to_texture_dtype_auto(
+     data: np.integer,
+-    colormap: LabelColormap,
++    colormap: CyclicLabelColormap,
+ ) -> np.integer:
+     ...
+ 
+ 
+ def _cast_labels_data_to_texture_dtype_auto(
+     data: Union[np.ndarray, np.integer],
+-    colormap: LabelColormap,
++    colormap: CyclicLabelColormap,
+ ) -> Union[np.ndarray, np.integer]:
+     """Convert labels data to the data type used in the texture.
+ 
+@@ -680,7 +772,7 @@ def _cast_labels_data_to_texture_dtype_auto(
+     ----------
+     data : np.ndarray
+         Labels data to be converted.
+-    colormap : LabelColormap
++    colormap : CyclicLabelColormap
+         Colormap used to display the labels data.
+ 
+     Returns
+@@ -855,7 +947,7 @@ def _cast_labels_data_to_texture_dtype_direct(
+     ----------
+     data : np.ndarray | np.integer
+         Labels data to be converted.
+-    direct_colormap : LabelColormap
++    direct_colormap : CyclicLabelColormap
+         Colormap used to display the labels data.
+ 
+     Returns
+diff --git a/napari/utils/colormaps/colormap_utils.py b/napari/utils/colormaps/colormap_utils.py
+index 94738924..b414770e 100644
+--- a/napari/utils/colormaps/colormap_utils.py
++++ b/napari/utils/colormaps/colormap_utils.py
+@@ -1,5 +1,5 @@
+ import warnings
+-from collections import OrderedDict
++from collections import OrderedDict, defaultdict
+ from functools import lru_cache
+ from threading import Lock
+ from typing import Dict, List, Optional, Tuple, Union
+@@ -19,8 +19,8 @@ from napari.utils.colormaps.bop_colors import bopd
+ from napari.utils.colormaps.colormap import (
+     Colormap,
+     ColormapInterpolationMode,
++    CyclicLabelColormap,
+     DirectLabelColormap,
+-    LabelColormap,
+     minimum_dtype_for_labels,
+ )
+ from napari.utils.colormaps.inverse_colormaps import inverse_cmaps
+@@ -409,7 +409,7 @@ def _color_random(n, *, colorspace='lab', tolerance=0.0, seed=0.5):
+ 
+ def label_colormap(
+     num_colors=256, seed=0.5, background_value=0
+-) -> LabelColormap:
++) -> CyclicLabelColormap:
+     """Produce a colormap suitable for use with a given label set.
+ 
+     Parameters
+@@ -422,7 +422,7 @@ def label_colormap(
+ 
+     Returns
+     -------
+-    colormap : napari.utils.LabelColormap
++    colormap : napari.utils.CyclicLabelColormap
+         A colormap for use with labels remapped to [0, 1].
+ 
+     Notes
+@@ -467,13 +467,14 @@ def label_colormap(
+     rgb8_colors = (colors * uint8_max).astype(np.uint8)
+     colors = rgb8_colors.astype(np.float32) / uint8_max
+ 
+-    return LabelColormap(
++    return CyclicLabelColormap(
+         name='label_colormap',
+         display_name=trans._p('colormap', 'low discrepancy colors'),
+         colors=colors,
+         controls=np.linspace(0, 1, len(colors) + 1),
+         interpolation='zero',
+         background_value=background_value,
++        seed=seed,
+     )
+ 
+ 
+@@ -501,8 +502,8 @@ def _primes(upto=2**16):
+ 
+ 
+ def shuffle_and_extend_colormap(
+-    colormap: LabelColormap, seed: int, min_random_choices: int = 5
+-) -> LabelColormap:
++    colormap: CyclicLabelColormap, seed: int, min_random_choices: int = 5
++) -> CyclicLabelColormap:
+     """Shuffle the colormap colors and extend it to more colors.
+ 
+     The new number of colors will be a prime number that fits into the same
+@@ -510,7 +511,7 @@ def shuffle_and_extend_colormap(
+ 
+     Parameters
+     ----------
+-    colormap : napari.utils.LabelColormap
++    colormap : napari.utils.CyclicLabelColormap
+         Colormap to shuffle and extend.
+     seed : int
+         Seed for the random number generator.
+@@ -527,7 +528,7 @@ def shuffle_and_extend_colormap(
+ 
+     Returns
+     -------
+-    colormap : napari.utils.LabelColormap
++    colormap : napari.utils.CyclicLabelColormap
+         Shuffled and extended colormap.
+     """
+     rng = np.random.default_rng(seed)
+@@ -554,7 +555,7 @@ def shuffle_and_extend_colormap(
+         axis=0,
+     )
+ 
+-    new_colormap = LabelColormap(
++    new_colormap = CyclicLabelColormap(
+         name=colormap.name,
+         colors=extended_colors,
+         controls=np.linspace(0, 1, len(extended_colors) + 1),
+@@ -579,10 +580,9 @@ def direct_colormap(color_dict=None):
+         to an array.
+     """
+     # we don't actually use the color array, so pass dummy.
+-    d = DirectLabelColormap(np.zeros(3))
+-    if color_dict is not None:
+-        d.color_dict.update(color_dict)
+-    return d
++    return DirectLabelColormap(
++        color_dict=color_dict or defaultdict(lambda: np.zeros(4)),
++    )
+ 
+ 
+ def vispy_or_mpl_colormap(name):
+@@ -666,6 +666,11 @@ RGB = ['red', 'green', 'blue']
+ CYMRGB = ['cyan', 'yellow', 'magenta', 'red', 'green', 'blue']
+ 
+ 
++AVAILABLE_LABELS_COLORMAPS = {
++    'lodisc-50': label_colormap(50),
++}
++
++
+ def _increment_unnamed_colormap(
+     existing: List[str], name: str = '[unnamed colormap]'
+ ) -> Tuple[str, str]:
+diff --git a/napari/utils/migrations.py b/napari/utils/migrations.py
+index eca71da1..44b1120d 100644
+--- a/napari/utils/migrations.py
++++ b/napari/utils/migrations.py
+@@ -1,3 +1,4 @@
++import inspect
+ import warnings
+ from functools import wraps
+ 
+@@ -79,6 +80,10 @@ def deprecated_constructor_arg_by_attr(name):
+     """
+ 
+     def wrapper(func):
++        if not hasattr(func, '_deprecated_constructor_args'):
++            func._deprecated_constructor_args = []
++        func._deprecated_constructor_args.append(name)
++
+         @wraps(func)
+         def _wrapper(*args, **kwargs):
+             value = _UNSET
+@@ -93,3 +98,44 @@ def deprecated_constructor_arg_by_attr(name):
+         return _wrapper
+ 
+     return wrapper
++
++
++def deprecated_class_name(
++    new_class: type,
++    previous_name: str,
++    version: str,
++    since_version: str,
++) -> type:
++    """Function to deprecate a class.
++
++    Usage:
++
++        class NewName:
++            pass
++
++        OldName = deprecated_class_name(
++            NewName, 'OldName', version='0.5.0', since_version='0.4.19'
++        )
++    """
++    msg = (
++        f"{previous_name} is deprecated since {since_version} and will be "
++        f"removed in {version}. Please use {new_class.__name__}."
++    )
++    prealloc_signature = inspect.signature(new_class.__new__)
++
++    class _OldClass(new_class):
++        def __new__(cls, *args, **kwargs):
++            warnings.warn(msg, FutureWarning, stacklevel=2)
++            if super().__new__ is object.__new__:
++                return super().__new__(cls)
++            return super().__new__(cls, *args, **kwargs)
++
++        def __init_subclass__(cls, **kwargs):
++            warnings.warn(msg, FutureWarning, stacklevel=2)
++
++    _OldClass.__module__ = new_class.__module__
++    _OldClass.__name__ = previous_name
++    _OldClass.__qualname__ = previous_name
++    _OldClass.__new__.__signature__ = prealloc_signature  # type: ignore [attr-defined]
++
++    return _OldClass
+-- 
+2.34.1
+
