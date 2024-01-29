@@ -1,0 +1,115 @@
+From f1a39b863281de51d350e7b1eebbe7d404d40abc Mon Sep 17 00:00:00 2001
+From: Grzegorz Bokota <bokota+github@gmail.com>
+Date: Wed, 24 Jan 2024 16:35:15 +0100
+Subject: [PATCH] Fix `Labels.data_setitem` setting of view by taking dims
+ order into account (#6616)
+
+closes #6615
+
+In #6607, we started painting into both the data and the slice view.
+(And this was already happening and broken when painting into lazy
+arrays such as zarr and dask, #6112.) However, when setting the view we
+need to take into account the axis ordering used when slicing (some axes
+may be transposed). This manifested as an index error in #6615.
+
+In this PR, we add an `indices_order` argument to `index_in_slice`
+function and the function returns indices in the requested order, which
+we can then use to set the view.
+---
+ napari/layers/labels/_tests/test_labels.py | 10 +++++++++-
+ napari/layers/labels/labels.py             |  4 +++-
+ napari/utils/_indexing.py                  | 14 +++++++++-----
+ 3 files changed, 21 insertions(+), 7 deletions(-)
+
+diff --git a/napari/layers/labels/_tests/test_labels.py b/napari/layers/labels/_tests/test_labels.py
+index 9d5a5339..f93de038 100644
+--- a/napari/layers/labels/_tests/test_labels.py
++++ b/napari/layers/labels/_tests/test_labels.py
+@@ -697,6 +697,14 @@ def test_data_setitem_multi_dim():
+     )
+ 
+ 
++def test_data_setitiem_transposed_axes():
++    data = np.zeros((10, 100), dtype=np.uint32)
++    labels = Labels(data)
++    labels.data_setitem((np.array([9]), np.array([99])), 1)
++    labels._slice_dims([0, 0], 2, [1, 0])
++    labels.data_setitem((np.array([9]), np.array([99])), 2)
++
++
+ def test_selecting_label():
+     """Test selecting label."""
+     np.random.seed(0)
+@@ -823,7 +831,7 @@ def test_paint_2d():
+ 
+ 
+ def test_paint_2d_xarray():
+-    """Test the memory usage of painting an xarray indirectly via timeout."""
++    """Test the memory usage of painting a xarray indirectly via timeout."""
+     now = time.monotonic()
+     data = xr.DataArray(np.zeros((3, 3, 1024, 1024), dtype=np.uint32))
+ 
+diff --git a/napari/layers/labels/labels.py b/napari/layers/labels/labels.py
+index 63c792ed..6efe3f0c 100644
+--- a/napari/layers/labels/labels.py
++++ b/napari/layers/labels/labels.py
+@@ -1492,7 +1492,9 @@ class Labels(_ImageBase):
+         self.data[indices] = value
+ 
+         pt_not_disp = self._get_pt_not_disp()
+-        displayed_indices = index_in_slice(indices, pt_not_disp)
++        displayed_indices = index_in_slice(
++            indices, pt_not_disp, self._slice_input.order
++        )
+         if isinstance(value, np.ndarray):
+             visible_values = value[elements_in_slice(indices, pt_not_disp)]
+         else:
+diff --git a/napari/utils/_indexing.py b/napari/utils/_indexing.py
+index 5b6fe9ef..03c1099e 100644
+--- a/napari/utils/_indexing.py
++++ b/napari/utils/_indexing.py
+@@ -35,7 +35,9 @@ def elements_in_slice(
+ 
+ 
+ def index_in_slice(
+-    index: Tuple[npt.NDArray[np.int_], ...], position_in_axes: Dict[int, int]
++    index: Tuple[npt.NDArray[np.int_], ...],
++    position_in_axes: Dict[int, int],
++    indices_order: Tuple[int, ...],
+ ) -> Tuple[npt.NDArray[np.int_], ...]:
+     """Convert a NumPy fancy indexing expression from data to sliced space.
+ 
+@@ -45,6 +47,8 @@ def index_in_slice(
+         A NumPy fancy indexing expression [1]_.
+     position_in_axes : dict[int, int]
+         A dictionary mapping sliced (non-displayed) axes to a slice position.
++    indices_order : tuple of int
++        The order of the indices in data view.
+ 
+     Returns
+     -------
+@@ -55,9 +59,9 @@ def index_in_slice(
+     Examples
+     --------
+     >>> index = (np.arange(5), np.full(5, 1), np.arange(4, 9))
+-    >>> index_in_slice(index, {0: 3})
++    >>> index_in_slice(index, {0: 3}, (0, 1, 2))
+     (array([1]), array([7]))
+-    >>> index_in_slice(index, {1: 1, 2: 8})
++    >>> index_in_slice(index, {1: 1, 2: 8}, (0, 1, 2))
+     (array([4]),)
+ 
+     References
+@@ -66,7 +70,7 @@ def index_in_slice(
+     """
+     index_in_slice = elements_in_slice(index, position_in_axes)
+     return tuple(
+-        ix[index_in_slice]
+-        for i, ix in enumerate(index)
++        index[i][index_in_slice]
++        for i in indices_order
+         if i not in position_in_axes
+     )
+-- 
+2.34.1
+
