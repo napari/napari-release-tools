@@ -195,6 +195,7 @@ docs_authors -= BOT_LIST
 
 
 user_name_pattern = re.compile(r"@([\w-]+)")  # pattern for GitHub usernames
+pr_number_pattern = re.compile(r"#(\d+)")  # pattern for GitHub PR numbers
 
 old_contributors = set()
 
@@ -238,11 +239,17 @@ for section, pull_request_dicts in highlights.items():
     section_path = (
         LOCAL_DIR / "additional_notes" / args.milestone / f"{section.lower()}.md"
     )
+    mentioned_pr = set()
     if section_path.exists():
         with section_path.open() as f:
-            print(f.read(), file=file_handle)
+            text = f.read()
+        for pr_number in pr_number_pattern.findall(text):
+            mentioned_pr.add(int(pr_number))
+        print(text, file=file_handle)
 
     for number, pull_request_info in pull_request_dicts.items():
+        if number in mentioned_pr:
+            continue
         repo_str = pull_request_info["repo"]
         print(
             f'- {pull_request_info["summary"]} ([napari/{repo_str}/#{number}](https://{GH}/{GH_USER}/{repo_str}/pull/{number}))',
