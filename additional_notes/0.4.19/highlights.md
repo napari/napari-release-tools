@@ -71,11 +71,8 @@ available, see the
 RGB hex color prefixed with `#`, as in
 `napari.imshow(data, colormap=`#88ff1a`)`.
 
-(Amusing side note/API break: it turns out that "orange" is both the name of a
-white-to-orange colormap in VisPy, and one of the color names in the color
-dictionary, which then produces a *black-to-orange* colormap! We decided to use
-the new, color-name behavior in this update. So if you are wondering why your
-`imshow(data, colormap='orange')` calls look different — this is why.)
+(For an amusing side note, though, check out the [API Changes](#api-changes)
+note related to this PR. 😅)
 
 ### Some technical stuff
 
