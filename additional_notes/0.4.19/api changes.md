@@ -12,4 +12,3 @@ events emitted when editing Shapes or Points was changed to be more granular.
 The types are no longer "add", "remove", and "change", but "adding", "added",
 "removing", "removed", "changing", and "changed". This gives listeners more
 control over when to take action in response to an event.
-
