@@ -109,4 +109,3 @@ meetings](https://napari.org/stable/community/meeting_schedule.html), or [tag
 us on Mastodon](https://fosstodon.org/@napari)!
 
 Read on for the full list of changes that went into this release.
-

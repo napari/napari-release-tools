@@ -232,12 +232,14 @@ https://napari.org/stable/
 """,
     file=file_handle,
 )
-highlights_path = LOCAL_DIR / "highlight" / (args.milestone + ".md")
 
 for section, pull_request_dicts in highlights.items():
     print(f"## {section}\n", file=file_handle)
-    if section == "Highlights" and highlights_path.exists():
-        with open(highlights_path) as f:
+    section_path = (
+        LOCAL_DIR / "additional_notes" / args.milestone / f"{section.lower()}.md"
+    )
+    if section_path.exists():
+        with section_path.open() as f:
             print(f.read(), file=file_handle)
 
     for number, pull_request_info in pull_request_dicts.items():
