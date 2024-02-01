@@ -1,0 +1,71 @@
+From 7af2f95a513e8cffbf9d42bdf1899b73619827a5 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Melissa=20Weber=20Mendon=C3=A7a?= <melissawm@gmail.com>
+Date: Wed, 2 Aug 2023 16:12:35 -0300
+Subject: [PATCH] Add roadmap board link to Roadmaps page (#212)
+
+# Description
+
+Adds link to GitHub board containing the napari roadmap to Roadmap page.
+
+EDIT: [Rendered page is
+here](https://output.circle-artifacts.com/output/job/31a35d46-3a9c-414e-ad63-7f7a8a988b93/artifacts/0/docs/_build/roadmaps/index.html)
+
+## Type of change
+- [x] Fixes or improves existing content
+
+# References
+Closes #182
+
+## Final checklist:
+- [x] My PR is the minimum possible work for the desired functionality
+---
+ docs/developers/contributing.md |  2 ++
+ docs/developers/index.md        |  2 ++
+ docs/roadmaps/index.md          | 12 +++++++++++-
+ 3 files changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/docs/developers/contributing.md b/docs/developers/contributing.md
+index 2cfc01b7..89f904ec 100644
+--- a/docs/developers/contributing.md
++++ b/docs/developers/contributing.md
+@@ -5,6 +5,8 @@ We welcome your contributions! Please see the provided steps below and never hes
+
+ If you are a new user, we recommend checking out the detailed [Github Docs](https://docs.github.com/en).
+
++You can see the general direction for napari development and possible work plans in our current [Roadmap](../roadmaps/index.md).
++
+ (dev-installation)=
+ ## Setting up a development installation
+
+diff --git a/docs/developers/index.md b/docs/developers/index.md
+index 917935b2..e9f0b5da 100644
+--- a/docs/developers/index.md
++++ b/docs/developers/index.md
+@@ -2,6 +2,8 @@
+
+ Here you can find resources about the contributing workflow for both code to napari core and documentation of the project, as well as information for onboarding of new core developers.
+
++You can see the general direction for napari development and possible work plans in our current [Roadmap](../roadmaps/index.md).
++
+ ## For contributors
+
+ - [Contributing guide](./contributing)
+diff --git a/docs/roadmaps/index.md b/docs/roadmaps/index.md
+index 1d4a7925..520ba90f 100644
+--- a/docs/roadmaps/index.md
++++ b/docs/roadmaps/index.md
+@@ -1,3 +1,13 @@
+ # Roadmaps
+
+-Past and future roadmaps for the `napari` project.
++The current `napari` roadmap can be seen in the following GitHub board: [napari global roadmap](https://github.com/orgs/napari/projects/24/views/2?pane=info)
++
++This roadmap captures the current priorities of the napari core developer team. It is revisited every six months.
++
++---
++
++You can see past roadmaps below.
++
++- [](0_4.md)
++- [](0_3_retrospective.md)
++- [](0_3.md)

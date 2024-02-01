@@ -1,0 +1,86 @@
+From f91f3347e7787cf743c1698c405ecd1447a6b337 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Melissa=20Weber=20Mendon=C3=A7a?= <melissawm@gmail.com>
+Date: Wed, 13 Sep 2023 22:51:42 -0300
+Subject: [PATCH] Fix titles on Getting Started section of user guide (#228)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+# Description
+Makes contents a bit clearer, and matches the tiles in the Getting
+started index page.
+
+h/t @seankmartin who called this out 😄
+
+Old page:
+
+![Screenshot_20230814_141217](https://github.com/napari/docs/assets/3949932/0d5b3014-a901-4a3a-8ff4-a3417248c83b)
+
+New page:
+
+![Screenshot_20230814_141249](https://github.com/napari/docs/assets/3949932/6bde0fb4-f2b4-4d42-bfdd-d6854eda712f)
+
+## Type of change
+- [x] Fixes or improves existing content
+---
+ docs/tutorials/fundamentals/getting_started.md | 4 +---
+ docs/tutorials/fundamentals/installation.md    | 2 +-
+ docs/tutorials/start_index.md                  | 6 +++---
+ 3 files changed, 5 insertions(+), 7 deletions(-)
+
+diff --git a/docs/tutorials/fundamentals/getting_started.md b/docs/tutorials/fundamentals/getting_started.md
+index e54c5c12..29951e40 100644
+--- a/docs/tutorials/fundamentals/getting_started.md
++++ b/docs/tutorials/fundamentals/getting_started.md
+@@ -1,7 +1,5 @@
+ (getting_started)=
+-# Getting started
+-
+-Welcome to the getting started with **napari** tutorial!
++# How to launch napari
+
+ This tutorial assumes you have already installed napari.
+ For help with installation see our [installation tutorial](./installation).
+diff --git a/docs/tutorials/fundamentals/installation.md b/docs/tutorials/fundamentals/installation.md
+index 0579b9f7..ada383d6 100644
+--- a/docs/tutorials/fundamentals/installation.md
++++ b/docs/tutorials/fundamentals/installation.md
+@@ -15,7 +15,7 @@ jupyter:
+
+ (installation)=
+
+-# Installing
++# How to install napari
+
+ Welcome to the **napari** installation guide!
+
+diff --git a/docs/tutorials/start_index.md b/docs/tutorials/start_index.md
+index bf132c99..b8113d8d 100644
+--- a/docs/tutorials/start_index.md
++++ b/docs/tutorials/start_index.md
+@@ -5,7 +5,7 @@ napari. For more detailed use-cases, check out the [napari tutorials](./index)
+ or [How-to guides](../howtos/index).
+
+ ::::{grid}
+-:::{grid-item-card} napari quick start
++:::{grid-item-card} Quick start
+ :link: napari-quick-start
+ :link-type: ref
+
+@@ -21,7 +21,7 @@ A quick glance of what napari does aimed at first-timers.
+ How to do a clean install of napari and launch the viewer.
+ :::
+
+-:::{grid-item-card} Getting started
++:::{grid-item-card} How to launch napari
+ :link: getting_started
+ :link-type: ref
+
+@@ -30,7 +30,7 @@ This tutorial will teach you all the different ways to launch napari.
+ ::::
+
+ ::::{grid}
+-:::{grid-item-card} napari viewer tutorial
++:::{grid-item-card} Viewer tutorial
+ :link: viewer-tutorial
+ :link-type: ref

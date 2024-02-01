@@ -54,6 +54,13 @@ parser.add_argument(
     help="The file with the corrections",
     default=LOCAL_DIR / "name_corrections.yaml",
 )
+parser.add_argument(
+    "--with-pr",
+    help="Include PR numbers for not merged PRs",
+    type=int,
+    default=None,
+    nargs="+",
+)
 
 args = parser.parse_args()
 
@@ -113,9 +120,8 @@ label_to_section = {
 }
 
 
-for pull in iter_pull_request(f"milestone:{args.milestone} is:merged"):
-    issue = pull.as_issue()
-    assert pull.merged
+def parse_pull(pull):
+    assert pull.merged or pull.number in args.with_pr
 
     commit = repo.get_commit(pull.merge_commit_sha)
 
@@ -142,6 +148,14 @@ for pull in iter_pull_request(f"milestone:{args.milestone} is:merged"):
     if not assigned_to_section:
         other_pull_requests[pull.number] = {"summary": summary, "repo": GH_REPO}
 
+
+for pull_ in iter_pull_request(f"milestone:{args.milestone} is:merged"):
+    parse_pull(pull_)
+
+if args.with_pr is not None:
+    for pr_num in args.with_pr:
+        pull = repo.get_pull(pr_num)
+        parse_pull(pull)
 
 for pull in iter_pull_request(
     f"milestone:{args.milestone} is:merged", repo=GH_DOCS_REPO
@@ -181,6 +195,7 @@ docs_authors -= BOT_LIST
 
 
 user_name_pattern = re.compile(r"@([\w-]+)")  # pattern for GitHub usernames
+pr_number_pattern = re.compile(r"#(\d+)")  # pattern for GitHub PR numbers
 
 old_contributors = set()
 
@@ -214,17 +229,30 @@ rendering), and the scientific Python stack (numpy, scipy).
 print(
     """
 For more information, examples, and documentation, please visit our website:
-https://github.com/napari/napari
+https://napari.org/stable/
 """,
     file=file_handle,
 )
 
 for section, pull_request_dicts in highlights.items():
     print(f"## {section}\n", file=file_handle)
+    section_path = (
+        LOCAL_DIR / "additional_notes" / args.milestone / f"{section.lower()}.md"
+    )
+    mentioned_pr = set()
+    if section_path.exists():
+        with section_path.open() as f:
+            text = f.read()
+        for pr_number in pr_number_pattern.findall(text):
+            mentioned_pr.add(int(pr_number))
+        print(text, file=file_handle)
+
     for number, pull_request_info in pull_request_dicts.items():
+        if number in mentioned_pr:
+            continue
         repo_str = pull_request_info["repo"]
         print(
-            f'- {pull_request_info["summary"]} ([napari/{repo_str}/#{number}](https://{GH}/{GH_USER}/{repo_str}/pull/{number}))',
+            f'- {pull_request_info["summary"]} ([napari/{repo_str}#{number}](https://{GH}/{GH_USER}/{repo_str}/pull/{number}))',
             file=file_handle,
         )
     print("", file=file_handle)

@@ -1,0 +1,55 @@
+From d460805d60e1488cfc2c2151968d94469ab1814c Mon Sep 17 00:00:00 2001
+From: Grzegorz Bokota <bokota+github@gmail.com>
+Date: Mon, 22 Jan 2024 23:26:01 +0100
+Subject: [PATCH] Fix wrong working interpolation of labels in 3d (#6596)
+
+closes #6595
+
+Set interpolation for rendering of 3D data for labels.
+---
+ napari/_qt/_tests/test_qt_viewer.py | 17 ++++++++++++++++-
+ napari/_vispy/layers/labels.py      |  1 +
+ 2 files changed, 17 insertions(+), 1 deletion(-)
+
+diff --git a/napari/_qt/_tests/test_qt_viewer.py b/napari/_qt/_tests/test_qt_viewer.py
+index 788a6873..0dad4195 100644
+--- a/napari/_qt/_tests/test_qt_viewer.py
++++ b/napari/_qt/_tests/test_qt_viewer.py
+@@ -946,7 +946,22 @@ def test_background_color(qtbot, qt_viewer: QtViewer, dtype):
+         )
+ 
+ 
+-@skip_on_win_ci
++def test_rendering_interpolation(qtbot, qt_viewer):
++    data = np.zeros((20, 20, 20), dtype=np.uint8)
++    data[1:-1, 1:-1, 1:-1] = 5
++    layer = qt_viewer.viewer.add_labels(
++        data, opacity=1, rendering="translucent"
++    )
++    layer.selected_label = 5
++    qt_viewer.viewer.dims.ndisplay = 3
++    QApplication.processEvents()
++    canvas_screenshot = qt_viewer.screenshot(flash=False)
++    shape = np.array(canvas_screenshot.shape[:2])
++    pixel = canvas_screenshot[tuple((shape * 0.5).astype(int))]
++    color = layer.colormap.map(5)[0] * 255
++    npt.assert_array_equal(pixel, color)
++
++
+ def test_shortcut_passing(make_napari_viewer):
+     viewer = make_napari_viewer(ndisplay=3)
+     layer = viewer.add_labels(
+diff --git a/napari/_vispy/layers/labels.py b/napari/_vispy/layers/labels.py
+index 726770e3..f04bf480 100644
+--- a/napari/_vispy/layers/labels.py
++++ b/napari/_vispy/layers/labels.py
+@@ -337,6 +337,7 @@ class LabelLayerNode(ImageLayerNode):
+             ),
+             clim=[0, 2**23 - 1],
+             texture_format=texture_format,
++            interpolation='nearest',
+         )
+ 
+     def get_node(self, ndisplay: int, dtype=None) -> Node:
+-- 
+2.34.1

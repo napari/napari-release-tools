@@ -1,3 +1,4 @@
+# PYTHON_ARGCOMPLETE_OK
 """
 This is script to cherry-pick commits base on PR labels
 """
@@ -7,6 +8,7 @@ import argparse
 import os
 from pathlib import Path
 
+import argcomplete
 from git import GitCommandError, Repo
 from tqdm import tqdm
 
@@ -31,9 +33,7 @@ def main():
     parser.add_argument(
         "--first-commits", help="file with list of first commits to cherry pick"
     )
-    parser.add_argument(
-        "--stop-after", help="Stop after this commit", default=0, type=int
-    )
+    parser.add_argument("--stop-after", help="Stop after this PR", default=0, type=int)
     parser.add_argument(
         "--git-main-branch",
         help="The git main branch",
@@ -43,7 +43,14 @@ def main():
     parser.add_argument(
         "--working-dir", help="path to repository", default=LOCAL_DIR, type=Path
     )
+    parser.add_argument(
+        "--skip-commits",
+        nargs="+",
+        help="list of commits to skip as they are already cherry-picked",
+        type=int,
+    )
 
+    argcomplete.autocomplete(parser)
     args = parser.parse_args()
 
     target_branch = f"v{args.milestone}x"
@@ -62,6 +69,7 @@ def main():
         stop_after=args.stop_after,
         base_branch=args.base_branch,
         main_branch=args.git_main_branch,
+        skip_commits=args.skip_commits,
     )
 
 
@@ -94,6 +102,7 @@ def perform_cherry_pick(
     stop_after: int | None,
     base_branch: str,
     main_branch: str = "main",
+    skip_commits: list[int] = None,
 ):
     """
     Perform cherry-pick process
@@ -115,6 +124,8 @@ def perform_cherry_pick(
     main_branch: str
         the main branch of repository, by default is ``main``
         but could be for example ``master``
+    skip_commits: list[int]
+        list of commits to skip as they are already cherry-picked
 
     Returns
     -------
@@ -140,14 +151,17 @@ def perform_cherry_pick(
         if x.milestone == milestone
     ]
 
-    pr_commits_dict = get_pr_commits_dict(repo, base_branch)
+    pr_commits_dict = get_pr_commits_dict(repo, main_branch)
     consumed_pr = get_consumed_pr(repo, target_branch)
+
+    if skip_commits:
+        consumed_pr.update(skip_commits)
 
     # check for errors, may require to reset cache if happens
     for el in pr_targeted_for_release:
         assert el.closed_at is not None, el
 
-    # order PR by merge date, move "first_commits" on begin
+    # order PR by merge date, move "first_commits" to begin
     # (by default PR are ordered by creation date)
     pr_list_base = sorted(
         pr_targeted_for_release,

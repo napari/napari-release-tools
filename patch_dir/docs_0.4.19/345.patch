@@ -1,0 +1,46 @@
+From 44d3571b7576d40062f42d52d97ea36056263361 Mon Sep 17 00:00:00 2001
+From: Kevin Yamauchi <kevin.yamauchi@gmail.com>
+Date: Wed, 31 Jan 2024 15:55:04 +0100
+Subject: [PATCH] add melissa to core devs (#345)
+
+# References and relevant issues
+This PR adds @melissawm , our newest core dev to the teams page!
+
+# Description
+<!-- What does this pull request (PR) do? Does it add new content,
+improve/fix existing
+context, improve/fix workflow/documentation build/deployment or
+something else?
+<!-- If relevant, please include a screenshot or a screen capture in
+your content
+change: "An image is worth a thousand words!" -->
+<!-- You can use https://www.cockos.com/licecap/ or similar to create
+animations. -->
+<!-- You can also see a preview of the documentation changes you are
+submitting by
+clicking on "Details" to the right of the "Check the rendered docs
+here!" check on your PR.-->
+
+<!-- Final Checklist
+- If images included: I have added [alt
+text](https://webaim.org/techniques/alttext/)
+If workflow, documentation build or deployment change:
+- My PR is the minimum possible work for the desired functionality
+- I have commented my code, to let others know what it does
+-->
+---
+ docs/community/team.md | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/docs/community/team.md b/docs/community/team.md
+index 726dfcaa..075bf254 100644
+--- a/docs/community/team.md
++++ b/docs/community/team.md
+@@ -13,6 +13,7 @@ napari is a consensus-based community project. Anyone with an interest in the pr
+ - [Kira Evans](https://github.com/napari/napari/commits?author=kne42) - [@kne42](https://github.com/kne42)
+ - [Kyle Harrington](https://github.com/napari/napari/commits?author=kephale) - [@kephale](https://github.com/kephale)*
+ - [Lorenzo Gaifas](https://github.com/napari/napari/commits?author=brisvag) - [@brisvag](https://github.com/brisvag)
++- [Melissa Weber Mendonça](https://github.com/napari/napari/commits?author=melissawm) - [@melissawm](https://github.com/melissawm)
+ - [Wouter-Michiel Vierdag](https://github.com/napari/napari/commits?author=melonora) - [@melonora](https://github.com/melonora)
+ - [Peter Sobolewski](https://github.com/napari/napari/commits?author=psobolewskiPhD) - [@psobolewskiPhD](https://github.com/psobolewskiPhD)
+ 

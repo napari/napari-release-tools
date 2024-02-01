@@ -1,0 +1,57 @@
+From 003be0135fe26f8faebb9884949868ce1697ee7a Mon Sep 17 00:00:00 2001
+From: Grzegorz Bokota <bokota+github@gmail.com>
+Date: Tue, 14 Nov 2023 21:43:01 +0100
+Subject: [PATCH] Do not run macos process renaming if debugger is loaded
+ (#6437)
+
+For some time, I have had problems with running napari under the
+debugger on macOS (breakpoint is not working, for example).
+
+Partially it was caused by a problem reported in #6432 (direct
+breakepoint invoke). But breakpoints from IDE were not working because
+of running the second process under the hood.
+
+This PR adds checks if debugger (`pdb` or `pydevd`) is already loaded
+and then does not start a separate process.
+
+This PR will simplify life of persons who develop napari plugins on
+macOS.
+
+The side effect of this PR is that it will disable renaming for persons
+who have `npe1` version of `napari-console` (version <0.0.9)
+---
+ napari/__main__.py | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
+
+diff --git a/napari/__main__.py b/napari/__main__.py
+index b3b4a15b..197c718d 100644
+--- a/napari/__main__.py
++++ b/napari/__main__.py
+@@ -435,7 +435,15 @@ def _maybe_rerun_with_macos_fixes():
+        This requires relaunching the app from a symlink to the
+        desired python executable, conveniently named 'napari'.
+     """
+-    if sys.platform != "darwin":
++    from napari._qt import API_NAME
++
++    # This import mus be here to raise exception about PySide6 problem
++
++    if (
++        sys.platform != "darwin"
++        or "pdb" in sys.modules
++        or "pydevd" in sys.modules
++    ):
+         return
+ 
+     if "_NAPARI_RERUN_WITH_FIXES" in os.environ:
+@@ -450,8 +458,6 @@ def _maybe_rerun_with_macos_fixes():
+     import subprocess
+     from tempfile import mkdtemp
+ 
+-    from qtpy import API_NAME
+-
+     # In principle, we will relaunch to the same python we were using
+     executable = sys.executable
+     cwd = Path.cwd()
+-- 
+2.34.1

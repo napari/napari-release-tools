@@ -1,0 +1,64 @@
+From 512e78becf1b1e47981f92192988fa7752a09dcb Mon Sep 17 00:00:00 2001
+From: Talley Lambert <talley.lambert@gmail.com>
+Date: Thu, 18 Jan 2024 02:21:18 -0500
+Subject: [PATCH] Add Kyle to steering council, make Talley emeritus (#322)
+
+@napari/core-devs, I've always felt that the core-devs list should
+accurately reflect the _currently active_ team, and I don't see my
+activity on napari returning any time soon, so this PR moves me from
+"current" to "emeritus" core developers.
+
+(It also adds a steering council asterisk for @kephale)
+---
+ docs/community/team.md           | 11 ++++++-----
+ docs/community/working_groups.md |  1 -
+ 2 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/docs/community/team.md b/docs/community/team.md
+index c4ac67ad..c9f4531c 100644
+--- a/docs/community/team.md
++++ b/docs/community/team.md
+@@ -12,25 +12,26 @@ napari is a consensus-based community project. Anyone with an interest in the pr
+ - [Juan Nunez-Iglesias](https://github.com/napari/napari/commits?author=jni) - [@jni](https://github.com/jni)*
+ - [Kevin Yamauchi](https://github.com/napari/napari/commits?author=kevinyamauchi) - [@kevinyamauchi](https://github.com/kevinyamauchi)*
+ - [Kira Evans](https://github.com/napari/napari/commits?author=kne42) - [@kne42](https://github.com/kne42)
+-- [Kyle Harrington](https://github.com/napari/napari/commits?author=kephale) - [@kephale](https://github.com/kephale)
++- [Kyle Harrington](https://github.com/napari/napari/commits?author=kephale) - [@kephale](https://github.com/kephale)*
+ - [Loic Royer](https://github.com/napari/napari/commits?author=royerloic) - [@royerloic](https://github.com/royerloic)^
+ - [Lorenzo Gaifas](https://github.com/napari/napari/commits?author=brisvag) - [@brisvag](https://github.com/brisvag)
+ - [Wouter-Michiel Vierdag](https://github.com/napari/napari/commits?author=melonora) - [@melonora](https://github.com/melonora)
+ - [Nicholas Sofroniew](https://github.com/napari/napari/commits?author=sofroniewn) - [@sofroniewn](https://github.com/sofroniewn)^
+ - [Peter Sobolewski](https://github.com/napari/napari/commits?author=psobolewskiPhD) - [@psobolewskiPhD](https://github.com/psobolewskiPhD)
+-- [Talley Lambert](https://github.com/napari/napari/commits?author=tlambert03) - [@tlambert03](https://github.com/tlambert03)^
+ 
+-<sub>* on the napari [steering council](https://napari.org/community/governance.html#steering-council).</sub>
+-
+-<sub>^ emeritus [steering council](https://napari.org/community/governance.html#steering-council).</sub>
+ 
+ ## Emeritus Core Developers
+ 
+ - [Shannon Axelrod](https://github.com/napari/napari/commits?author=shanaxel42) - [@shanaxel42](https://github.com/shanaxel42)
++- [Talley Lambert](https://github.com/napari/napari/commits?author=tlambert03) - [@tlambert03](https://github.com/tlambert03)^
+ - [Justine Larsen](https://github.com/napari/napari/commits?author=justinelarsen) - [@justinelarsen](https://github.com/justinelarsen)
+ - [Ziyang Liu](https://github.com/napari/napari/commits?author=potating-potato) - [@potating-potato](https://github.com/potating-potato)
+ - [Ahmet Can Solak](https://github.com/napari/napari/commits?author=AhmetCanSolak) - [@AhmetCanSolak](https://github.com/AhmetCanSolak)
+ 
++<sub>* on the napari [steering council](https://napari.org/community/governance.html#steering-council).</sub>
++
++<sub>^ emeritus [steering council](https://napari.org/community/governance.html#steering-council).</sub>
++
+ ## Project history
+ 
+ The napari project began in the spring of 2018. It was born out of the shared need for fast n-dimensional image viewing in Python by project co-founders Loïc Royer, from the Chan Zuckerberg Biohub (CZ Biohub), and Juan Nunez-Iglesias, from Monash University. Since then it has grown rapidly to now also provide a graphical user interface to a plugin ecosystem of image analysis tools for scientists to use in their daily work.
+diff --git a/docs/community/working_groups.md b/docs/community/working_groups.md
+index 47892ad2..0daacdd4 100644
+--- a/docs/community/working_groups.md
++++ b/docs/community/working_groups.md
+@@ -19,7 +19,6 @@ We believe working groups are a helpful way to move forward work on particular t
+ ## Existing working groups
+ 
+ - Bundled Application (Co-Leads: [Gonzalo Peña-Castellanos](https://github.com/goanpeca) and [Ziyang Liu](https://github.com/potating-potato))
+-- Plugins (Co-Leads: [Talley Lambert](https://github.com/tlambert03) and [Nathan Clack](https://github.com/nclack))
+ - Architecture (Co-Leads: [Juan Nunez-Iglesias](https://github.com/jni) and [Andy Sweet](https://github.com/andy-sweet))
+ - Documentation (Co-Leads: [Genevieve Buckley](https://github.com/GenevieveBuckley) and [Justin Kiggins](https://github.com/neuromusic))
+ 

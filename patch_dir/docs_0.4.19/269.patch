@@ -1,0 +1,36 @@
+From 757be899d872135fc3d91bebe52e0e7589e640b6 Mon Sep 17 00:00:00 2001
+From: Peter Sobolewski <76622105+psobolewskiPhD@users.noreply.github.com>
+Date: Thu, 9 Nov 2023 13:31:10 -0500
+Subject: [PATCH] [NAP-8] delete :orphan: (#269)
+
+# References and relevant issues
+First noted here:
+https://github.com/napari/napari/pull/6384#discussion_r1385853123
+
+
+# Description
+There is an orphan `:orphan:` tag at the top of NAP-8. Pretty sure it's
+not doing anything--the other naps don't have it. This deletes it.
+---
+ docs/naps/8-telemetry.md | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/docs/naps/8-telemetry.md b/docs/naps/8-telemetry.md
+index 36fbc574..c36839f5 100644
+--- a/docs/naps/8-telemetry.md
++++ b/docs/naps/8-telemetry.md
+@@ -1,6 +1,4 @@
+-:orphan: 
+-  
+- (nap-8)= 
++(nap-8)= 
+   
+  # NAP-8 — Telemetry
+   
+@@ -248,4 +246,4 @@ it is harder to adjust a set of data that is collected as these services are des
+   
+  This document is dedicated to the public domain with the Creative Commons CC0 
+  license [^id3]. Attribution to this source is encouraged where appropriate, as per 
+- CC0+BY [^id4].
+\ No newline at end of file
++ CC0+BY [^id4].

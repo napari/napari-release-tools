@@ -1,0 +1,1527 @@
+From c7c585bd8244c0850beb63da9542540a9e8e74d2 Mon Sep 17 00:00:00 2001
+From: Eric Perlman <perlman@gmail.com>
+Date: Fri, 21 Jul 2023 20:51:05 -0400
+Subject: [PATCH] Use a shader for low discrepancy label conversion (#3308)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The pull request will move the current label color calculation onto the
+GPU.
+
+This is the result of dozens of hours of hacking between @perlman,
+@jni, and @brisvag. It moves the mapping from label space to 0-1
+(which can then be colormapped) to the shader.
+
+It also adds hashing in OpenGL for direct color mode, which avoids
+many of the collisions we were seeing in that mode when mapping
+labels to 0-1 and then using a custom colormap.
+
+Closes #204 (count those digits!!!!)
+Closes #4384 (which you'll see has been hit by many people — it's a big one)
+Closes #4864
+Closes #4942
+Closes #6077
+Closes #6010
+
+This converts labels to np.float32, so labels above `2**23` can be aliased
+together. But this limitation seems preferable to existing issues.
+
+- [X] Implement shader for 3D label layers (ISO categorical)
+- [X] Implement shader for 2D label layers
+- [X] Fix the CPU-based color computation (for paint color preview &
+layer preview)
+- [X] 3D iso categorical view
+- [x] Test function of directly mapped colors
+
+- [ ] Address uint64 labels. Labels are currently converted to float32
+- [ ] Factor `seed` into a `uniform`
+
+- [X] This change requires a documentation update
+
+- [X] Additional tests added to confirm consistent coloring between GPU
+& CPU
+- [X] Manual testing of the various examples (`examples/**labels*.py`)
+
+---------
+
+Co-authored-by: Juan Nunez-Iglesias <juan.nunez-iglesias@monash.edu>
+Co-authored-by: Lorenzo Gaifas <brisvag@gmail.com>
+Co-authored-by: Juan Nunez-Iglesias <jni@fastmail.com>
+Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.github.com>
+---
+ examples/dev/direct-colormap-aliasing-test.py |  80 +++++
+ napari/_qt/_tests/test_qt_viewer.py           |  38 +++
+ napari/_vispy/layers/image.py                 |  16 +-
+ napari/_vispy/layers/labels.py                | 284 +++++++++++++++++-
+ napari/_vispy/visuals/volume.py               |  49 ++-
+ napari/layers/labels/_tests/test_labels.py    | 154 ++--------
+ napari/layers/labels/labels.py                | 263 ++++------------
+ napari/utils/colormaps/__init__.py            |   2 +
+ .../utils/colormaps/_tests/test_colormaps.py  |   6 +-
+ napari/utils/colormaps/colormap.py            |  66 ++++
+ napari/utils/colormaps/colormap_utils.py      |  41 ++-
+ pyproject.toml                                |   2 +-
+ 12 files changed, 664 insertions(+), 337 deletions(-)
+ create mode 100644 examples/dev/direct-colormap-aliasing-test.py
+
+diff --git a/examples/dev/direct-colormap-aliasing-test.py b/examples/dev/direct-colormap-aliasing-test.py
+new file mode 100644
+index 00000000..0008adb1
+--- /dev/null
++++ b/examples/dev/direct-colormap-aliasing-test.py
+@@ -0,0 +1,80 @@
++import matplotlib
++import numpy as np
++import pandas as pd
++
++import napari
++
++# Set the number of steps
++nb_steps = 10000
++
++# Create a dummy label image
++base = np.linspace(start=1, stop=nb_steps, num=nb_steps).astype('uint16')
++label_img = np.repeat(
++        base.reshape([1, base.shape[0]]), int(nb_steps/10), axis=0
++        )
++
++# Add a harder test case: Randomly order the label values.
++# But assign them monotonously increasing feature values
++# (=> if it's off by one, the error is more visible)
++
++shuffled = np.linspace(start=1, stop=nb_steps, num=nb_steps).astype('uint16')
++np.random.shuffle(shuffled)
++label_img_shuffled = np.repeat(
++        shuffled.reshape([1, shuffled.shape[0]]), int(nb_steps/10), axis=0
++        )
++df_shuffled = pd.DataFrame([shuffled, np.linspace(start=1, stop=nb_steps, num=nb_steps).astype('uint16')]).T
++df_shuffled.columns = ['label', 'feature']
++
++# calculate the colormaps manually
++lower_contrast_limit = 1
++upper_contrast_limit = nb_steps
++
++df = df_shuffled
++
++df['feature_scaled_shuffled'] = (
++    (df['feature'] - lower_contrast_limit)
++    / (upper_contrast_limit - lower_contrast_limit)
++)
++colors = matplotlib.colormaps['viridis'](df['feature_scaled_shuffled'])
++colormap_shuffled = dict(zip(df['label'].astype(int), colors))
++
++df['feature_scaled_not_shuffled'] = (
++    (df['label'] - lower_contrast_limit)
++    / (upper_contrast_limit - lower_contrast_limit)
++)
++colors_ordered = (
++    matplotlib.colormaps['viridis'](df['feature_scaled_not_shuffled'])
++)
++colormap_ordered = dict(zip(df['label'].astype(int), colors_ordered))
++
++# calculate texel positions as colors for debugging
++# uncomment the relevant line in the shader to compare
++from napari._vispy.layers.labels import build_textures_from_dict, hash2d_get  # noqa
++
++tex_shape = (1000, 1000)  # NOTE: this has to be equal to the actual texture shape in build_textures_from_dict!
++keys, values = build_textures_from_dict(colormap_ordered)
++texel_pos_img = np.zeros((1, nb_steps, 4))
++texel_pos_img[..., -1] = 1  # alpha
++for k in range(nb_steps):
++    grid_position = hash2d_get(k + 1, keys, values)[0]
++    # divide by shape and set to RG values like in shader (tex coords)
++    texel_pos_img[:, k, :2] = (np.array(grid_position) + 0.5) / tex_shape
++
++# Add to napari
++viewer = napari.Viewer()
++viewer.add_image(label_img, colormap='viridis')
++labels_layer_shuffled = viewer.add_labels(label_img_shuffled, opacity=100)
++#viewer.add_image(texel_pos_img, rgb=True)
++labels_layer_ordered = viewer.add_labels(label_img, opacity=100)
++viewer.grid.enabled = True
++viewer.grid.shape = -1, 1
++
++# Set the label image colormaps
++labels_layer_shuffled.color = colormap_shuffled
++labels_layer_ordered.color = colormap_ordered
++
++# TMP debugging stuff
++vlab = viewer.window._qt_viewer.layer_to_visual[viewer.layers[-1]]
++
++
++napari.run()
+diff --git a/napari/_qt/_tests/test_qt_viewer.py b/napari/_qt/_tests/test_qt_viewer.py
+index 9629cf2e..5da35126 100644
+--- a/napari/_qt/_tests/test_qt_viewer.py
++++ b/napari/_qt/_tests/test_qt_viewer.py
+@@ -697,6 +697,44 @@ def test_create_non_empty_viewer_model(qtbot):
+     gc.collect()
+
+
++@skip_local_popups
++@skip_on_win_ci
++def test_label_colors_matching_widget(qtbot, make_napari_viewer):
++    """Make sure the rendered label colors match the QtColorBox widget."""
++    viewer = make_napari_viewer(show=True)
++    # XXX TODO: this unstable! Seed = 0 fails, for example. This is due to numerical
++    #           imprecision in random colormap on gpu vs cpu
++    np.random.seed(1)
++    data = np.ones((2, 2), dtype=np.uint64)
++    layer = viewer.add_labels(data)
++    layer.opacity = 1.0  # QtColorBox & single layer are blending differently
++
++    test_colors = np.concatenate(
++        (
++            np.arange(1, 10, dtype=np.uint64),
++            np.random.randint(2**20, size=(20), dtype=np.uint64),
++        )
++    )
++
++    for label in test_colors:
++        # Change color & selected color to the same label
++        layer.data = np.full((2, 2), label, dtype=np.uint64)
++        layer.selected_label = label
++
++        qtbot.wait(
++            100
++        )  # wait for .update() to be called on QtColorBox from Qt
++
++        color_box_color = viewer.window._qt_viewer.controls.widgets[
++            layer
++        ].colorBox.color
++        screenshot = viewer.window.screenshot(flash=False, canvas_only=True)
++        shape = np.array(screenshot.shape[:2])
++        middle_pixel = screenshot[tuple(shape // 2)]
++
++        np.testing.assert_equal(color_box_color, middle_pixel)
++
++
+ def test_axes_labels(make_napari_viewer):
+     viewer = make_napari_viewer(ndisplay=3)
+     layer = viewer.add_image(np.zeros((2, 2, 2)), scale=(1, 2, 4))
+diff --git a/napari/_vispy/layers/image.py b/napari/_vispy/layers/image.py
+index d63c1b55..954fef39 100644
+--- a/napari/_vispy/layers/image.py
++++ b/napari/_vispy/layers/image.py
+@@ -25,7 +25,9 @@ class ImageLayerNode:
+
+         self._custom_node = custom_node
+         self._image_node = ImageNode(
+-            None,
++            None
++            if (texture_format is None or texture_format == 'auto')
++            else np.array([[0.0]], dtype=np.float32),
+             method='auto',
+             texture_format=texture_format,
+         )
+@@ -47,9 +49,17 @@ class ImageLayerNode:
+
+
+ class VispyImageLayer(VispyBaseLayer):
+-    def __init__(self, layer, node=None, texture_format='auto') -> None:
++    def __init__(
++        self,
++        layer,
++        node=None,
++        texture_format='auto',
++        layer_node_class=ImageLayerNode,
++    ) -> None:
+         # Use custom node from caller, or our standard image/volume nodes.
+-        self._layer_node = ImageLayerNode(node, texture_format=texture_format)
++        self._layer_node = layer_node_class(
++            node, texture_format=texture_format
++        )
+
+         # Default to 2D (image) node.
+         super().__init__(layer, self._layer_node.get_node(2))
+diff --git a/napari/_vispy/layers/labels.py b/napari/_vispy/layers/labels.py
+index 61589edc..e932c59d 100644
+--- a/napari/_vispy/layers/labels.py
++++ b/napari/_vispy/layers/labels.py
+@@ -1,11 +1,243 @@
+-from napari._vispy.layers.image import VispyImageLayer
++import numpy as np
++from vispy.color import Colormap as VispyColormap
++from vispy.gloo import Texture2D
++from vispy.scene.node import Node
++from vispy.scene.visuals import create_visual_node
++from vispy.visuals.image import ImageVisual
++from vispy.visuals.shaders import Function, FunctionChain
++
++from napari._vispy.layers.image import ImageLayerNode, VispyImageLayer
++from napari._vispy.visuals.volume import Volume as VolumeNode
++
++low_disc_lookup_shader = """
++uniform sampler2D texture2D_LUT;
++
++vec4 sample_label_color(float t) {
++    float phi_mod = 0.6180339887498948482;  // phi - 1
++    float value = 0.0;
++    float margin = 1.0 / 256;
++
++    if (t == 0) {
++        return vec4(0);
++    }
++
++    if (($use_selection) && ($selection != t)) {
++        return vec4(0);
++    }
++
++    value = mod((t * phi_mod + $seed), 1.0) * (1 - 2*margin) + margin;
++
++    return texture2D(
++        texture2D_LUT,
++        vec2(0.0, clamp(value, 0.0, 1.0))
++    );
++}
++"""
++
++
++direct_lookup_shader = """
++uniform sampler2D texture2D_keys;
++uniform sampler2D texture2D_values;
++uniform vec2 LUT_shape;
++
++
++vec4 sample_label_color(float t) {
++    if (($use_selection) && ($selection != t)) {
++        return vec4(0);
++    }
++
++    float empty = 0.;
++    // get position in the texture grid (same as hash2d_get)
++    vec2 pos = vec2(
++        mod(int(t / LUT_shape.y), LUT_shape.x),
++        mod(t, LUT_shape.y)
++    );
++
++    // add .5 to move to the center of each texel and convert to texture coords
++    vec2 pos_tex = (pos + vec2(.5)) / LUT_shape;
++
++    // sample key texture
++    float found = texture2D(
++        texture2D_keys,
++        pos_tex
++    ).r;
++
++    // return vec4(pos_tex, 0, 1); // debug if texel is calculated correctly (correct)
++    // return vec4(found / 15, 0, 0, 1); // debug if key is calculated correctly (correct, should be a black-to-red gradient)
++
++    // we get a different value:
++    // - if it's the empty key, exit;
++    // - otherwise, it's a hash collision: continue searching
++    while ((abs(found - t) > 1e-8) && (abs(found - empty) > 1e-8)) {
++        t = t + 1;
++        // same as above
++        vec2 pos = vec2(
++            mod(int(t / LUT_shape.y), LUT_shape.x),
++            mod(t, LUT_shape.y)
++        );
++        pos_tex = (pos + vec2(.5)) / LUT_shape;
++
++        found = texture2D(
++            texture2D_keys,
++            pos_tex
++        ).r;
++    }
++
++    // return vec4(pos_tex, 0, 1); // debug if final texel is calculated correctly
++
++    vec4 color = vec4(0);
++    if (abs(found - empty) > 1e-8) {
++        color = texture2D(
++            texture2D_values,
++            pos_tex
++        );
++    }
++    return color;
++}
++
++"""
++
++
++class LabelVispyColormap(VispyColormap):
++    def __init__(
++        self,
++        colors,
++        controls=None,
++        seed=0.5,
++        use_selection=False,
++        selection=0.0,
++    ):
++        super().__init__(colors, controls, interpolation='zero')
++        self.glsl_map = (
++            low_disc_lookup_shader.replace('$seed', str(seed))
++            .replace('$use_selection', str(use_selection).lower())
++            .replace('$selection', str(selection))
++        )
++
++
++class DirectLabelVispyColormap(VispyColormap):
++    def __init__(
++        self,
++        use_selection=False,
++        selection=0.0,
++    ):
++        colors = ['w', 'w']  # dummy values, since we use our own machinery
++        super().__init__(colors, controls=None, interpolation='zero')
++        self.glsl_map = direct_lookup_shader.replace(
++            '$use_selection', str(use_selection).lower()
++        ).replace('$selection', str(selection))
++
++
++def idx_to_2D(idx, shape):
++    """
++    From a 1D index generate a 2D index that fits the given shape.
++
++    The 2D index will wrap around line by line and back to the beginning.
++    """
++    return (idx // shape[1]) % shape[0], (idx % shape[1])
++
++
++def hash2d_get(key, keys, values, empty_val=0):
++    """
++    Given a key, retrieve its location in the keys table.
++    """
++    pos = idx_to_2D(key, keys.shape)
++    initial_key = key
++    while keys[pos] != key and keys[pos] != empty_val:
++        if key - initial_key > keys.size:
++            raise KeyError('label does not exist')
++        key += 1
++        pos = idx_to_2D(key, keys.shape)
++    return pos if keys[pos] == key else None
++
++
++def hash2d_set(key, value, keys, values, empty_val=0):
++    """
++    Set a value in the 2d hashmap, wrapping around to avoid collision.
++    """
++    if key is None:
++        return
++    pos = idx_to_2D(key, keys.shape)
++    initial_key = key
++    while keys[pos] != empty_val:
++        if key - initial_key > keys.size:
++            raise OverflowError('too many labels')
++        key += 1
++        pos = idx_to_2D(key, keys.shape)
++    keys[pos] = key
++    values[pos] = value
++
++
++def build_textures_from_dict(color_dict, empty_val=0, shape=(1000, 1000)):
++    keys = np.full(shape, empty_val, dtype=np.float32)
++    values = np.zeros(shape + (4,), dtype=np.float32)
++    for key, value in color_dict.items():
++        hash2d_set(key, value, keys, values)
++    return keys, values
+
+
+ class VispyLabelsLayer(VispyImageLayer):
+-    def __init__(self, *args, **kwargs) -> None:
+-        super().__init__(*args, texture_format=None, **kwargs)
++    def __init__(self, layer, node=None, texture_format='r32f') -> None:
++        super().__init__(
++            layer,
++            node=node,
++            texture_format=texture_format,
++            layer_node_class=LabelLayerNode,
++        )
+
++        self.layer.events.color_mode.connect(self._on_colormap_change)
+         self.layer.events.labels_update.connect(self._on_partial_labels_update)
++        self.layer.events.selected_label.connect(self._on_colormap_change)
++        self.layer.events.show_selected_label.connect(self._on_colormap_change)
++
++    def _on_rendering_change(self):
++        # overriding the Image method so we can maintain the same old rendering name
++        if isinstance(self.node, VolumeNode):
++            rendering = self.layer.rendering
++            self.node.method = (
++                rendering
++                if rendering != 'translucent'
++                else 'translucent_categorical'
++            )
++            self._on_attenuation_change()
++            self._on_iso_threshold_change()
++
++    def _on_colormap_change(self, event=None):
++        # self.layer.colormap is a labels_colormap, which is an evented model
++        # from napari.utils.colormaps.Colormap (or similar). If we use it
++        # in our constructor, we have access to the texture data we need
++        colormap = self.layer.colormap
++        mode = self.layer.color_mode
++
++        if mode == 'auto':
++            self.node.cmap = LabelVispyColormap(
++                colors=colormap.colors,
++                controls=colormap.controls,
++                seed=colormap.seed,
++                use_selection=colormap.use_selection,
++                selection=colormap.selection,
++            )
++        elif mode == 'direct':
++            color_dict = (
++                self.layer.color
++            )  # TODO: should probably account for non-given labels
++            key_texture, val_texture = build_textures_from_dict(color_dict)
++            self.node.cmap = DirectLabelVispyColormap(
++                use_selection=colormap.use_selection,
++                selection=colormap.selection,
++            )
++            # note that textures have to be transposed here!
++            self.node.shared_program['texture2D_keys'] = Texture2D(
++                key_texture.T, internalformat='r32f', interpolation='nearest'
++            )
++            self.node.shared_program['texture2D_values'] = Texture2D(
++                val_texture.swapaxes(0, 1),
++                internalformat='rgba32f',
++                interpolation='nearest',
++            )
++            self.node.shared_program['LUT_shape'] = key_texture.shape
++        else:
++            self.node.cmap = VispyColormap(*colormap)
+
+     def _on_partial_labels_update(self, event):
+         if not self.layer.loaded:
+@@ -22,3 +254,49 @@ class VispyLabelsLayer(VispyImageLayer):
+             event.data, copy=False, offset=event.offset
+         )
+         self.node.update()
++
++
++class LabelVisual(ImageVisual):
++    def __init__(self, *args, **kwargs):
++        super().__init__(*args, **kwargs)
++
++    def _build_color_transform(self):
++        fun = FunctionChain(
++            None,
++            [
++                Function(self._func_templates['red_to_luminance']),
++                Function(self.cmap.glsl_map),
++            ],
++        )
++        return fun
++
++
++class LabelLayerNode(ImageLayerNode):
++    def __init__(self, custom_node: Node = None, texture_format=None):
++        self._custom_node = custom_node
++        self._image_node = LabelNode(
++            None
++            if (texture_format is None or texture_format == 'auto')
++            else np.array([[0.0]], dtype=np.float32),
++            method='auto',
++            texture_format=texture_format,
++        )
++
++        self._volume_node = VolumeNode(
++            np.zeros((1, 1, 1), dtype=np.float32),
++            clim=[0, 2**23 - 1],
++            texture_format=texture_format,
++        )
++
++
++BaseLabel = create_visual_node(LabelVisual)
++
++
++class LabelNode(BaseLabel):  # type: ignore [valid-type,misc]
++    def _compute_bounds(self, axis, view):
++        if self._data is None:
++            return None
++        elif axis > 1:  # noqa: RET505
++            return (0, 0)
++        else:
++            return (0, self.size[axis])
+diff --git a/napari/_vispy/visuals/volume.py b/napari/_vispy/visuals/volume.py
+index f3067487..06f3956b 100644
+--- a/napari/_vispy/visuals/volume.py
++++ b/napari/_vispy/visuals/volume.py
+@@ -32,7 +32,7 @@ int detectAdjacentBackground(float val_neg, float val_pos)
+     return adjacent_bg;
+ }
+
+-vec4 calculateCategoricalColor(vec4 betterColor, vec3 loc, vec3 step)
++vec4 calculateShadedCategoricalColor(vec4 betterColor, vec3 loc, vec3 step)
+ {
+     // Calculate color by incorporating ambient and diffuse lighting
+     vec4 color0 = $get_data(loc);
+@@ -119,6 +119,7 @@ ISO_CATEGORICAL_SNIPPETS = {
+         vec3 dstep = 1.5 / u_shape;  // step to sample derivative, set to match iso shader
+         gl_FragColor = vec4(0.0);
+         bool discard_fragment = true;
++        vec4 label_id = vec4(0.0);
+         """,
+     "in_loop": """
+         // check if value is different from the background value
+@@ -126,12 +127,51 @@ ISO_CATEGORICAL_SNIPPETS = {
+             // Take the last interval in smaller steps
+             vec3 iloc = loc - step;
+             for (int i=0; i<10; i++) {
+-                color = $get_data(iloc);
+-                color = applyColormap(color.g);
++                label_id = $get_data(iloc);
++                color = sample_label_color(label_id.r);
+                 if (floatNotEqual(color.a, 0) ) {
++                    // fully transparent color is considered as background, see napari/napari#5227
++                    // when the value mapped to non-transparent color is reached
++                    // calculate the shaded color (apply lighting effects)
++                    color = calculateShadedCategoricalColor(color, iloc, dstep);
++                    gl_FragColor = color;
++
++                    // set the variables for the depth buffer
++                    frag_depth_point = iloc * u_shape;
++                    discard_fragment = false;
++
++                    iter = nsteps;
++                    break;
++                }
++                iloc += step * 0.1;
++            }
++        }
++        """,
++    "after_loop": """
++        if (discard_fragment)
++            discard;
++        """,
++}
++
++TRANSLUCENT_CATEGORICAL_SNIPPETS = {
++    "before_loop": """
++        vec4 color3 = vec4(0.0);  // final color
++        gl_FragColor = vec4(0.0);
++        bool discard_fragment = true;
++        vec4 label_id = vec4(0.0);
++        """,
++    "in_loop": """
++        // check if value is different from the background value
++        if ( floatNotEqual(val, categorical_bg_value) ) {
++            // Take the last interval in smaller steps
++            vec3 iloc = loc - step;
++            for (int i=0; i<10; i++) {
++                label_id = $get_data(iloc);
++                color = sample_label_color(label_id.r);
++                if (floatNotEqual(color.a, 0) ) {
++                    // fully transparent color is considered as background, see napari/napari#5227
+                     // when the value mapped to non-transparent color is reached
+                     // calculate the color (apply lighting effects)
+-                    color = calculateCategoricalColor(color, iloc, dstep);
+                     gl_FragColor = color;
+
+                     // set the variables for the depth buffer
+@@ -157,6 +197,7 @@ shaders['fragment'] = before + FUNCTION_DEFINITIONS + 'void main()' + after
+
+ rendering_methods = BaseVolume._rendering_methods.copy()
+ rendering_methods['iso_categorical'] = ISO_CATEGORICAL_SNIPPETS
++rendering_methods['translucent_categorical'] = TRANSLUCENT_CATEGORICAL_SNIPPETS
+
+
+ class Volume(BaseVolume):
+diff --git a/napari/layers/labels/_tests/test_labels.py b/napari/layers/labels/_tests/test_labels.py
+index b11cc342..f8c4f9d3 100644
+--- a/napari/layers/labels/_tests/test_labels.py
++++ b/napari/layers/labels/_tests/test_labels.py
+@@ -12,7 +12,6 @@ import zarr
+ from numpy.core.numerictypes import issubdtype
+ from numpy.testing import assert_array_almost_equal, assert_raises
+ from skimage import data
+-from vispy.color import Colormap as VispyColormap
+
+ from napari._tests.utils import check_layer_world_data_extent
+ from napari.components import ViewerModel
+@@ -20,7 +19,7 @@ from napari.layers import Labels
+ from napari.layers.labels._labels_constants import LabelsRendering
+ from napari.layers.labels._labels_utils import get_contours
+ from napari.utils import Colormap
+-from napari.utils.colormaps import label_colormap, low_discrepancy_image
++from napari.utils.colormaps import label_colormap
+
+
+ def test_random_labels():
+@@ -241,13 +240,12 @@ def test_seed():
+     layer = Labels(data, seed=0.7)
+     assert layer.seed == 0.7
+
+-    # ensure setting seed triggers
+-    # recalculation of _all_vals
+-    _all_vals_07 = layer._all_vals.copy()
++    # ensure setting seed updates the random colormap
++    mapped_07 = layer._random_colormap.map(layer.data)
+     layer.seed = 0.4
+-    _all_vals_04 = layer._all_vals.copy()
++    mapped_04 = layer._random_colormap.map(layer.data)
+     assert_raises(
+-        AssertionError, assert_array_almost_equal, _all_vals_04, _all_vals_07
++        AssertionError, assert_array_almost_equal, mapped_07, mapped_04
+     )
+
+
+@@ -256,7 +254,7 @@ def test_num_colors():
+     np.random.seed(0)
+     data = np.random.randint(20, size=(10, 15))
+     layer = Labels(data)
+-    assert layer.num_colors == 50
++    assert layer.num_colors == 49
+
+     layer.num_colors = 80
+     assert layer.num_colors == 80
+@@ -386,8 +384,15 @@ def test_label_colormap():
+     # Make sure color 0 is transparent
+     assert not np.any(colormap.map([0.0]))
+
+-    # Test that out-of-range values map to last value
+-    assert np.all(colormap.map([1.0, 1.1, 2.0]) == colormap.colors[-1])
++    # test that all four colors are represented in a large set of random
++    # labels.
++    # we choose non-zero labels, and then there should not be any transparent
++    # values.
++    labels = np.random.randint(1, 2**23, size=(100, 100)).astype(np.float32)
++    colormapped = colormap.map(labels)
++    linear = np.reshape(colormapped, (-1, 4))
++    unique = np.unique(linear, axis=0)
++    assert len(unique) == 4
+
+
+ def test_custom_color_dict():
+@@ -405,77 +410,12 @@ def test_custom_color_dict():
+     assert (layer.get_color(4) == layer.get_color(16)).all()
+     assert (layer.get_color(8) == layer.get_color(32)).all()
+
+-    # Test to see if our label mapped control points map to those in the colormap
+-    # with an extra half step.
+-    local_controls = np.array(
+-        sorted(np.unique([*layer._label_color_index.values(), 1.0]))
+-    )
+-    colormap_controls = np.array(layer._colormap.controls)
+-    assert np.max(np.abs(local_controls - colormap_controls)) == pytest.approx(
+-        0.5 / (len(colormap_controls) - 1)
+-    )
+-
+     # test disable custom color dict
+     # should not initialize as white since we are using random.seed
+     layer.color_mode = 'auto'
+     assert not (layer.get_color(1) == np.array([1.0, 1.0, 1.0, 1.0])).all()
+
+
+-def test_large_custom_color_dict():
+-    """Confirm that the napari & vispy colormaps behave the same."""
+-
+-    label_count = 897
+-    colors = {
+-        color: (0, (color / 256.0) / 256.0, (color % 256) / 256.0)
+-        for color in range(label_count)
+-    }
+-    data, _ = np.meshgrid(range(label_count), range(5))
+-    layer = Labels(data, color=colors)
+-
+-    # Get color list using layer interface & napari.utils.colormap.ColorMap
+-    label_color = layer.get_color(list(range(label_count)))
+-
+-    # Get the color by converting to control points with the layer and passing
+-    # that to a vispy.color.colormap.Colormap
+-    vispy_colormap = VispyColormap(
+-        colors=layer.colormap.colors,
+-        controls=layer.colormap.controls,
+-        interpolation='zero',
+-    )
+-    label_color_controls = [
+-        layer._label_color_index[x] for x in range(label_count)
+-    ]
+-    vispy_colors = vispy_colormap.map(np.array(list(label_color_controls)))
+-
+-    assert (label_color == vispy_colors).all()
+-
+-
+-def test_warning_too_many_colors():
+-    label_count = 1500
+-    colors = {
+-        color: (0, (color / 256.0) / 256.0, (color % 256) / 256.0)
+-        for color in range(label_count)
+-    }
+-    data, _ = np.meshgrid(range(label_count), range(5))
+-    with pytest.warns(UserWarning):
+-        # Expect a warning for 1500 colors > 1024 in LUT
+-        Labels(data, color=colors)
+-
+-
+-def test_add_colors():
+-    """Test adding new colors"""
+-    data = np.random.randint(20, size=(40, 40))
+-    layer = Labels(data)
+-    assert len(layer._all_vals) == np.max(data) + 1
+-
+-    layer.selected_label = 51
+-    assert len(layer._all_vals) == 52
+-
+-    layer.show_selected_label = True
+-    layer.selected_label = 53
+-    assert len(layer._all_vals) == 54
+-
+-
+ def test_metadata():
+     """Test setting labels metadata."""
+     np.random.seed(0)
+@@ -594,7 +534,8 @@ def test_contour(input_data, expected_data_view):
+     np.testing.assert_array_equal(layer.data, input_data)
+
+     np.testing.assert_array_equal(
+-        layer._raw_to_displayed(input_data), layer._data_view
++        layer._raw_to_displayed(input_data.astype(np.float32)),
++        layer._data_view,
+     )
+     data_view_before_contour = layer._data_view.copy()
+
+@@ -609,7 +550,7 @@ def test_contour(input_data, expected_data_view):
+         layer._data_view,
+         np.where(
+             expected_data_view > 0,
+-            low_discrepancy_image(expected_data_view),
++            expected_data_view,
+             0,
+         ),
+     )
+@@ -1011,40 +952,21 @@ def test_ndim_paint():
+     )
+
+
+-def test_switching_display_func():
+-    label_data = np.random.randint(2**25, 2**25 + 5, size=(50, 50))
+-    layer = Labels(label_data)
+-    assert layer._color_lookup_func == layer._lookup_with_low_discrepancy_image
+-
+-    label_data = np.random.randint(0, 5, size=(50, 50))
+-    layer = Labels(label_data)
+-    assert layer._color_lookup_func == layer._lookup_with_index
+-
+-
+ def test_cursor_size_with_negative_scale():
+     layer = Labels(np.zeros((5, 5), dtype=int), scale=[-1, -1])
+     layer.mode = 'paint'
+     assert layer.cursor_size > 0
+
+
+-def test_switching_display_func_during_slicing():
+-    label_array = (5e6 * np.ones((2, 2, 2))).astype(np.uint64)
+-    label_array[0, :, :] = [[0, 1], [2, 3]]
+-    layer = Labels(label_array)
+-    layer._slice_dims(point=(1, 0, 0))
+-    assert layer._color_lookup_func == layer._lookup_with_low_discrepancy_image
+-    assert layer._all_vals.size < 1026
+-
+-
+-def test_add_large_colors():
+-    label_array = (5e6 * np.ones((2, 2, 2))).astype(np.uint64)
+-    label_array[0, :, :] = [[0, 1], [2, 3]]
++@pytest.mark.xfail(
++    reason="labels are converted to float32 before being mapped"
++)
++def test_large_label_values():
++    label_array = 2**23 + np.arange(4, dtype=np.uint64).reshape((2, 2))
+     layer = Labels(label_array)
+-    assert len(layer._all_vals) == 4
++    mapped = layer._random_colormap.map(layer.data)
+
+-    layer.show_selected_label = True
+-    layer.selected_label = int(5e6)
+-    assert layer._all_vals.size < 1026
++    assert len(np.unique(mapped.reshape((-1, 4)), axis=0)) == 4
+
+
+ def test_fill_tensorstore():
+@@ -1484,15 +1406,14 @@ def test_color_mapping_with_show_selected_label():
+
+     data = np.arange(5, dtype=np.int32)[:, np.newaxis].repeat(5, axis=1)
+     layer = Labels(data)
+-    mapped_colors_all = layer._raw_to_displayed(layer._slice.image.raw).copy()
++    mapped_colors_all = layer.colormap.map(data)
+
+-    layer.selected_label = 1
+     layer.show_selected_label = True
+
+-    for selected_label in range(1, 5):
++    for selected_label in range(5):
+         layer.selected_label = selected_label
+         label_mask = data == selected_label
+-        mapped_colors = layer._raw_to_displayed(layer._slice.image.raw)
++        mapped_colors = layer.colormap.map(data)
+
+         assert np.allclose(
+             mapped_colors[label_mask], mapped_colors_all[label_mask]
+@@ -1500,19 +1421,17 @@ def test_color_mapping_with_show_selected_label():
+         assert np.allclose(mapped_colors[np.logical_not(label_mask)], 0)
+
+     layer.show_selected_label = False
+-    assert np.allclose(
+-        layer._raw_to_displayed(layer._slice.image.raw), mapped_colors_all
+-    )
++    assert np.allclose(layer.colormap.map(data), mapped_colors_all)
+
+
+ def test_color_mapping_when_seed_is_changed():
+     """Checks if the color mapping is updated when the color palette seed is changed."""
+     np.random.seed(0)
+     layer = Labels(np.random.randint(50, size=(10, 10)))
+-    mapped_colors1 = layer._raw_to_displayed(layer._slice.image.raw)
++    mapped_colors1 = layer.colormap.map(layer._as_type(layer._slice.image.raw))
+
+     layer.new_colormap()
+-    mapped_colors2 = layer._raw_to_displayed(layer._slice.image.raw)
++    mapped_colors2 = layer.colormap.map(layer._as_type(layer._slice.image.raw))
+
+     assert not np.allclose(mapped_colors1, mapped_colors2)
+
+@@ -1540,9 +1459,6 @@ def test_negative_label_slicing():
+     assert tuple(layer.get_color(-2)) != tuple(layer.get_color(100))
+
+
+-@pytest.mark.xfail(
+-    reason='This is a known bug with the current label color implementation'
+-)
+ def test_negative_label_doesnt_flicker():
+     data = np.array(
+         [
+@@ -1553,16 +1469,12 @@ def test_negative_label_doesnt_flicker():
+     )
+     layer = Labels(data)
+     layer._slice_dims(point=(1, 0, 0))
+-    # this is expected to fail: -1 doesn't trigger an index error in
+-    # layer._all_vals, it instead just wraps to 5, the previous max label.
++    # This used to fail when negative values were used to index into _all_vals.
+     assert tuple(layer.get_color(-1)) != tuple(layer.get_color(5))
+     minus_one_color_original = tuple(layer.get_color(-1))
+     layer.dims_point = (2, 0, 0)
+     layer._set_view_slice()
+-    # this is also expected to fail: when we switch layers, we see the 6
+-    # label, which causes an index error, which triggers a recalculation of
+-    # the label colors. Now -1 is seen so it is taken into account in the
+-    # indexing calculation, and changes color
++
+     assert tuple(layer.get_color(-1)) == minus_one_color_original
+
+
+diff --git a/napari/layers/labels/labels.py b/napari/layers/labels/labels.py
+index 49eb89e4..00873ae5 100644
+--- a/napari/layers/labels/labels.py
++++ b/napari/layers/labels/labels.py
+@@ -32,7 +32,7 @@ from napari.layers.utils.layer_utils import _FeatureTable
+ from napari.utils import config
+ from napari.utils._dtype import normalize_dtype
+ from napari.utils.colormaps import (
+-    color_dict_to_colormap,
++    direct_colormap,
+     label_colormap,
+     low_discrepancy_image,
+ )
+@@ -229,6 +229,7 @@ class Labels(_ImageBase):
+         Mode.FILL: no_op,
+         Mode.ERASE: no_op,
+     }
++
+     _cursor_modes = {
+         Mode.PAN_ZOOM: 'standard',
+         Mode.TRANSFORM: 'standard',
+@@ -244,7 +245,7 @@ class Labels(_ImageBase):
+         self,
+         data,
+         *,
+-        num_colors=50,
++        num_colors=49,
+         features=None,
+         properties=None,
+         color=None,
+@@ -272,8 +273,8 @@ class Labels(_ImageBase):
+         self._seed = seed
+         self._background_label = 0
+         self._num_colors = num_colors
+-        self._random_colormap = label_colormap(self.num_colors)
+-        self._all_vals = np.array([], dtype=np.float32)
++        self._random_colormap = label_colormap(self.num_colors, seed)
++        self._direct_colormap = direct_colormap()
+         self._color_mode = LabelColorMode.AUTO
+         self._show_selected_label = False
+         self._contour = 0
+@@ -281,13 +282,12 @@ class Labels(_ImageBase):
+         self._cached_mapped_labels = None
+
+         data = self._ensure_int_labels(data)
+-        self._color_lookup_func = None
+
+         super().__init__(
+             data,
+             rgb=False,
+             colormap=self._random_colormap,
+-            contrast_limits=[0.0, 1.0],
++            contrast_limits=[0.0, 2**23 - 1.0],
+             interpolation2d='nearest',
+             interpolation3d='nearest',
+             rendering=rendering,
+@@ -335,6 +335,8 @@ class Labels(_ImageBase):
+         self._brush_size = 10
+
+         self._selected_label = 1
++        self.colormap.selection = self._selected_label
++        self.colormap.use_selection = self._show_selected_label
+         self._selected_color = self.get_color(self._selected_label)
+         self._updated_slice = None
+         self.color = color
+@@ -434,11 +436,10 @@ class Labels(_ImageBase):
+     @seed.setter
+     def seed(self, seed):
+         self._seed = seed
+-        # invalidate _all_vals to trigger re-generation
+-        # in _raw_to_displayed
+-        self._all_vals = np.array([], dtype=np.float32)
++        self.colormap.seed = seed
+         self._cached_labels = None  # invalidate the cached color mapping
+         self._selected_color = self.get_color(self.selected_label)
++        self.events.colormap()  # Will update the LabelVispyColormap shader
+         self.refresh()
+         self.events.selected_label()
+
+@@ -539,6 +540,7 @@ class Labels(_ImageBase):
+             for label, color_str in color.items()
+         }
+         self._color = colors
++        self._direct_colormap = direct_colormap(colors)
+
+         # `colors` may contain just the default None and background label
+         # colors, in which case we need to be in AUTO color mode. Otherwise,
+@@ -650,12 +652,12 @@ class Labels(_ImageBase):
+         if selected_label == self.selected_label:
+             return
+
++        self.colormap.selection = selected_label
+         self._selected_label = selected_label
+         self._selected_color = self.get_color(selected_label)
++
+         self.events.selected_label()
+
+-        # note: self.color_mode returns a string and this comparison fails,
+-        # so use self._color_mode
+         if self.show_selected_label:
+             self._cached_labels = None  # invalidates labels cache
+             self.refresh()
+@@ -673,22 +675,12 @@ class Labels(_ImageBase):
+     @color_mode.setter
+     def color_mode(self, color_mode: Union[str, LabelColorMode]):
+         color_mode = LabelColorMode(color_mode)
+-
+-        if color_mode == LabelColorMode.DIRECT:
+-            custom_colormap, label_color_index = color_dict_to_colormap(
+-                self.color
+-            )
+-            super()._set_colormap(custom_colormap)
+-            self._label_color_index = label_color_index
+-        elif color_mode == LabelColorMode.AUTO:
+-            self._label_color_index = {}
+-            super()._set_colormap(self._random_colormap)
+-
+-        else:
+-            raise ValueError(trans._("Unsupported Color Mode"))
+-
+         self._cached_labels = None  # invalidates labels cache
+         self._color_mode = color_mode
++        if color_mode == LabelColorMode.AUTO:
++            super()._set_colormap(self._random_colormap)
++        else:
++            super()._set_colormap(self._direct_colormap)
+         self._selected_color = self.get_color(self.selected_label)
+         self.events.color_mode()
+         self.events.colormap()
+@@ -701,9 +693,10 @@ class Labels(_ImageBase):
+         return self._show_selected_label
+
+     @show_selected_label.setter
+-    def show_selected_label(self, filter_val):
+-        self._show_selected_label = filter_val
+-        self.events.show_selected_label(show_selected_label=filter_val)
++    def show_selected_label(self, show_selected):
++        self._show_selected_label = show_selected
++        self.colormap.use_selection = show_selected
++        self.events.show_selected_label(show_selected_label=show_selected)
+         self._cached_labels = None
+         self.refresh()
+
+@@ -764,14 +757,8 @@ class Labels(_ImageBase):
+
+     @contrast_limits.setter
+     def contrast_limits(self, value):
+-        # Setting contrast_limits of labels layers leads to wrong visualization of the layer
+-        if tuple(value) != (0, 1):
+-            raise AttributeError(
+-                trans._(
+-                    "Setting contrast_limits on labels layers is not allowed.",
+-                    deferred=True,
+-                )
+-            )
++        # Setting contrast_limits of labels layers leads to wrong visualization
++        # of the layer, so we ignore the value
+         self._contrast_limits = (0, 1)
+
+     def _reset_editable(self) -> None:
+@@ -805,100 +792,13 @@ class Labels(_ImageBase):
+             image = np.where(im != 0, low_discrepancy_image(im, self._seed), 0)
+         return image
+
+-    def _lookup_with_index(self, im, selected_label=None):
+-        """Returns display version of im using color lookup array by index
+-
+-        Parameters
+-        ----------
+-        im : array or int
+-            Raw integer input image.
+-        selected_label : int, optional
+-            Value of selected label to color, by default None
+-        """
+-        if selected_label:
+-            if selected_label > len(self._all_vals):
+-                self._color_lookup_func = self._get_color_lookup_func(
+-                    im,
+-                    min(np.min(im), selected_label),
+-                    max(np.max(im), selected_label),
+-                )
+-            if (
+-                self._color_lookup_func
+-                == self._lookup_with_low_discrepancy_image
+-            ):
+-                image = self._color_lookup_func(im, selected_label)
+-            else:
+-                colors = np.zeros_like(self._all_vals)
+-                colors[selected_label] = low_discrepancy_image(
+-                    selected_label, self._seed
+-                )
+-                image = colors[im]
+-        else:
+-            try:
+-                image = self._all_vals[im]
+-            except IndexError:
+-                self._color_lookup_func = self._get_color_lookup_func(
+-                    im, np.min(im), np.max(im)
+-                )
+-                if (
+-                    self._color_lookup_func
+-                    == self._lookup_with_low_discrepancy_image
+-                ):
+-                    # revert to "classic" mode converting all pixels since we
+-                    # encountered a large value in the raw labels image
+-                    image = self._color_lookup_func(im, selected_label)
+-                else:
+-                    image = self._all_vals[im]
+-        return image
+-
+-    def _get_color_lookup_func(self, data, min_label_val, max_label_val):
+-        """Returns function used for mapping label values to colors
+-
+-        If array of [0..max(data)] would be larger than data,
+-        returns lookup_with_low_discrepancy_image, otherwise returns
+-        lookup_with_index
+-
+-        Parameters
+-        ----------
+-        data : array
+-            labels data
+-        min_label_val : int
+-            minimum label value in data
+-        max_label_val : int
+-            maximum label value in data
+-
+-        Returns
+-        -------
+-        lookup_func : function
+-            function to use for mapping label values to colors
+-        """
+-
+-        # low_discrepancy_image is slow for large images, but large labels can
+-        # blow up memory usage of an index array of colors. If the index array
+-        # would be larger than the image, we go back to computing the low
+-        # discrepancy image on the whole input image. (Up to a minimum value of
+-        # 1kB.)
+-        min_label_val0 = min(min_label_val, 0)
+-        # +1 to allow indexing with max_label_val
+-        data_range = max_label_val - min_label_val0 + 1
+-        nbytes_low_discrepancy = low_discrepancy_image(np.array([0])).nbytes
+-        max_nbytes = max(data.nbytes, 1024)
+-        if data_range * nbytes_low_discrepancy > max_nbytes:
+-            return self._lookup_with_low_discrepancy_image
+-
+-        if self._all_vals.size < data_range:
+-            new_all_vals = low_discrepancy_image(
+-                np.arange(min_label_val0, max_label_val + 1, dtype=np.float32),
+-                self._seed,
+-            )
+-            self._all_vals = np.roll(new_all_vals, min_label_val0)
+-            self._all_vals[0] = 0
+-        return self._lookup_with_index
++    def _as_type(self, data, selected_label=None):
++        return data.astype(np.float32)
+
+     def _partial_labels_refresh(self):
+         """Prepares and displays only an updated part of the labels."""
+
+-        if self._updated_slice is None or not self._slice.loaded:
++        if self._updated_slice is None or not self.loaded:
+             return
+
+         dims_displayed = self._slice_input.displayed
+@@ -944,6 +844,7 @@ class Labels(_ImageBase):
+         labels = raw  # for readability
+         sliced_labels = None
+
++        # lookup function -> self._as_type
+         if self.contour > 0:
+             if labels.ndim == 2:
+                 # Add one more pixel for the correct borders computation
+@@ -996,7 +897,7 @@ class Labels(_ImageBase):
+         if labels_to_map.size == 0:
+             return self._cached_mapped_labels[data_slice]
+
+-        mapped_labels = self._map_labels_to_colors(labels_to_map)
++        mapped_labels = self._as_type(labels_to_map)
+
+         if update_mask is not None:
+             self._cached_mapped_labels[data_slice][update_mask] = mapped_labels
+@@ -1005,79 +906,43 @@ class Labels(_ImageBase):
+
+         return self._cached_mapped_labels[data_slice]
+
+-    def _map_labels_to_colors(self, labels_to_map):
+-        """Convert an integer labels to a float array of encoded colors.
++    def _update_thumbnail(self):
++        """Update the thumbnail with current data and colormap.
+
+-        Parameters
+-        ----------
+-        labels_to_map : array
+-            Integer input labels.
+-        Returns
+-        -------
+-             Encoded colors mapped between 0 and 1.
++        This is overridden from _ImageBase because we don't need to do things
++        like adjusting gamma or changing the data based on the contrast
++        limits.
+         """
+-        if self._color_lookup_func is None:
+-            self._color_lookup_func = self._get_color_lookup_func(
+-                labels_to_map, np.min(labels_to_map), np.max(labels_to_map)
+-            )
+-        if (
+-            not self.show_selected_label
+-            and self._color_mode == LabelColorMode.DIRECT
+-        ):
+-            min_label_id = labels_to_map.min()
+-            max_label_id = labels_to_map.max()
+-            upper_bound_n_unique_labels = max_label_id - min_label_id
+-            none_color_index = self._label_color_index[None]
++        if not self.loaded:
++            # ASYNC_TODO: Do not compute the thumbnail until we are loaded.
++            # Is there a nicer way to prevent this from getting called?
++            return
+
+-            if upper_bound_n_unique_labels < 65536:
+-                mapping = np.array(
+-                    [
+-                        self._label_color_index.get(label_id, none_color_index)
+-                        for label_id in range(min_label_id, max_label_id + 1)
+-                    ]
+-                )
+-                mapped_labels = mapping[labels_to_map - min_label_id]
+-            else:
+-                unique_ids, inv = np.unique(labels_to_map, return_inverse=True)
+-                mapped_labels = np.array(
+-                    [
+-                        self._label_color_index.get(label_id, none_color_index)
+-                        for label_id in unique_ids
+-                    ]
+-                )[inv].reshape(labels_to_map.shape)
+-        elif (
+-            not self.show_selected_label
+-            and self._color_mode == LabelColorMode.AUTO
+-        ):
+-            mapped_labels = self._color_lookup_func(labels_to_map)
+-        elif (
+-            self.show_selected_label
+-            and self._color_mode == LabelColorMode.AUTO
+-        ):
+-            mapped_labels = self._color_lookup_func(
+-                labels_to_map, self._selected_label
+-            )
+-        elif (
+-            self.show_selected_label
+-            and self._color_mode == LabelColorMode.DIRECT
+-        ):
+-            selected_label = self._selected_label
+-            if selected_label not in self._label_color_index:
+-                selected_label = None
+-            index = self._label_color_index
+-            mapped_labels = np.where(
+-                labels_to_map == selected_label,
+-                index[selected_label],
+-                np.where(
+-                    labels_to_map != self._background_label,
+-                    index[None],
+-                    index[self._background_label],
+-                ),
+-            )
+-        else:
+-            raise ValueError("Unsupported Color Mode")
++        image = self._slice.thumbnail.view
++        if self._slice_input.ndisplay == 3 and self.ndim > 2:
++            # we are only using the current slice so `image` will never be
++            # bigger than 3. If we are in this clause, it is exactly 3, so we
++            # use max projection. For labels, ideally we would use "first
++            # nonzero projection", but we leave that for a future PR. (TODO)
++            image = np.max(image, axis=0)
++        imshape = np.array(image.shape[:2])
++        thumbshape = np.array(self._thumbnail_shape[:2])
++
++        raw_zoom_factor = np.min(thumbshape / imshape)
++        new_shape = np.clip(
++            raw_zoom_factor * imshape, a_min=1, a_max=thumbshape
++        )
++        zoom_factor = tuple(new_shape / imshape)
+
+-        return mapped_labels
++        downsampled = ndi.zoom(image, zoom_factor, prefilter=False, order=0)
++        if self.color_mode == LabelColorMode.AUTO:
++            color_array = self.colormap.map(downsampled.ravel())
++        else:  # direct
++            color_array = self._direct_colormap.map(downsampled.ravel())
++        colormapped = color_array.reshape(downsampled.shape + (4,))
++        colormapped[..., 3] *= self.opacity
++
++        self.thumbnail = colormapped
+
+     def new_colormap(self):
+         self.seed = np.random.rand()
+@@ -1086,10 +951,12 @@ class Labels(_ImageBase):
+         """Return the color corresponding to a specific label."""
+         if label == 0:
+             col = None
+-        elif label is None:
++        elif label is None or (
++            self.show_selected_label and label != self.selected_label
++        ):
+             col = self.colormap.map([0, 0, 0, 0])[0]
+         else:
+-            val = self._map_labels_to_colors(np.array([label]))
++            val = self._as_type(np.array([label]))
+             col = self.colormap.map(val)[0]
+         return col
+
+diff --git a/napari/utils/colormaps/__init__.py b/napari/utils/colormaps/__init__.py
+index d204d0dd..be76af6a 100644
+--- a/napari/utils/colormaps/__init__.py
++++ b/napari/utils/colormaps/__init__.py
+@@ -10,6 +10,7 @@ from napari.utils.colormaps.colormap_utils import (
+     SIMPLE_COLORMAPS,
+     ValidColormapArg,
+     color_dict_to_colormap,
++    direct_colormap,
+     display_name_to_name,
+     ensure_colormap,
+     label_colormap,
+@@ -30,6 +31,7 @@ __all__ = [
+     "ValidColormapArg",
+     "color_dict_to_colormap",
+     "display_name_to_name",
++    "direct_colormap",
+     "ensure_colormap",
+     "label_colormap",
+     "low_discrepancy_image",
+diff --git a/napari/utils/colormaps/_tests/test_colormaps.py b/napari/utils/colormaps/_tests/test_colormaps.py
+index acf41d51..77969eae 100644
+--- a/napari/utils/colormaps/_tests/test_colormaps.py
++++ b/napari/utils/colormaps/_tests/test_colormaps.py
+@@ -20,8 +20,12 @@ from napari.utils.colormaps.vendored import cm
+
+ @pytest.mark.parametrize("name", list(AVAILABLE_COLORMAPS.keys()))
+ def test_colormap(name):
+-    np.random.seed(0)
++    if name == 'label_colormap':
++        pytest.skip(
++            'label_colormap is inadvertantly added to AVAILABLE_COLORMAPS but is not a normal colormap'
++        )
+
++    np.random.seed(0)
+     cmap = AVAILABLE_COLORMAPS[name]
+
+     # Test can map random 0-1 values
+diff --git a/napari/utils/colormaps/colormap.py b/napari/utils/colormaps/colormap.py
+index 2b893cda..f2a29335 100644
+--- a/napari/utils/colormaps/colormap.py
++++ b/napari/utils/colormaps/colormap.py
+@@ -1,3 +1,4 @@
++from collections import defaultdict
+ from enum import Enum
+ from typing import Optional
+
+@@ -142,3 +143,68 @@ class Colormap(EventedModel):
+     @property
+     def colorbar(self):
+         return make_colorbar(self)
++
++
++class LabelColormap(Colormap):
++    """Colormap that shuffles values before mapping to colors.
++
++    Attributes
++    ----------
++    seed : float
++    use_selection : bool
++    selection : float
++    """
++
++    seed: float = 0.5
++    use_selection: bool = False
++    selection: float = 0.0
++    interpolation: ColormapInterpolationMode = ColormapInterpolationMode.ZERO
++
++    def map(self, values):
++        from napari.utils.colormaps.colormap_utils import low_discrepancy_image
++
++        # Convert to float32 to match the current GL shader implementation
++        values = np.atleast_1d(values).astype(np.float32)
++
++        values_low_discr = low_discrepancy_image(values, seed=self.seed)
++        mapped = super().map(values_low_discr)
++
++        # If using selected, disable all others
++        if self.use_selection:
++            mapped[~np.isclose(values, self.selection)] = 0
++
++        return mapped
++
++
++class DirectLabelColormap(Colormap):
++    """Colormap using a direct mapping from labels to color using a dict.
++
++    Attributes
++    ----------
++    color_dict: defaultdict
++        The dictionary mapping labels to colors.
++    use_selection: bool
++        Whether to color using the selected label.
++    selection: float
++        The selected label.
++    """
++
++    color_dict: defaultdict = defaultdict(lambda: np.zeros(4))
++    use_selection: bool = False
++    selection: float = 0.0
++
++    def map(self, values):
++        # Convert to float32 to match the current GL shader implementation
++        values = np.atleast_1d(values).astype(np.float32)
++        mapped = np.zeros(values.shape + (4,), dtype=np.float32)
++        for idx in np.ndindex(values.shape):
++            value = values[idx]
++            if value in self.color_dict:
++                color = self.color_dict[value]
++                if len(color) == 3:
++                    color = np.append(color, 1)
++                mapped[idx] = color
++        # If using selected, disable all others
++        if self.use_selection:
++            mapped[~np.isclose(values, self.selection)] = 0
++        return mapped
+diff --git a/napari/utils/colormaps/colormap_utils.py b/napari/utils/colormaps/colormap_utils.py
+index f747b1e4..169fe589 100644
+--- a/napari/utils/colormaps/colormap_utils.py
++++ b/napari/utils/colormaps/colormap_utils.py
+@@ -15,7 +15,12 @@ from vispy.color import (
+ from vispy.color.colormap import LUT_len
+
+ from napari.utils.colormaps.bop_colors import bopd
+-from napari.utils.colormaps.colormap import Colormap, ColormapInterpolationMode
++from napari.utils.colormaps.colormap import (
++    Colormap,
++    ColormapInterpolationMode,
++    DirectLabelColormap,
++    LabelColormap,
++)
+ from napari.utils.colormaps.inverse_colormaps import inverse_cmaps
+ from napari.utils.colormaps.standardize_color import transform_color
+ from napari.utils.colormaps.vendored import cm
+@@ -259,6 +264,9 @@ def low_discrepancy_image(image, seed=0.5, margin=1 / 256):
+     image_out = margin + (1 - 2 * margin) * (
+         image_float - np.floor(image_float)
+     )
++
++    # Clear zero (background) values, matching the shader behavior in _glsl_label_step
++    image_out[image == 0] = 0.0
+     return image_out
+
+
+@@ -419,28 +427,49 @@ def label_colormap(num_colors=256, seed=0.5):
+     """
+     # Starting the control points slightly above 0 and below 1 is necessary
+     # to ensure that the background pixel 0 is transparent
+-    midpoints = np.linspace(0.00001, 1 - 0.00001, num_colors)
++    midpoints = np.linspace(0.00001, 1 - 0.00001, num_colors + 1)
+     control_points = np.concatenate(([0], midpoints, [1.0]))
+     # make sure to add an alpha channel to the colors
+     colors = np.concatenate(
+         (
+-            _color_random(num_colors + 1, seed=seed),
+-            np.full((num_colors + 1, 1), 1),
++            _color_random(num_colors + 2, seed=seed),
++            np.full((num_colors + 2, 1), 1),
+         ),
+         axis=1,
+     )
+     # Insert alpha at layer 0
+     colors[0, :] = 0  # ensure alpha is 0 for label 0
+-
+-    return Colormap(
++    return LabelColormap(
+         name='label_colormap',
+         display_name=trans._p('colormap', 'low discrepancy colors'),
+         colors=colors,
+         controls=control_points,
+         interpolation='zero',
++        seed=seed,
+     )
+
+
++def direct_colormap(color_dict=None):
++    """Make a direct colormap from a dictionary mapping labels to colors.
++
++    Parameters
++    ----------
++    color_dict : dict, optional
++        A dictionary mapping labels to colors.
++
++    Returns
++    -------
++    d : DirectLabelColormap
++        A napari colormap whose map() function applies the color dictionary
++        to an array.
++    """
++    # we don't actually use the color array, so pass dummy.
++    d = DirectLabelColormap(np.zeros(3))
++    if color_dict is not None:
++        d.color_dict.update(color_dict)
++    return d
++
++
+ def vispy_or_mpl_colormap(name):
+     """Try to get a colormap from vispy, or convert an mpl one to vispy format.
+
+diff --git a/pyproject.toml b/pyproject.toml
+index 7a171e36..d9d08b93 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -126,7 +126,7 @@ fix = true
+ "napari/utils/_testsupport.py" = ["B011"]
+ "tools/test_strings.py" = ["F401"]
+ "tools/**" = ["INP001", "T20"]
+-"examples/**" = ["INP001", "T20"]
++"examples/**" = ["ICN001", "INP001", "T20"]
+ "**/vendored/**" = ["TID"]
+
+ [tool.ruff.flake8-quotes]
+--
+2.40.0.windows.1

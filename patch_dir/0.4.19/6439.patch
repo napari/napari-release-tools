@@ -1,0 +1,2605 @@
+From 59103298d33451183547bb298daeb233a1c9a297 Mon Sep 17 00:00:00 2001
+From: Grzegorz Bokota <bokota+github@gmail.com>
+Date: Fri, 15 Dec 2023 03:35:27 +0100
+Subject: [PATCH] Update performance and reduce memory usage for big Labels
+ layer in direct color mode (#6439)
+
+Closes #6518
+Closes #6084
+
+In this PR, similarly to #6411, instead of using `float32` to pass data
+to the GPU there we introduce heuristics for choosing smaller data
+types, while keeping high performance.
+
+Instead of complex calculation of color in the shader, a precomputed
+texture array is used.
+To avoid repetitive texture calculation, the textures are cached in the
+`Colormap` objects.
+
+For data of type uint8/int8/uint16/int16 we do not perform any transform
+of data. We send them to the GPU as it is. This allows to reduce
+computational time.
+
+Based on experiments, the rendering performance is a little worse for
+uint16/int16 than for uint8/int8. But it may depend on the GPU. Also,
+using uint16/int16 means usage more GPU memory than for 8 bits type.
+Still less than current main.
+
+For datatypes using at least 32 bits, we add a preprocessing step where
+we identify a set of labels that are mapped to the same color and map
+all of them to the same value.
+This often saves enough space to fall back to uint8/uint16. It allows
+using a smaller additional array, and use less GPU memory. If there are
+more than `2**16` distinct colors, then float32 is used, though
+performance will be reduced.
+
+We support only up to `2**23` distinct colors for now.
+
+For reduced memory usage, part of the functions used for data
+preprocessing are compiled using numba. We provide a version of the
+function that does not require `numba` but it limits the number of
+distinct colors to `2**16` and involves additional array creation (more
+memory usage).
+
+---------
+
+Co-authored-by: Juan Nunez-Iglesias <jni@fastmail.com>
+Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.github.com>
+Co-authored-by: Lorenzo Gaifas <brisvag@gmail.com>
+Co-authored-by: Andy Sweet <andrew.d.sweet@gmail.com>
+---
+ napari/_qt/_tests/test_qt_viewer.py           | 131 ++-
+ napari/_vispy/_tests/test_vispy_labels.py     | 117 +--
+ napari/_vispy/layers/image.py                 |   8 +-
+ napari/_vispy/layers/labels.py                | 462 +++--------
+ .../benchmarks/benchmark_qt_viewer_labels.py  |  13 +-
+ napari/conftest.py                            |   5 +-
+ napari/layers/image/image.py                  |   4 +-
+ napari/layers/labels/_tests/test_labels.py    |  36 +-
+ napari/layers/labels/labels.py                | 142 ++--
+ .../utils/colormaps/_tests/test_colormap.py   | 224 +++++-
+ .../utils/colormaps/_tests/test_colormaps.py  |   4 +-
+ napari/utils/colormaps/colormap.py            | 751 +++++++++++++-----
+ 12 files changed, 1106 insertions(+), 791 deletions(-)
+
+diff --git a/napari/_qt/_tests/test_qt_viewer.py b/napari/_qt/_tests/test_qt_viewer.py
+index 168be56e..93163997 100644
+--- a/napari/_qt/_tests/test_qt_viewer.py
++++ b/napari/_qt/_tests/test_qt_viewer.py
+@@ -2,7 +2,7 @@ import gc
+ import os
+ import weakref
+ from dataclasses import dataclass
+-from itertools import takewhile
++from itertools import product, takewhile
+ from typing import List, Tuple
+ from unittest import mock
+ 
+@@ -707,7 +707,7 @@ def _update_data(
+     label: int,
+     qtbot: QtBot,
+     qt_viewer: QtViewer,
+-    dtype=np.uint64,
++    dtype: np.dtype = np.uint64,
+ ) -> Tuple[np.ndarray, np.ndarray]:
+     """Change layer data and return color of label and middle pixel of screenshot."""
+     layer.data = np.full((2, 2), label, dtype=dtype)
+@@ -783,36 +783,48 @@ def test_label_colors_matching_widget_auto(
+ @skip_local_popups
+ @skip_on_win_ci
+ @pytest.mark.parametrize("use_selection", [True, False])
++@pytest.mark.parametrize("dtype", [np.uint64, np.uint16, np.uint8, np.int16])
+ def test_label_colors_matching_widget_direct(
+-    qtbot, qt_viewer_with_controls, use_selection
++    qtbot, qt_viewer_with_controls, use_selection, dtype
+ ):
+     """Make sure the rendered label colors match the QtColorBox widget."""
+-    data = np.ones((2, 2), dtype=np.uint64)
++    data = np.ones((2, 2), dtype=dtype)
+     layer = qt_viewer_with_controls.viewer.add_labels(data)
+     layer.show_selected_label = use_selection
+     layer.opacity = 1.0  # QtColorBox & single layer are blending differently
+-    layer.color = {
++    color = {
+         0: "transparent",
+         1: "yellow",
+         3: "blue",
+         8: "red",
+-        1000: "green",
++        150: "green",
+         None: "white",
+     }
++    test_colors = (1, 2, 3, 8, 150, 50)
+ 
+-    test_colors = (1, 2, 3, 8, 1000, 50)
++    if np.iinfo(dtype).min < 0:
++        color[-1] = "pink"
++        color[-2] = "orange"
++        test_colors = test_colors + (-1, -2, -10)
++
++    layer.color = color
+ 
+     color_box_color, middle_pixel = _update_data(
+-        layer, 0, qtbot, qt_viewer_with_controls
++        layer, 0, qtbot, qt_viewer_with_controls, dtype
+     )
+     assert np.allclose([0, 0, 0, 255], middle_pixel)
+ 
+     for label in test_colors:
+         # Change color & selected color to the same label
+         color_box_color, middle_pixel = _update_data(
+-            layer, label, qtbot, qt_viewer_with_controls
++            layer, label, qtbot, qt_viewer_with_controls, dtype
+         )
+         assert np.allclose(color_box_color, middle_pixel, atol=1), label
++        assert np.allclose(
++            color_box_color,
++            layer.color.get(label, layer.color[None]) * 255,
++            atol=1,
++        ), label
+ 
+ 
+ def test_axes_labels(make_napari_viewer):
+@@ -948,3 +960,104 @@ def test_shortcut_passing(make_napari_viewer):
+         )
+     )
+     assert layer.mode == "erase"
++
++
++@pytest.mark.parametrize("mode", ["direct", "random"])
++def test_selection_collision(qt_viewer: QtViewer, mode):
++    data = np.zeros((10, 10), dtype=np.uint8)
++    data[:5] = 10
++    data[5:] = 10 + 49
++    layer = qt_viewer.viewer.add_labels(data, opacity=1)
++    layer.selected_label = 10
++    if mode == "direct":
++        layer.color = {10: "red", 10 + 49: "red"}
++
++    for dtype in np.sctypes['int'] + np.sctypes['uint']:
++        layer.data = data.astype(dtype)
++        layer.show_selected_label = False
++        QApplication.processEvents()
++        canvas_screenshot = qt_viewer.screenshot(flash=False)
++        shape = np.array(canvas_screenshot.shape[:2])
++        pixel_10 = canvas_screenshot[tuple((shape * 0.25).astype(int))]
++        pixel_59 = canvas_screenshot[tuple((shape * 0.75).astype(int))]
++        npt.assert_array_equal(pixel_10, pixel_59, err_msg=f"{dtype}")
++        assert not np.all(pixel_10 == [0, 0, 0, 255]), dtype
++
++        layer.show_selected_label = True
++
++        canvas_screenshot = qt_viewer.screenshot(flash=False)
++        shape = np.array(canvas_screenshot.shape[:2])
++        pixel_10_2 = canvas_screenshot[tuple((shape * 0.25).astype(int))]
++        pixel_59_2 = canvas_screenshot[tuple((shape * 0.75).astype(int))]
++
++        npt.assert_array_equal(pixel_59_2, [0, 0, 0, 255], err_msg=f"{dtype}")
++        npt.assert_array_equal(pixel_10_2, pixel_10, err_msg=f"{dtype}")
++
++
++def test_all_supported_dtypes(qt_viewer):
++    data = np.zeros((10, 10), dtype=np.uint8)
++    layer = qt_viewer.viewer.add_labels(data, opacity=1)
++
++    for i, dtype in enumerate(np.sctypes['int'] + np.sctypes['uint'], start=1):
++        data = np.full((10, 10), i, dtype=dtype)
++        layer.data = data
++        QApplication.processEvents()
++        canvas_screenshot = qt_viewer.screenshot(flash=False)
++        midd_pixel = canvas_screenshot[
++            tuple(np.array(canvas_screenshot.shape[:2]) // 2)
++        ]
++        npt.assert_equal(
++            midd_pixel, layer.colormap.map(i)[0] * 255, err_msg=f"{dtype} {i}"
++        )
++
++    layer.color = {
++        0: 'red',
++        1: 'green',
++        2: 'blue',
++        3: 'yellow',
++        4: 'magenta',
++        5: 'cyan',
++        6: 'white',
++        7: 'pink',
++        8: 'orange',
++        9: 'purple',
++        10: 'brown',
++        11: 'gray',
++    }
++
++    for i, dtype in enumerate(np.sctypes['int'] + np.sctypes['uint'], start=1):
++        data = np.full((10, 10), i, dtype=dtype)
++        layer.data = data
++        QApplication.processEvents()
++        canvas_screenshot = qt_viewer.screenshot(flash=False)
++        midd_pixel = canvas_screenshot[
++            tuple(np.array(canvas_screenshot.shape[:2]) // 2)
++        ]
++        npt.assert_equal(
++            midd_pixel, layer.colormap.map(i)[0] * 255, err_msg=f"{dtype} {i}"
++        )
++
++
++def test_more_than_uint16_colors(qt_viewer):
++    # this test is slow (10s locally)
++    data = np.zeros((10, 10), dtype=np.uint32)
++    colors = {
++        i: (x, y, z, 1)
++        for i, (x, y, z) in zip(
++            range(256**2 + 20),
++            product(np.linspace(0, 1, 256, endpoint=True), repeat=3),
++        )
++    }
++    layer = qt_viewer.viewer.add_labels(data, opacity=1, color=colors)
++    assert layer._slice.image.view.dtype == np.float32
++
++    for i in [1, 1000, 100000]:
++        data = np.full((10, 10), i, dtype=np.uint32)
++        layer.data = data
++        canvas_screenshot = qt_viewer.screenshot(flash=False)
++        midd_pixel = canvas_screenshot[
++            tuple(np.array(canvas_screenshot.shape[:2]) // 2)
++        ]
++        npt.assert_equal(
++            midd_pixel, layer.colormap.map(i)[0] * 255, err_msg=f"{i}"
++        )
+diff --git a/napari/_vispy/_tests/test_vispy_labels.py b/napari/_vispy/_tests/test_vispy_labels.py
+index 10a46fa1..fe4d7dea 100644
+--- a/napari/_vispy/_tests/test_vispy_labels.py
++++ b/napari/_vispy/_tests/test_vispy_labels.py
+@@ -1,121 +1,24 @@
+-from itertools import product
+-from unittest.mock import patch
+-
+ import numpy as np
+ import pytest
+ 
+ from napari._vispy.layers.labels import (
+-    MAX_LOAD_FACTOR,
+-    PRIME_NUM_TABLE,
+     build_textures_from_dict,
+-    hash2d_get,
+-    idx_to_2d,
+ )
+ 
+ 
+-@pytest.fixture(scope='module', autouse=True)
+-def mock_max_texture_size():
+-    """When running tests in this file, pretend max texture size is 2^16."""
+-    with patch('napari._vispy.layers.labels.MAX_TEXTURE_SIZE', 2**16):
+-        yield
+-
+-
+-def test_idx_to_2d():
+-    assert idx_to_2d(0, (100, 100)) == (0, 0)
+-    assert idx_to_2d(1, (100, 100)) == (0, 1)
+-    assert idx_to_2d(101, (100, 100)) == (1, 1)
+-    assert idx_to_2d(521, (100, 100)) == (5, 21)
+-    assert idx_to_2d(100 * 100 + 521, (100, 100)) == (5, 21)
+-
+-
+ def test_build_textures_from_dict():
+-    keys, values, collision = build_textures_from_dict(
+-        {1: (1, 1, 1, 1), 2: (2, 2, 2, 2)}
++    values = build_textures_from_dict(
++        {0: (0, 0, 0, 0), 1: (1, 1, 1, 1), 2: (2, 2, 2, 2)},
++        max_size=10,
+     )
+-    assert not collision
+-    assert keys.shape == (37, 37)
+-    assert values.shape == (37, 37, 4)
+-    assert keys[0, 1] == 1
+-    assert keys[0, 2] == 2
+-    assert np.array_equiv(values[0, 1], (1, 1, 1, 1))
+-    assert np.array_equiv(values[0, 2], (2, 2, 2, 2))
++    assert values.shape == (3, 1, 4)
++    assert np.array_equiv(values[1], (1, 1, 1, 1))
++    assert np.array_equiv(values[2], (2, 2, 2, 2))
+ 
+ 
+-def test_build_textures_from_dict_too_many_labels(monkeypatch):
+-    with pytest.raises(MemoryError):
+-        build_textures_from_dict(
+-            {i: (i, i, i, i) for i in range(1001)}, shape=(10, 10)
+-        )
+-    monkeypatch.setattr(
+-        "napari._vispy.layers.labels.PRIME_NUM_TABLE", [[61], [127]]
+-    )
+-    with pytest.raises(MemoryError):
++def test_build_textures_from_dict_exc():
++    with pytest.raises(ValueError, match="Cannot create a 2D texture"):
+         build_textures_from_dict(
+-            {i: (i, i, i, i) for i in range((251**2) // 2)},
++            {0: (0, 0, 0, 0), 1: (1, 1, 1, 1), 2: (2, 2, 2, 2)},
++            max_size=1,
+         )
+-
+-
+-def test_size_of_texture_square():
+-    count = int(127 * 127 * MAX_LOAD_FACTOR) - 1
+-    keys, values, *_ = build_textures_from_dict(
+-        {i: (i, i, i, i) for i in range(count)}
+-    )
+-    assert keys.shape == (127, 127)
+-    assert values.shape == (127, 127, 4)
+-
+-
+-def test_size_of_texture_rectangle():
+-    count = int(128 * 128 * MAX_LOAD_FACTOR) + 5
+-    keys, values, *_ = build_textures_from_dict(
+-        {i: (i, i, i, i) for i in range(count)}
+-    )
+-    assert keys.shape == (251, 127)
+-    assert values.shape == (251, 127, 4)
+-
+-
+-def test_build_textures_from_dict_collision():
+-    keys, values, collision = build_textures_from_dict(
+-        {1: (1, 1, 1, 1), 26: (2, 2, 2, 2), 27: (3, 3, 3, 3)}, shape=(5, 5)
+-    )
+-    assert collision
+-    assert keys.shape == (5, 5)
+-    assert keys[0, 1] == 1
+-    assert keys[0, 2] == 26
+-    assert keys[0, 3] == 27
+-    assert np.array_equiv(values[0, 1], (1, 1, 1, 1))
+-    assert np.array_equiv(values[0, 2], (2, 2, 2, 2))
+-    assert np.array_equiv(values[0, 3], (3, 3, 3, 3))
+-
+-    assert hash2d_get(1, keys) == (0, 1)
+-    assert hash2d_get(26, keys) == (0, 2)
+-    assert hash2d_get(27, keys) == (0, 3)
+-
+-
+-def test_collide_keys():
+-    base_keys = [x * y for x, y in product(PRIME_NUM_TABLE[0], repeat=2)]
+-    colors = {0: (0, 0, 0, 0), 1: (1, 1, 1, 1)}
+-    colors.update({i + 10: (1, 0, 0, 1) for i in base_keys})
+-    colors.update({2 * i + 10: (0, 1, 0, 1) for i in base_keys})
+-    keys, values, collision = build_textures_from_dict(colors)
+-    assert not collision
+-    assert keys.shape == (37, 61)
+-    assert values.shape == (37, 61, 4)
+-
+-
+-def test_collide_keys2():
+-    base_keys = [x * y for x, y in product(PRIME_NUM_TABLE[0], repeat=2)] + [
+-        x * y for x, y in product(PRIME_NUM_TABLE[0], PRIME_NUM_TABLE[1])
+-    ]
+-    colors = {0: (0, 0, 0, 0), 1: (1, 1, 1, 1)}
+-    colors.update({i + 10: (1, 0, 0, 1) for i in base_keys})
+-    colors.update({2 * i + 10: (0, 1, 0, 1) for i in base_keys})
+-
+-    # enforce collision for collision table of size 31
+-    colors.update({31 * i + 10: (0, 0, 1, 1) for i in base_keys})
+-    # enforce collision for collision table of size 29
+-    colors.update({29 * i + 10: (0, 0, 1, 1) for i in base_keys})
+-
+-    keys, values, collision = build_textures_from_dict(colors)
+-    assert collision
+-    assert keys.shape == (37, 37)
+-    assert values.shape == (37, 37, 4)
+diff --git a/napari/_vispy/layers/image.py b/napari/_vispy/layers/image.py
+index 717b76a5..ee9e24b5 100644
+--- a/napari/_vispy/layers/image.py
++++ b/napari/_vispy/layers/image.py
+@@ -300,7 +300,9 @@ class VispyImageLayer(VispyBaseLayer):
+             if self.layer.multiscale:
+                 raise ValueError(
+                     trans._(
+-                        "Shape of in dividual tiles in multiscale {shape} cannot exceed GL_MAX_TEXTURE_SIZE {texture_size}. Rendering is currently in {ndisplay}D mode.",
++                        "Shape of individual tiles in multiscale {shape} cannot "
++                        "exceed GL_MAX_TEXTURE_SIZE {texture_size}. Rendering is "
++                        "currently in {ndisplay}D mode.",
+                         deferred=True,
+                         shape=data.shape,
+                         texture_size=MAX_TEXTURE_SIZE,
+@@ -309,7 +311,9 @@ class VispyImageLayer(VispyBaseLayer):
+                 )
+             warnings.warn(
+                 trans._(
+-                    "data shape {shape} exceeds GL_MAX_TEXTURE_SIZE {texture_size} in at least one axis and will be downsampled. Rendering is currently in {ndisplay}D mode.",
++                    "data shape {shape} exceeds GL_MAX_TEXTURE_SIZE {texture_size}"
++                    " in at least one axis and will be downsampled."
++                    " Rendering is currently in {ndisplay}D mode.",
+                     deferred=True,
+                     shape=data.shape,
+                     texture_size=MAX_TEXTURE_SIZE,
+diff --git a/napari/_vispy/layers/labels.py b/napari/_vispy/layers/labels.py
+index 00716268..d472cee4 100644
+--- a/napari/_vispy/layers/labels.py
++++ b/napari/_vispy/layers/labels.py
+@@ -1,6 +1,5 @@
+-from itertools import product
+-from math import ceil, isnan, log2, sqrt
+-from typing import TYPE_CHECKING, Dict, Optional, Tuple, Union
++import math
++from typing import TYPE_CHECKING, Dict, Tuple
+ 
+ import numpy as np
+ from vispy.color import Colormap as VispyColormap
+@@ -17,48 +16,18 @@ from napari._vispy.layers.image import (
+ from napari._vispy.utils.gl import get_max_texture_sizes
+ from napari._vispy.visuals.labels import LabelNode
+ from napari._vispy.visuals.volume import Volume as VolumeNode
+-from napari.utils._dtype import vispy_texture_dtype
+ from napari.utils.colormaps.colormap import (
+     LabelColormap,
++    _texture_dtype,
+ )
+ 
+ if TYPE_CHECKING:
+     from napari.layers import Labels
+ 
+ 
+-# We use table sizes that are prime numbers near powers of 2.
+-# For each power of 2, we keep three candidate sizes. This allows us to
+-# maximize the chances of finding a collision-free table for a given set of
+-# keys (which we typically know at build time).
+-PRIME_NUM_TABLE = [
+-    [37, 31, 29],
+-    [61, 59, 53],
+-    [127, 113, 109],
+-    [251, 241, 239],
+-    [509, 503, 499],
+-    [1021, 1019, 1013],
+-    [2039, 2029, 2027],
+-    [4093, 4091, 4079],
+-    [8191, 8179, 8171],
+-    [16381, 16369, 16363],
+-    [32749, 32719, 32717],
+-    [65521, 65519, 65497],
+-]
+-
+-START_TWO_POWER = 5
+-
+-MAX_LOAD_FACTOR = 0.25
+-
+-MAX_TEXTURE_SIZE = None
+-
+ ColorTuple = Tuple[float, float, float, float]
+ 
+ 
+-EMPTY_VAL = -1.0
+-
+-_UNSET = object()
+-
+-
+ auto_lookup_shader_uint8 = """
+ uniform sampler2D texture2D_values;
+ 
+@@ -93,72 +62,32 @@ vec4 sample_label_color(float t) {
+ 
+ 
+ direct_lookup_shader = """
+-uniform sampler2D texture2D_keys;
+ uniform sampler2D texture2D_values;
+ uniform vec2 LUT_shape;
+-uniform int color_count;
+-
+ 
+ vec4 sample_label_color(float t) {
+-    if (($use_selection) && ($selection != t)) {
+-        return vec4(0);
+-    }
+-
+-    float empty = $EMPTY_VAL;
+-    // get position in the texture grid (same as hash2d_get)
+-    vec2 pos = vec2(
+-        mod(int(t / LUT_shape.y), LUT_shape.x),
+-        mod(t, LUT_shape.y)
++    t = t * $scale;
++    return texture2D(
++        texture2D_values,
++        vec2(0.0, (t + 0.5) / $color_map_size)
+     );
++}
+ 
+-    // add .5 to move to the center of each texel and convert to texture coords
+-    vec2 pos_tex = (pos + vec2(.5)) / LUT_shape;
+-
+-    // sample key texture
+-    float found = texture2D(
+-        texture2D_keys,
+-        pos_tex
+-    ).r;
+-
+-    // return vec4(pos_tex, 0, 1); // debug if texel is calculated correctly (correct)
+-    // return vec4(found / 15, 0, 0, 1); // debug if key is calculated correctly (correct, should be a black-to-red gradient)
+-
+-    // we get a different value:
+-    // - if it's the empty key, exit;
+-    // - otherwise, it's a hash collision: continue searching
+-    float initial_t = t;
+-    int count = 0;
+-    while ((abs(found - initial_t) > 1e-8) && (abs(found - empty) > 1e-8)) {
+-        count = count + 1;
+-        t = initial_t + float(count);
+-        if (count >= color_count) {
+-            return vec4(0);
+-        }
+-        // same as above
+-        vec2 pos = vec2(
+-            mod(int(t / LUT_shape.y), LUT_shape.x),
+-            mod(t, LUT_shape.y)
+-        );
+-        pos_tex = (pos + vec2(.5)) / LUT_shape;
+-
+-        found = texture2D(
+-            texture2D_keys,
+-            pos_tex
+-        ).r;
+-    }
++"""
+ 
+-    // return vec4(pos_tex, 0, 1); // debug if final texel is calculated correctly
++direct_lookup_shader_many = """
++uniform sampler2D texture2D_values;
++uniform vec2 LUT_shape;
+ 
+-    vec4 color = vec4($default_color);
+-    if (abs(found - empty) > 1e-8) {
+-        color = texture2D(
+-            texture2D_values,
+-            pos_tex
+-        );
+-    }
+-    return color;
++vec4 sample_label_color(float t) {
++    t = t * $scale;
++    float row = mod(t, LUT_shape.x);
++    float col = int(t / LUT_shape.x);
++    return texture2D(
++        texture2D_values,
++        vec2((col + 0.5) / LUT_shape.y, (row + 0.5) / LUT_shape.x)
++    );
+ }
+-
+ """
+ 
+ 
+@@ -187,7 +116,7 @@ class LabelVispyColormap(VispyColormap):
+                 f"Cannot use dtype {view_dtype} with LabelVispyColormap"
+             )
+ 
+-        selection = colormap.selection_as_minimum_dtype(raw_dtype)
++        selection = colormap._selection_as_minimum_dtype(raw_dtype)
+ 
+         self.glsl_map = (
+             shader.replace('$color_map_size', str(len(colormap.colors)))
+@@ -201,269 +130,66 @@ class DirectLabelVispyColormap(VispyColormap):
+         self,
+         use_selection=False,
+         selection=0.0,
+-        collision=True,
+-        default_color=(0, 0, 0, 0),
+-        empty_value=EMPTY_VAL,
++        scale=1.0,
++        color_map_size=255,
++        multi=False,
+     ):
+         colors = ['w', 'w']  # dummy values, since we use our own machinery
+         super().__init__(colors, controls=None, interpolation='zero')
++        shader = direct_lookup_shader_many if multi else direct_lookup_shader
+         self.glsl_map = (
+-            direct_lookup_shader.replace(
+-                "$use_selection", str(use_selection).lower()
+-            )
++            shader.replace("$use_selection", str(use_selection).lower())
+             .replace("$selection", str(selection))
+-            .replace("$collision", str(collision).lower())
+-            .replace("$default_color", ", ".join(map(str, default_color)))
+-            .replace("$EMPTY_VAL", str(empty_value))
++            .replace("$scale", str(scale))
++            .replace("$color_map_size", str(color_map_size))
+         )
+ 
+ 
+-def idx_to_2d(idx, shape):
+-    """
+-    From a 1D index generate a 2D index that fits the given shape.
+-
+-    The 2D index will wrap around line by line and back to the beginning.
+-    """
+-    return int((idx // shape[1]) % shape[0]), int(idx % shape[1])
+-
+-
+-def hash2d_get(key, keys, empty_val=EMPTY_VAL):
+-    """
+-    Given a key, retrieve its location in the keys table.
+-    """
+-    pos = idx_to_2d(key, keys.shape)
+-    initial_key = key
+-    while keys[pos] != initial_key and keys[pos] != empty_val:
+-        if key - initial_key > keys.size:
+-            raise KeyError('label does not exist')
+-        key += 1
+-        pos = idx_to_2d(key, keys.shape)
+-    return pos if keys[pos] == initial_key else None
+-
+-
+-def hash2d_set(
+-    key: Union[float, np.floating],
+-    value: ColorTuple,
+-    keys: np.ndarray,
+-    values: np.ndarray,
+-    empty_val=EMPTY_VAL,
+-) -> bool:
+-    """
+-    Set a value in the 2d hashmap, wrapping around to avoid collision.
+-    """
+-    if key is None or isnan(key):
+-        return False
+-    pos = idx_to_2d(key, keys.shape)
+-    initial_key = key
+-    collision = False
+-    while keys[pos] != empty_val:
+-        collision = True
+-        if key - initial_key > keys.size:
+-            raise OverflowError('too many labels')
+-        key += 1
+-        pos = idx_to_2d(key, keys.shape)
+-    keys[pos] = initial_key
+-    values[pos] = value
+-
+-    return collision
+-
+-
+-def _get_shape_from_keys(
+-    keys: np.ndarray, first_dim_index: int, second_dim_index: int
+-) -> Optional[Tuple[int, int]]:
+-    """Get the smallest hashmap size without collisions, if any.
+-
+-    This function uses precomputed prime numbers from PRIME_NUM_TABLE.
+-
+-    For each index, it gets a list of prime numbers close to
+-    ``2**(index + START_TWO_POWER)`` (where ``START_TWO_POWER=5``), that is,
+-    the smallest table is close to ``32 * 32``.
+-
+-    The function then iterates over all combinations of prime numbers from the
+-    lists and checks for a combination that has no collisions for the
+-    given keys, returning that combination.
+-
+-    If no combination can be found, returns None.
+-
+-    Although keys that collide for all table combinations are rare, they are
+-    possible: see ``test_collide_keys`` and ``test_collide_keys2``.
+-
+-    Parameters
+-    ----------
+-    keys: np.ndarray
+-        array of keys to be inserted into the hashmap,
+-        used for collision detection
+-    first_dim_index: int
+-        index for first dimension of PRIME_NUM_TABLE
+-    second_dim_index: int
+-        index for second dimension of PRIME_NUM_TABLE
+-
+-    Returns
+-    shp : 2-tuple of int, optional
+-        If a table shape can be found that has no collisions for the given
+-        keys, return that shape. Otherwise, return None.
+-    """
+-    for fst_size, snd_size in product(
+-        PRIME_NUM_TABLE[first_dim_index],
+-        PRIME_NUM_TABLE[second_dim_index],
+-    ):
+-        fst_crd = (keys // snd_size) % fst_size
+-        snd_crd = keys % snd_size
+-
+-        collision_set = set(zip(fst_crd, snd_crd))
+-        if len(collision_set) == len(set(keys)):
+-            return fst_size, snd_size
+-    return None
+-
+-
+-def _get_shape_from_dict(
+-    color_dict: Dict[float, Tuple[float, float, float, float]]
+-) -> Tuple[int, int]:
+-    """Compute the shape of a 2D hashmap based on the keys in `color_dict`.
+-
+-    This function finds indices for the first and second dimensions of a
+-    table in PRIME_NUM_TABLE based on a target load factor of 0.125-0.25,
+-    then calls `_get_shape_from_keys` based on those indices.
++def build_textures_from_dict(
++    color_dict: Dict[int, ColorTuple], max_size: int
++) -> np.ndarray:
++    """This code assumes that the keys in the color_dict are sequential from 0.
+ 
+-    This is quite a low load-factor, but, ultimately, the hash table
+-    textures are tiny compared to most datasets, so we choose these
+-    factors to minimize the chance of collisions and trade a bit of GPU
+-    memory for speed.
++    If any keys are larger than the size of the dictionary, they will
++    overwrite earlier keys in the best case, or it might just crash.
+     """
+-    keys = np.array([x for x in color_dict if x is not None], dtype=np.int64)
+-
+-    size = len(keys) / MAX_LOAD_FACTOR
+-    size_sqrt = sqrt(size)
+-    size_log2 = log2(size_sqrt)
+-    max_idx = len(PRIME_NUM_TABLE) - 1
+-    max_size = PRIME_NUM_TABLE[max_idx][0] ** 2
+-    fst_dim = min(max(int(ceil(size_log2)) - START_TWO_POWER, 0), max_idx)
+-    snd_dim = min(max(int(round(size_log2, 0)) - START_TWO_POWER, 0), max_idx)
+-
+-    if len(keys) > max_size:
+-        raise MemoryError(
+-            f'Too many labels: napari supports at most {max_size} labels, '
+-            f'got {len(keys)}.'
++    if len(color_dict) > 2**23:
++        raise ValueError(  # pragma: no cover
++            "Cannot map more than 2**23 colors because of float32 precision. "
++            f"Got {len(color_dict)}"
+         )
+-
+-    shp = _get_shape_from_keys(keys, fst_dim, snd_dim)
+-    if shp is None and snd_dim < max_idx:
+-        # if we still have room to grow, try the next size up to get a
+-        # collision-free table
+-        shp = _get_shape_from_keys(keys, fst_dim, snd_dim + 1)
+-    if shp is None:
+-        # at this point, if there's still collisions, we give up and return
+-        # the largest possible table given these indices and the target load
+-        # factor.
+-        # (To see a set of keys that cause collision,
+-        # and land on this branch, see test_collide_keys2.)
+-        shp = PRIME_NUM_TABLE[fst_dim][0], PRIME_NUM_TABLE[snd_dim][0]
+-    return shp
+-
+-
+-def get_shape_from_dict(color_dict):
+-    global MAX_TEXTURE_SIZE
+-    if MAX_TEXTURE_SIZE is None:
+-        MAX_TEXTURE_SIZE = get_max_texture_sizes()[0]
+-
+-    shape = _get_shape_from_dict(color_dict)
+-
+-    if MAX_TEXTURE_SIZE is not None and (
+-        shape[0] > MAX_TEXTURE_SIZE or shape[1] > MAX_TEXTURE_SIZE
+-    ):
+-        raise MemoryError(
+-            f'Too many labels. GPU does not support textures of this size.'
+-            f' Requested size is {shape[0]}x{shape[1]}, but maximum supported'
+-            f' size is {MAX_TEXTURE_SIZE}x{MAX_TEXTURE_SIZE}'
++    if len(color_dict) > max_size**2:
++        raise ValueError(
++            "Cannot create a 2D texture holding more than "
++            f"{max_size}**2={max_size ** 2} colors."
++            f"Got {len(color_dict)}"
+         )
+-    return shape
+-
+-
+-def _get_empty_val_from_dict(color_dict):
+-    empty_val = EMPTY_VAL
+-    while empty_val in color_dict:
+-        empty_val -= 1
+-    return empty_val
++    data = np.zeros(
++        (
++            min(len(color_dict), max_size),
++            math.ceil(len(color_dict) / max_size),
++            4,
++        ),
++        dtype=np.float32,
++    )
++    for key, value in color_dict.items():
++        data[key % data.shape[0], key // data.shape[0]] = value
++    return data
+ 
+ 
+-def build_textures_from_dict(
+-    color_dict: Dict[Optional[float], ColorTuple],
+-    empty_val=_UNSET,
+-    shape=None,
+-    use_selection=False,
+-    selection=0.0,
+-) -> Tuple[np.ndarray, np.ndarray, bool]:
+-    """
+-    This function construct hash table for fast lookup of colors.
+-    It uses pair of textures.
+-    First texture is a table of keys, used to determine position,
+-    second is a table of values.
+-
+-    The procedure of selection table and collision table is
+-    implemented in hash2d_get function.
+-
+-    Parameters
+-    ----------
+-    color_dict: Dict[float, Tuple[float, float, float, float]]
+-        Dictionary from labels to colors
+-    empty_val: float
+-        Value to use for empty cells in the hash table
+-    shape: Optional[Tuple[int, int]]
+-        Shape of the hash table.
+-        If None, it is calculated from the number of
+-        labels using _get_shape_from_dict
+-    use_selection: bool
+-        If True, only the selected label is shown.
+-        The generated colormap is single-color of size (1, 1)
+-    selection: float
+-        used only if use_selection is True.
+-        Determines the selected label.
+-
+-    Returns
+-    -------
+-    keys: np.ndarray
+-        Texture of keys for the hash table
+-    values: np.ndarray
+-        Texture of values for the hash table
+-    collision: bool
+-        True if there are collisions in the hash table
+-    """
+-    if use_selection:
+-        keys = np.full((1, 1), selection, dtype=vispy_texture_dtype)
+-        values = np.zeros((1, 1, 4), dtype=vispy_texture_dtype)
+-        values[0, 0] = color_dict.get(selection, color_dict[None])
+-        return keys, values, False
+-
+-    if empty_val is _UNSET:
+-        empty_val = _get_empty_val_from_dict(color_dict)
+-
+-    if len(color_dict) > 2**31 - 2:
+-        raise MemoryError(
+-            f'Too many labels ({len(color_dict)}). Maximum supported number of labels is 2^31-2'
+-        )
+-
+-    if shape is None:
+-        shape = get_shape_from_dict(color_dict)
++def _select_colormap_texture(
++    colormap: LabelColormap, view_dtype, raw_dtype
++) -> np.ndarray:
++    if raw_dtype.itemsize > 2:
++        color_texture = colormap._get_mapping_from_cache(view_dtype)
++    else:
++        color_texture = colormap._get_mapping_from_cache(raw_dtype)
+ 
+-    if len(color_dict) > shape[0] * shape[1]:
+-        raise MemoryError(
+-            f'Too many labels ({len(color_dict)}). Maximum supported number of labels for the given shape is {shape[0] * shape[1]}'
++    if color_texture is None:
++        raise ValueError(  # pragma: no cover
++            f"Cannot build a texture for dtype {raw_dtype=} and {view_dtype=}"
+         )
+-
+-    keys = np.full(shape, empty_val, dtype=vispy_texture_dtype)
+-    values = np.zeros(shape + (4,), dtype=vispy_texture_dtype)
+-    visited = set()
+-    collision = False
+-    for key, value in color_dict.items():
+-        key_ = vispy_texture_dtype(key)
+-        if key_ in visited:
+-            # input int keys are unique but can map to the same float.
+-            # if so, we ignore all but the first appearance.
+-            continue
+-        visited.add(key_)
+-        collision |= hash2d_set(key_, value, keys, values, empty_val=empty_val)
+-
+-    return keys, values, collision
++    return color_texture.reshape(256, -1, 4)
+ 
+ 
+ class VispyLabelsLayer(VispyImageLayer):
+@@ -481,6 +207,9 @@ class VispyLabelsLayer(VispyImageLayer):
+         self.layer.events.labels_update.connect(self._on_partial_labels_update)
+         self.layer.events.selected_label.connect(self._on_colormap_change)
+         self.layer.events.show_selected_label.connect(self._on_colormap_change)
++        self.layer.events.data.connect(self._on_colormap_change)
++        # as we generate colormap texture based on the data type, we need to
++        # update it when the data type changes
+ 
+     def _on_rendering_change(self):
+         # overriding the Image method, so we can maintain the same old rendering name
+@@ -506,11 +235,10 @@ class VispyLabelsLayer(VispyImageLayer):
+             return
+         colormap = self.layer.colormap
+         mode = self.layer.color_mode
+-
+-        if mode == 'auto':
+-            view_dtype = self.layer._slice.image.view.dtype
+-            raw_dtype = self.layer._slice.image.raw.dtype
+-            if view_dtype != raw_dtype:
++        view_dtype = self.layer._slice.image.view.dtype
++        raw_dtype = self.layer._slice.image.raw.dtype
++        if mode == 'auto' or (mode == "direct" and raw_dtype.itemsize <= 2):
++            if raw_dtype.itemsize > 2 and isinstance(colormap, LabelColormap):
+                 # If the view dtype is different from the raw dtype, it is possible
+                 # that background pixels are not the same value as the `background_value`.
+                 # For example, if raw_dtype is int8 and background_value is `-1`
+@@ -521,12 +249,11 @@ class VispyLabelsLayer(VispyImageLayer):
+                 # a copy instead of temporary overwrite the background_value
+                 colormap = LabelColormap(**colormap.dict())
+                 colormap.background_value = (
+-                    colormap.background_as_minimum_dtype(raw_dtype)
++                    colormap._background_as_minimum_dtype(raw_dtype)
+                 )
+-            if view_dtype == np.uint8:
+-                color_texture = colormap._uint8_colors.reshape(256, -1, 4)
+-            else:
+-                color_texture = colormap._uint16_colors.reshape(256, -1, 4)
++            color_texture = _select_colormap_texture(
++                colormap, view_dtype, raw_dtype
++            )
+             self.node.cmap = LabelVispyColormap(
+                 colormap, view_dtype=view_dtype, raw_dtype=raw_dtype
+             )
+@@ -537,34 +264,33 @@ class VispyLabelsLayer(VispyImageLayer):
+             )
+             self.texture_data = color_texture
+ 
+-        elif mode == 'direct':
+-            color_dict = (
+-                self.layer.color
+-            )  # TODO: should probably account for non-given labels
+-            key_texture, val_texture, collision = build_textures_from_dict(
+-                color_dict,
+-                use_selection=colormap.use_selection,
+-                selection=float(colormap.selection),
++        elif mode == 'direct':  # only for raw_dtype.itemsize > 2
++            color_dict = colormap._values_mapping_to_minimum_values_set()[1]
++            max_size = get_max_texture_sizes()[0]
++            val_texture = build_textures_from_dict(color_dict, max_size)
++
++            dtype = _texture_dtype(
++                self.layer._direct_colormap._num_unique_colors + 2,
++                raw_dtype,
+             )
++            if issubclass(dtype.type, np.integer):
++                scale = np.iinfo(dtype).max
++            else:  # float32 texture
++                scale = 1.0
+ 
+             self.node.cmap = DirectLabelVispyColormap(
+                 use_selection=colormap.use_selection,
+-                selection=float(colormap.selection),
+-                collision=collision,
+-                default_color=colormap.default_color,
+-                empty_value=_get_empty_val_from_dict(color_dict),
+-            )
+-            # note that textures have to be transposed here!
+-            self.node.shared_program['texture2D_keys'] = Texture2D(
+-                key_texture.T, internalformat='r32f', interpolation='nearest'
++                selection=colormap.selection,
++                scale=scale,
++                color_map_size=val_texture.shape[0],
++                multi=val_texture.shape[1] > 1,
+             )
+             self.node.shared_program['texture2D_values'] = Texture2D(
+-                val_texture.swapaxes(0, 1),
++                val_texture,
+                 internalformat='rgba32f',
+                 interpolation='nearest',
+             )
+-            self.node.shared_program['LUT_shape'] = key_texture.shape
+-            self.node.shared_program['color_count'] = len(color_dict)
++            self.node.shared_program['LUT_shape'] = val_texture.shape[:2]
+         else:
+             self.node.cmap = VispyColormap(*colormap)
+ 
+diff --git a/napari/benchmarks/benchmark_qt_viewer_labels.py b/napari/benchmarks/benchmark_qt_viewer_labels.py
+index bf1ca74b..b3c8aa5c 100644
+--- a/napari/benchmarks/benchmark_qt_viewer_labels.py
++++ b/napari/benchmarks/benchmark_qt_viewer_labels.py
+@@ -5,6 +5,7 @@
+ import os
+ from dataclasses import dataclass
+ from functools import lru_cache
++from itertools import cycle
+ from typing import List
+ 
+ import numpy as np
+@@ -117,7 +118,7 @@ class LabelRendering:
+     params = (
+         [10, 30, 300, 1500],
+         [np.uint8, np.uint16, np.uint32],
+-        ["auto"],  # "direct"],
++        ["auto", "direct"],
+     )
+ 
+     def setup(self, radius, dtype, label_mode):
+@@ -128,6 +129,16 @@ class LabelRendering:
+         self.viewer = ViewerModel()
+         self.qt_viewr = QtViewer(self.viewer)
+         self.layer = self.viewer.add_labels(self.data, scale=scale)
++        if label_mode == "direct":
++            colors = dict(
++                zip(
++                    range(10, 2000),
++                    cycle(["red", "green", "blue", "pink", "magenta"]),
++                )
++            )
++            colors[None] = "yellow"
++            colors[0] = "transparent"
++            self.layer.color = colors
+         self.qt_viewr.show()
+ 
+     @staticmethod
+diff --git a/napari/conftest.py b/napari/conftest.py
+index e3815ccf..2823ec2c 100644
+--- a/napari/conftest.py
++++ b/napari/conftest.py
+@@ -638,7 +638,10 @@ def dangling_qtimers(monkeypatch, request):
+     else:
+ 
+         def my_start(self, msec=None):
+-            timer_dkt[self] = _get_calling_place()
++            calling_place = _get_calling_place()
++            if "superqt" in calling_place and "throttler" in calling_place:
++                calling_place += f" - {_get_calling_place(2)}"
++            timer_dkt[self] = calling_place
+             if msec is not None:
+                 base_start(self, msec)
+             else:
+diff --git a/napari/layers/image/image.py b/napari/layers/image/image.py
+index ef36e99f..eca85d77 100644
+--- a/napari/layers/image/image.py
++++ b/napari/layers/image/image.py
+@@ -29,7 +29,7 @@ from napari.layers.utils.layer_utils import calc_data_range
+ from napari.layers.utils.plane import SlicingPlane
+ from napari.utils import config
+ from napari.utils._dtype import get_dtype_limits, normalize_dtype
+-from napari.utils.colormaps import AVAILABLE_COLORMAPS
++from napari.utils.colormaps import AVAILABLE_COLORMAPS, ensure_colormap
+ from napari.utils.events import Event
+ from napari.utils.events.event import WarningEmitter
+ from napari.utils.events.event_utils import connect_no_arg
+@@ -383,7 +383,7 @@ class _ImageBase(IntensityVisualizationMixin, Layer):
+         # _set_colormap method. This is important for Labels layers, because
+         # we don't want to use get_color before set_view_slice has been
+         # triggered (self.refresh(), below).
+-        self._set_colormap(colormap)
++        self._colormap = ensure_colormap(colormap)
+         self.contrast_limits = self._contrast_limits
+         self._interpolation2d = Interpolation.NEAREST
+         self._interpolation3d = Interpolation.NEAREST
+diff --git a/napari/layers/labels/_tests/test_labels.py b/napari/layers/labels/_tests/test_labels.py
+index 49776e5a..36575473 100644
+--- a/napari/layers/labels/_tests/test_labels.py
++++ b/napari/layers/labels/_tests/test_labels.py
+@@ -1,7 +1,6 @@
+ import copy
+ import itertools
+ import time
+-import warnings
+ from dataclasses import dataclass
+ from tempfile import TemporaryDirectory
+ from typing import List
+@@ -14,7 +13,7 @@ import xarray as xr
+ import zarr
+ from numpy.core.numerictypes import issubdtype
+ from numpy.testing import assert_array_almost_equal, assert_raises
+-from skimage import data
++from skimage import data as sk_data
+ 
+ from napari._tests.utils import check_layer_world_data_extent
+ from napari.components import ViewerModel
+@@ -891,7 +890,7 @@ def test_world_data_extent():
+     """Test extent after applying transforms."""
+     np.random.seed(0)
+     shape = (6, 10, 15)
+-    data = np.random.randint(20, size=(shape))
++    data = np.random.randint(20, size=shape)
+     layer = Labels(data)
+     extent = np.array(((0,) * 3, shape))
+     check_layer_world_data_extent(layer, extent, (3, 1, 1), (10, 20, 5), True)
+@@ -916,7 +915,7 @@ def test_undo_redo(
+     preserve_labels,
+     n_dimensional,
+ ):
+-    blobs = data.binary_blobs(length=64, volume_fraction=0.3, n_dim=3)
++    blobs = sk_data.binary_blobs(length=64, volume_fraction=0.3, n_dim=3)
+     layer = Labels(blobs)
+     data_history = [blobs.copy()]
+     layer.brush_size = brush_size
+@@ -1411,7 +1410,7 @@ def test_invalidate_cache_when_change_color_mode():
+ 
+     layer.color_mode = 'direct'
+     layer._cached_labels = None
+-    assert layer._raw_to_displayed(layer._slice.image.raw).dtype == np.float32
++    assert layer._raw_to_displayed(layer._slice.image.raw).dtype == np.uint8
+ 
+     layer.color_mode = 'auto'
+     # If the cache is not invalidated, it returns colors for
+@@ -1421,6 +1420,20 @@ def test_invalidate_cache_when_change_color_mode():
+     )
+ 
+ 
++@pytest.mark.parametrize("dtype", np.sctypes['int'] + np.sctypes['uint'])
++@pytest.mark.parametrize("mode", ["auto", "direct"])
++def test_cache_for_dtypes(dtype, mode):
++    data = np.zeros((10, 10), dtype=dtype)
++    labels = Labels(data)
++    labels.color_mode = mode
++    assert labels._cached_labels is None
++    labels._raw_to_displayed(
++        labels._slice.image.raw, (slice(None), slice(None))
++    )
++    assert labels._cached_labels is not None
++    assert labels._cached_mapped_labels.dtype == labels._slice.image.view.dtype
++
++
+ def test_color_mapping_when_color_is_changed():
+     """Checks if the color mapping is computed correctly when the color palette is changed."""
+ 
+@@ -1430,7 +1443,7 @@ def test_color_mapping_when_color_is_changed():
+     gt_direct_3colors = layer._raw_to_displayed(layer._slice.image.raw)
+ 
+     layer = Labels(data, color={1: 'green', 2: 'red'})
+-    assert layer._raw_to_displayed(layer._slice.image.raw).dtype == np.float32
++    assert layer._raw_to_displayed(layer._slice.image.raw).dtype == np.uint8
+     layer.color = {1: 'green', 2: 'red', 3: 'white'}
+ 
+     assert np.allclose(
+@@ -1542,17 +1555,6 @@ def test_get_status_with_custom_index():
+     )
+ 
+ 
+-def test_collision_warning():
+-    label = Labels(data=np.zeros((10, 10), dtype=np.uint8))
+-    with pytest.warns(
+-        RuntimeWarning, match="Because integer labels are cast to less-precise"
+-    ):
+-        label.color = {2**25 + 1: 'red', 2**25 + 2: 'blue'}
+-    with warnings.catch_warnings():
+-        warnings.simplefilter("error")
+-        label.color = {1: 'red', 2: 'blue'}
+-
+-
+ def test_labels_features_event():
+     event_emitted = False
+ 
+diff --git a/napari/layers/labels/labels.py b/napari/layers/labels/labels.py
+index a608e9db..64a84133 100644
+--- a/napari/layers/labels/labels.py
++++ b/napari/layers/labels/labels.py
+@@ -3,7 +3,6 @@ from collections import deque
+ from contextlib import contextmanager
+ from typing import (
+     Dict,
+-    Iterable,
+     List,
+     Optional,
+     Tuple,
+@@ -46,9 +45,10 @@ from napari.utils.colormaps import (
+ )
+ from napari.utils.colormaps.colormap import (
+     LabelColormap,
+-    _cast_labels_data_to_texture_dtype,
+-    _convert_small_ints_to_unsigned,
+-    minimum_dtype_for_labels,
++    LabelColormapBase,
++    _cast_labels_data_to_texture_dtype_auto,
++    _cast_labels_data_to_texture_dtype_direct,
++    _texture_dtype,
+ )
+ from napari.utils.events import EmitterGroup, Event
+ from napari.utils.events.custom_types import Array
+@@ -227,6 +227,7 @@ class Labels(_ImageBase):
+     """
+ 
+     events: EmitterGroup
++    _colormap: LabelColormapBase
+ 
+     _modeclass = Mode
+ 
+@@ -496,14 +497,40 @@ class Labels(_ImageBase):
+ 
+         self.refresh()
+ 
+-    @_ImageBase.colormap.setter
+-    def colormap(self, colormap):
+-        super()._set_colormap(colormap)
+-        if isinstance(self._colormap, LabelColormap):
+-            self._random_colormap = self._colormap
++    @property
++    def colormap(self) -> LabelColormapBase:
++        if self.color_mode == LabelColorMode.AUTO:
++            return self._random_colormap
++        return self._direct_colormap
++
++    @colormap.setter
++    def colormap(self, colormap: LabelColormapBase):
++        self._set_colormap(colormap)
++
++    def _set_colormap(self, colormap):
++        if isinstance(colormap, LabelColormap):
++            self._random_colormap = colormap
++            self._colormap = self._random_colormap
++            color_mode = LabelColorMode.AUTO
+         else:
+-            self._direct_colormap = self._colormap
++            self._direct_colormap = colormap
++            # `self._direct_colormap.color_dict` may contain just the default None and background label
++            # colors, in which case we need to be in AUTO color mode. Otherwise,
++            # `self._direct_colormap.color_dict` contains colors for all labels, and we should be in DIRECT
++            # mode.
++
++            # For more information
++            # - https://github.com/napari/napari/issues/2479
++            # - https://github.com/napari/napari/issues/2953
++            if self._is_default_colors(self._direct_colormap.color_dict):
++                color_mode = LabelColorMode.AUTO
++                self._colormap = self._random_colormap
++            else:
++                color_mode = LabelColorMode.DIRECT
++                self._colormap = self._direct_colormap
+         self._selected_color = self.get_color(self.selected_label)
++        self.events.colormap()  # Will update the LabelVispyColormap shader
++        self.color_mode = color_mode
+ 
+     @property
+     def num_colors(self):
+@@ -584,9 +611,9 @@ class Labels(_ImageBase):
+         return label_index
+ 
+     @property
+-    def color(self):
++    def color(self) -> dict:
+         """dict: custom color dict for label coloring"""
+-        return self._color
++        return {**self._direct_colormap.color_dict}
+ 
+     @color.setter
+     def color(self, color):
+@@ -600,7 +627,6 @@ class Labels(_ImageBase):
+         # this is default color for label that is not in the color dict
+         # is provided as None key
+         # we pop it as `None` cannot be cast to float
+-        self._validate_colors(color)
+ 
+         color[None] = default_color
+ 
+@@ -609,61 +635,7 @@ class Labels(_ImageBase):
+             for label, color_str in color.items()
+         }
+         self._color = colors
+-        self._direct_colormap = direct_colormap(colors)
+-
+-        # `colors` may contain just the default None and background label
+-        # colors, in which case we need to be in AUTO color mode. Otherwise,
+-        # `colors` contains colors for all labels, and we should be in DIRECT
+-        # mode.
+-
+-        # For more information
+-        # - https://github.com/napari/napari/issues/2479
+-        # - https://github.com/napari/napari/issues/2953
+-        if self._is_default_colors(colors):
+-            color_mode = LabelColorMode.AUTO
+-        else:
+-            color_mode = LabelColorMode.DIRECT
+-
+-        self.color_mode = color_mode
+-
+-    @classmethod
+-    def _validate_colors(cls, labels: Iterable[int]):
+-        """Check whether any of the given labels will be aliased together.
+-
+-        See https://github.com/napari/napari/issues/6084 for details.
+-        """
+-        labels_int = np.fromiter(labels, dtype=int)
+-        labels_unique = np.unique(cls._to_vispy_texture_dtype(labels_int))
+-        if labels_unique.size == labels_int.size:
+-            return
+-
+-        # recalculate here second time to provide best performance on colors that are not colliding
+-        labels_unique, inverse, count = np.unique(
+-            cls._to_vispy_texture_dtype(labels_int),
+-            return_inverse=True,
+-            return_counts=True,
+-        )
+-        collided_idx = np.where(count > 1)[0]
+-        aliased_list = [
+-            labels_int[np.where(inverse == idx)[0]] for idx in collided_idx
+-        ]
+-
+-        alias_string = "\n".join(
+-            trans._(
+-                'Labels {col_li} will display as the same color as {col_la};',
+-                col_li=",".join(str(i) for i in lst[:-1]),
+-                col_la=str(lst[-1]),
+-            )
+-            for lst in aliased_list
+-        )
+-        warn_text = trans._(
+-            "Because integer labels are cast to less-precise float for display, "
+-            "the following label sets will render as the same color:\n"
+-            "{alias_string}\n"
+-            "See https://github.com/napari/napari/issues/6084 for details.",
+-            alias_string=alias_string,
+-        )
+-        warnings.warn(warn_text, category=RuntimeWarning)
++        self.colormap = direct_colormap(colors)
+ 
+     def _is_default_colors(self, color):
+         """Returns True if color contains only default colors, otherwise False.
+@@ -963,10 +935,13 @@ class Labels(_ImageBase):
+         )
+         return sliced_labels[delta_slice]
+ 
+-    def _get_cache_dtype(self) -> np.dtype:
++    def _get_cache_dtype(self, raw_dtype: np.dtype) -> np.dtype:
+         if self.color_mode == LabelColorMode.DIRECT:
+-            return np.dtype(np.float32)
+-        return minimum_dtype_for_labels(self.num_colors)
++            return _texture_dtype(
++                self._direct_colormap._num_unique_colors + 2,
++                raw_dtype,
++            )
++        return _texture_dtype(self.num_colors, raw_dtype)
+ 
+     def _setup_cache(self, labels):
+         """
+@@ -982,12 +957,12 @@ class Labels(_ImageBase):
+ 
+         self._cached_labels = np.zeros_like(labels)
+         self._cached_mapped_labels = np.zeros_like(
+-            labels, dtype=self._get_cache_dtype()
++            labels, dtype=self._get_cache_dtype(labels.dtype)
+         )
+ 
+     def _raw_to_displayed(
+         self, raw, data_slice: Optional[Tuple[slice, ...]] = None
+-    ):
++    ) -> np.ndarray:
+         """Determine displayed image from a saved raw image and a saved seed.
+ 
+         This function ensures that the 0 label gets mapped to the 0 displayed
+@@ -1042,11 +1017,13 @@ class Labels(_ImageBase):
+             return self._cached_mapped_labels[data_slice]
+ 
+         if self.color_mode == LabelColorMode.AUTO:
+-            mapped_labels = _cast_labels_data_to_texture_dtype(
++            mapped_labels = _cast_labels_data_to_texture_dtype_auto(
+                 labels_to_map, self._random_colormap
+             )
+         else:  # direct
+-            mapped_labels = self._to_vispy_texture_dtype(labels_to_map)
++            mapped_labels = _cast_labels_data_to_texture_dtype_direct(
++                labels_to_map, self._direct_colormap
++            )
+ 
+         if self._cached_labels is not None:
+             if update_mask is not None:
+@@ -1086,13 +1063,8 @@ class Labels(_ImageBase):
+         )
+         zoom_factor = tuple(new_shape / imshape)
+ 
+-        downsampled = _convert_small_ints_to_unsigned(
+-            ndi.zoom(image, zoom_factor, prefilter=False, order=0)
+-        )
+-        if self.color_mode == LabelColorMode.AUTO:
+-            color_array = self.colormap.map(downsampled)
+-        else:  # direct
+-            color_array = self._direct_colormap.map(downsampled)
++        downsampled = ndi.zoom(image, zoom_factor, prefilter=False, order=0)
++        color_array = self.colormap.map(downsampled)
+         color_array[..., 3] *= self.opacity
+ 
+         self.thumbnail = color_array
+@@ -1109,11 +1081,7 @@ class Labels(_ImageBase):
+         ):
+             col = self.colormap.map(self._background_label)[0]
+         else:
+-            raw_dtype = self._slice.image.raw.dtype
+-            val = _convert_small_ints_to_unsigned(
+-                np.array([label]).astype(raw_dtype)
+-            )
+-            col = self.colormap.map(val)[0]
++            col = self.colormap.map(label)[0]
+         return col
+ 
+     def _get_value_ray(
+diff --git a/napari/utils/colormaps/_tests/test_colormap.py b/napari/utils/colormaps/_tests/test_colormap.py
+index a69d18ef..a9dec656 100644
+--- a/napari/utils/colormaps/_tests/test_colormap.py
++++ b/napari/utils/colormaps/_tests/test_colormap.py
+@@ -1,4 +1,5 @@
+ import importlib
++from itertools import product
+ from unittest.mock import patch
+ 
+ import numpy as np
+@@ -7,6 +8,10 @@ import pytest
+ 
+ from napari.utils.color import ColorArray
+ from napari.utils.colormaps import Colormap, colormap
++from napari.utils.colormaps.colormap import (
++    MAPPING_OF_UNKNOWN_VALUE,
++    DirectLabelColormap,
++)
+ from napari.utils.colormaps.colormap_utils import label_colormap
+ 
+ 
+@@ -143,13 +148,119 @@ def test_cast_labels_to_minimum_type_auto(num: int, dtype, monkeypatch):
+     data = np.zeros(3, dtype=np.uint32)
+     data[1] = 10
+     data[2] = 10**6 + 5
+-    cast_arr = colormap._cast_labels_data_to_texture_dtype(data, cmap)
++    cast_arr = colormap._cast_labels_data_to_texture_dtype_auto(data, cmap)
+     assert cast_arr.dtype == dtype
+     assert cast_arr[0] == 0
+     assert cast_arr[1] == 10
+     assert cast_arr[2] == 10**6 % num + 5
+ 
+ 
++@pytest.fixture
++def direct_label_colormap():
++    return DirectLabelColormap(
++        color_dict={
++            0: np.array([0, 0, 0, 0]),
++            1: np.array([255, 0, 0, 255]),
++            2: np.array([0, 255, 0, 255]),
++            3: np.array([0, 0, 255, 255]),
++            12: np.array([0, 0, 255, 255]),
++            None: np.array([255, 255, 255, 255]),
++        },
++    )
++
++
++def test_direct_label_colormap_simple(direct_label_colormap):
++    np.testing.assert_array_equal(
++        direct_label_colormap.map([0, 2, 7]),
++        np.array([[0, 0, 0, 0], [0, 255, 0, 255], [255, 255, 255, 255]]),
++    )
++    assert direct_label_colormap._num_unique_colors == 5
++
++    (
++        label_mapping,
++        color_dict,
++    ) = direct_label_colormap._values_mapping_to_minimum_values_set()
++
++    assert len(label_mapping) == 6
++    assert len(color_dict) == 5
++    assert label_mapping[None] == MAPPING_OF_UNKNOWN_VALUE
++    assert label_mapping[12] == label_mapping[3]
++    np.testing.assert_array_equal(
++        color_dict[label_mapping[0]], direct_label_colormap.color_dict[0]
++    )
++    np.testing.assert_array_equal(
++        color_dict[0], direct_label_colormap.color_dict[None]
++    )
++
++
++def test_direct_label_colormap_selection(direct_label_colormap):
++    direct_label_colormap.selection = 2
++    direct_label_colormap.use_selection = True
++
++    np.testing.assert_array_equal(
++        direct_label_colormap.map([0, 2, 7]),
++        np.array([[0, 0, 0, 0], [0, 255, 0, 255], [0, 0, 0, 0]]),
++    )
++
++    (
++        label_mapping,
++        color_dict,
++    ) = direct_label_colormap._values_mapping_to_minimum_values_set()
++
++    assert len(label_mapping) == 2
++    assert len(color_dict) == 2
++
++
++@pytest.mark.usefixtures("disable_jit")
++def test_cast_direct_labels_to_minimum_type(direct_label_colormap):
++    data = np.arange(15, dtype=np.uint32)
++    cast = colormap._labels_raw_to_texture_direct(data, direct_label_colormap)
++    label_mapping = (
++        direct_label_colormap._values_mapping_to_minimum_values_set()[0]
++    )
++    assert cast.dtype == np.uint8
++    np.testing.assert_array_equal(
++        cast,
++        np.array(
++            [
++                label_mapping[0],
++                label_mapping[1],
++                label_mapping[2],
++                label_mapping[3],
++                MAPPING_OF_UNKNOWN_VALUE,
++                MAPPING_OF_UNKNOWN_VALUE,
++                MAPPING_OF_UNKNOWN_VALUE,
++                MAPPING_OF_UNKNOWN_VALUE,
++                MAPPING_OF_UNKNOWN_VALUE,
++                MAPPING_OF_UNKNOWN_VALUE,
++                MAPPING_OF_UNKNOWN_VALUE,
++                MAPPING_OF_UNKNOWN_VALUE,
++                label_mapping[3],
++                MAPPING_OF_UNKNOWN_VALUE,
++                MAPPING_OF_UNKNOWN_VALUE,
++            ]
++        ),
++    )
++
++
++@pytest.mark.parametrize(
++    "num,dtype", [(40, np.uint8), (1000, np.uint16), (80000, np.float32)]
++)
++@pytest.mark.usefixtures("disable_jit")
++def test_test_cast_direct_labels_to_minimum_type_no_jit(num, dtype):
++    cmap = DirectLabelColormap(
++        color_dict={
++            k: np.array([*v, 255])
++            for k, v in zip(range(num), product(range(256), repeat=3))
++        },
++    )
++    cmap.color_dict[None] = np.array([255, 255, 255, 255])
++    data = np.arange(10, dtype=np.uint32)
++    data[2] = 80005
++    cast = colormap._labels_raw_to_texture_direct(data, cmap)
++    assert cast.dtype == dtype
++
++
+ def test_zero_preserving_modulo_naive():
+     pytest.importorskip("numba")
+     data = np.arange(1000, dtype=np.uint32)
+@@ -208,7 +319,116 @@ def test_label_colormap_using_cache(dtype, monkeypatch):
+     expected = np.array([[0, 0, 0, 0], [1, 0, 0, 1], [0, 1, 0, 1]])
+     map1 = cmap.map(values)
+     npt.assert_array_equal(map1, expected)
+-    getattr(cmap, f"_{dtype.__name__}_colors")
+     monkeypatch.setattr(colormap, '_zero_preserving_modulo_numpy', None)
+     map2 = cmap.map(values)
+     npt.assert_array_equal(map1, map2)
++
++
++@pytest.mark.parametrize("size", [100, 1000])
++def test_cast_direct_labels_to_minimum_type_naive(size):
++    pytest.importorskip("numba")
++    data = np.arange(size, dtype=np.uint32)
++    dtype = colormap.minimum_dtype_for_labels(size)
++    cmap = DirectLabelColormap(
++        color_dict={
++            k: np.array([*v, 255])
++            for k, v in zip(range(size - 2), product(range(256), repeat=3))
++        },
++    )
++    cmap.color_dict[None] = np.array([255, 255, 255, 255])
++    res1 = colormap._labels_raw_to_texture_direct(data, cmap)
++    res2 = colormap._labels_raw_to_texture_direct_numpy(data, cmap)
++    npt.assert_array_equal(res1, res2)
++    assert res1.dtype == dtype
++    assert res2.dtype == dtype
++
++
++def test_direct_colormap_with_no_selection():
++    # Create a DirectLabelColormap with a simple color_dict
++    color_dict = {1: np.array([1, 0, 0, 1]), 2: np.array([0, 1, 0, 1])}
++    cmap = DirectLabelColormap(color_dict=color_dict)
++
++    # Map a single value
++    mapped = cmap.map(1)
++    npt.assert_array_equal(mapped[0], np.array([1, 0, 0, 1]))
++
++    # Map multiple values
++    mapped = cmap.map(np.array([1, 2]))
++    npt.assert_array_equal(mapped, np.array([[1, 0, 0, 1], [0, 1, 0, 1]]))
++
++
++def test_direct_colormap_with_selection():
++    # Create a DirectLabelColormap with a simple color_dict and a selection
++    color_dict = {1: np.array([1, 0, 0, 1]), 2: np.array([0, 1, 0, 1])}
++    cmap = DirectLabelColormap(
++        color_dict=color_dict, use_selection=True, selection=1
++    )
++
++    # Map a single value
++    mapped = cmap.map(1)
++    npt.assert_array_equal(mapped[0], np.array([1, 0, 0, 1]))
++
++    # Map a value that is not the selection
++    mapped = cmap.map(2)
++    npt.assert_array_equal(mapped[0], np.array([0, 0, 0, 0]))
++
++
++def test_direct_colormap_with_invalid_values():
++    # Create a DirectLabelColormap with a simple color_dict
++    color_dict = {1: np.array([1, 0, 0, 1]), 2: np.array([0, 1, 0, 1])}
++    cmap = DirectLabelColormap(color_dict=color_dict)
++
++    # Map a value that is not in the color_dict
++    mapped = cmap.map(3)
++    npt.assert_array_equal(mapped[0], np.array([0, 0, 0, 0]))
++
++
++def test_direct_colormap_with_empty_color_dict():
++    # Create a DirectLabelColormap with an empty color_dict
++    cmap = DirectLabelColormap(color_dict={})
++
++    # Map a value
++    mapped = cmap.map(1)
++    npt.assert_array_equal(mapped[0], np.array([0, 0, 0, 0]))
++
++
++def test_direct_colormap_with_non_integer_values():
++    # Create a DirectLabelColormap with a simple color_dict
++    color_dict = {1: np.array([1, 0, 0, 1]), 2: np.array([0, 1, 0, 1])}
++    cmap = DirectLabelColormap(color_dict=color_dict)
++
++    # Map a float value
++    with pytest.raises(TypeError, match='DirectLabelColormap can only'):
++        cmap.map(1.5)
++
++    # Map a string value
++    with pytest.raises(TypeError, match='DirectLabelColormap can only'):
++        cmap.map('1')
++
++
++def test_direct_colormap_with_collision():
++    # this test assumes that the the selected prime number for hash map size is 11
++    color_dict = {
++        1: np.array([1, 0, 0, 1]),
++        12: np.array([0, 1, 0, 1]),
++        23: np.array([0, 0, 1, 1]),
++    }
++    cmap = DirectLabelColormap(color_dict=color_dict)
++
++    npt.assert_array_equal(cmap.map(1)[0], np.array([1, 0, 0, 1]))
++    npt.assert_array_equal(cmap.map(12)[0], np.array([0, 1, 0, 1]))
++    npt.assert_array_equal(cmap.map(23)[0], np.array([0, 0, 1, 1]))
++
++
++def test_direct_colormap_negative_values():
++    # Create a DirectLabelColormap with a simple color_dict
++    color_dict = {-1: np.array([1, 0, 0, 1]), -2: np.array([0, 1, 0, 1])}
++    cmap = DirectLabelColormap(color_dict=color_dict)
++
++    # Map a single value
++    mapped = cmap.map(np.int8(-1))
++    npt.assert_array_equal(mapped[0], np.array([1, 0, 0, 1]))
++
++    # Map multiple values
++    mapped = cmap.map(np.array([-1, -2], dtype=np.int8))
++    npt.assert_array_equal(mapped, np.array([[1, 0, 0, 1], [0, 1, 0, 1]]))
+diff --git a/napari/utils/colormaps/_tests/test_colormaps.py b/napari/utils/colormaps/_tests/test_colormaps.py
+index fe090c85..5cbd035c 100644
+--- a/napari/utils/colormaps/_tests/test_colormaps.py
++++ b/napari/utils/colormaps/_tests/test_colormaps.py
+@@ -20,9 +20,9 @@ from napari.utils.colormaps.vendored import cm
+ 
+ @pytest.mark.parametrize("name", list(AVAILABLE_COLORMAPS.keys()))
+ def test_colormap(name):
+-    if name == 'label_colormap':
++    if name in {'label_colormap', 'custom'}:
+         pytest.skip(
+-            'label_colormap is inadvertantly added to AVAILABLE_COLORMAPS but is not a normal colormap'
++            'label_colormap  and custom are inadvertantly added to AVAILABLE_COLORMAPS but is not a normal colormap'
+         )
+ 
+     np.random.seed(0)
+diff --git a/napari/utils/colormaps/colormap.py b/napari/utils/colormaps/colormap.py
+index 7a1dd691..6cb7b8c4 100644
+--- a/napari/utils/colormaps/colormap.py
++++ b/napari/utils/colormaps/colormap.py
+@@ -1,6 +1,17 @@
+ from collections import defaultdict
+ from functools import cached_property
+-from typing import Optional, cast
++from typing import (
++    TYPE_CHECKING,
++    Any,
++    DefaultDict,
++    Dict,
++    List,
++    Optional,
++    Tuple,
++    Union,
++    cast,
++    overload,
++)
+ 
+ import numpy as np
+ 
+@@ -12,6 +23,13 @@ from napari.utils.events import EventedModel
+ from napari.utils.events.custom_types import Array
+ from napari.utils.translations import trans
+ 
++if TYPE_CHECKING:
++    from numba import typed
++
++MAPPING_OF_UNKNOWN_VALUE = 0
++# For direct mode we map all unknown values to single value
++# for simplicity of implementation we select 0
++
+ 
+ class ColormapInterpolationMode(StrEnum):
+     """INTERPOLATION: Interpolation mode for colormaps.
+@@ -36,7 +54,7 @@ class Colormap(EventedModel):
+         Data used in the colormap.
+     name : str
+         Name of the colormap.
+-    display_name : str
++    _display_name : str
+         Display name of the colormap.
+     controls : array, shape (N,) or (N+1,)
+         Control points of the colormap.
+@@ -77,7 +95,8 @@ class Colormap(EventedModel):
+         if v[0] != 0 or (len(v) > 1 and v[-1] != 1):
+             raise ValueError(
+                 trans._(
+-                    'Control points must start with 0.0 and end with 1.0. Got {start_control_point} and {end_control_point}',
++                    'Control points must start with 0.0 and end with 1.0. '
++                    'Got {start_control_point} and {end_control_point}',
+                     deferred=True,
+                     start_control_point=v[0],
+                     end_control_point=v[-1],
+@@ -146,76 +165,61 @@ class Colormap(EventedModel):
+         return make_colorbar(self)
+ 
+ 
+-class LabelColormap(Colormap):
+-    """Colormap that shuffles values before mapping to colors.
+-
+-    Attributes
+-    ----------
+-    seed : float
+-    use_selection : bool
+-    selection : int
+-    """
+-
+-    seed: float = 0.5
++class LabelColormapBase(Colormap):
+     use_selection: bool = False
+     selection: int = 0
+-    interpolation: ColormapInterpolationMode = ColormapInterpolationMode.ZERO
+     background_value: int = 0
++    interpolation: ColormapInterpolationMode = ColormapInterpolationMode.ZERO
++    _cache_mapping: Dict[Tuple[np.dtype, np.dtype], np.ndarray] = PrivateAttr(
++        default={}
++    )
++    _cache_other: Dict[str, Any] = PrivateAttr(default={})
+ 
+-    class Config:
++    class Config(Colormap.Config):
+         # this config is to avoid deepcopy of cached_property
+         # see https://github.com/pydantic/pydantic/issues/2763
+-        # it is required until drop pydantic 1 or pythin 3.11 and older
++        # it is required until we drop Pydantic 1 or Python 3.11 and older
+         # need to validate after drop pydantic 1
+         keep_untouched = (cached_property,)
+ 
+-    @cached_property
+-    def _uint8_colors(self) -> np.ndarray:
+-        data = np.arange(256, dtype=np.uint8)
+-        return self.map(data, apply_selection=False)
+-
+-    @cached_property
+-    def _uint16_colors(self) -> np.ndarray:
+-        data = np.arange(65536, dtype=np.uint16)
+-        return self.map(data, apply_selection=False)
+-
+-    def selection_as_type(self, dtype: np.dtype) -> int:
+-        """Convert the selection value to a specified data type.
++    def _cmap_without_selection(self) -> "LabelColormapBase":
++        if self.use_selection:
++            cmap = self.__class__(**self.dict())
++            cmap.use_selection = False
++            return cmap
++        return self
+ 
+-        This maps negative background values in int8 and int16 to their
+-        corresponding view in uint8 and uint16.
++    def _get_mapping_from_cache(
++        self, data_dtype: np.dtype
++    ) -> Optional[np.ndarray]:
++        """For given dtype, return precomputed array mapping values to colors.
+ 
+-        Parameters
+-        ----------
+-        dtype : np.dtype
+-            The desired data type to convert the selection value to.
+-
+-        Returns
+-        -------
+-        int
+-            The selection value converted to the specified data type.
++        Returns None if the dtype itemsize is greater than 2.
+         """
+-        return np.array([self.selection]).astype(dtype)[0]
++        target_dtype = _texture_dtype(self._num_unique_colors, data_dtype)
++        key = (data_dtype, target_dtype)
++        if key not in self._cache_mapping and data_dtype.itemsize <= 2:
++            data = np.arange(
++                np.iinfo(target_dtype).max + 1, dtype=target_dtype
++            ).astype(data_dtype)
++            self._cache_mapping[key] = self._map_without_cache(data)
++        return self._cache_mapping.get(key)
++
++    def _clear_cache(self):
++        """Mechanism to clean cached properties"""
++        self._cache_mapping = {}
++        self._cache_other = {}
+ 
+-    def background_as_type(self, dtype: np.dtype) -> int:
+-        """Convert the background value to a specified data type.
+-
+-        This maps negative background values in int8 and int16 to their
+-        corresponding view in uint8 and uint16.
++    @property
++    def _num_unique_colors(self) -> int:
++        """Number of unique colors, not counting transparent black."""
++        return len(self.colors) - 1
+ 
+-        Parameters
+-        ----------
+-        dtype : np.dtype
+-            The desired data type to convert the background value to.
++    def _map_without_cache(self, values: np.ndarray) -> np.ndarray:
++        """Function that maps values to colors without selection or cache"""
++        raise NotImplementedError
+ 
+-        Returns
+-        -------
+-        int
+-            The background value converted to the specified data type.
+-        """
+-        return np.array([self.background_value]).astype(dtype)[0]
+-
+-    def selection_as_minimum_dtype(self, dtype: np.dtype) -> int:
++    def _selection_as_minimum_dtype(self, dtype: np.dtype) -> int:
+         """Treat selection as given dtype and calculate value with min dtype.
+ 
+         Parameters
+@@ -228,11 +232,29 @@ class LabelColormap(Colormap):
+         int
+             The selection converted.
+         """
+-        return _cast_labels_data_to_texture_dtype(
+-            np.array([self.selection]).astype(dtype), self
+-        )[0]
++        raise NotImplementedError
++
++
++class LabelColormap(LabelColormapBase):
++    """Colormap that shuffles values before mapping to colors.
++
++    Attributes
++    ----------
++    seed : float
++    use_selection : bool
++    selection : int
++    """
++
++    seed: float = 0.5
++
++    def _selection_as_minimum_dtype(self, dtype: np.dtype) -> int:
++        return int(
++            _cast_labels_data_to_texture_dtype_auto(
++                dtype.type(self.selection), self
++            )
++        )
+ 
+-    def background_as_minimum_dtype(self, dtype: np.dtype) -> int:
++    def _background_as_minimum_dtype(self, dtype: np.dtype) -> int:
+         """Treat background as given dtype and calculate value with min dtype.
+ 
+         Parameters
+@@ -245,19 +267,30 @@ class LabelColormap(Colormap):
+         int
+             The background converted.
+         """
+-        return _cast_labels_data_to_texture_dtype(
+-            np.array([self.background_value]).astype(dtype), self
+-        )[0]
++        return int(
++            _cast_labels_data_to_texture_dtype_auto(
++                dtype.type(self.background_value), self
++            )
++        )
+ 
+-    def map(self, values, apply_selection=True) -> np.ndarray:
++    def _map_without_cache(self, values) -> np.ndarray:
++        texture_dtype_values = _zero_preserving_modulo_numpy(
++            values,
++            len(self.colors) - 1,
++            values.dtype,
++            self.background_value,
++        )
++        mapped = self.colors[texture_dtype_values]
++        mapped[texture_dtype_values == 0] = 0
++        return mapped
++
++    def map(self, values) -> np.ndarray:
+         """Map values to colors.
+ 
+         Parameters
+         ----------
+         values : np.ndarray or float
+             Values to be mapped.
+-        apply_selection : bool
+-            Whether to apply selection if self.use_selection is True.
+ 
+         Returns
+         -------
+@@ -268,29 +301,13 @@ class LabelColormap(Colormap):
+ 
+         if values.dtype.kind == 'f':
+             values = values.astype(np.int64)
+-
+-        if values.dtype == np.uint8 and "_uint8_colors" in self.__dict__:
+-            # __dict__ checks whether _uint8_colors is cached — if not, it
+-            # falls back on else to map all the colors, avoiding an infinite
+-            # recursion.
+-            mapped = self._uint8_colors[values]
+-        elif values.dtype == np.uint16 and "_uint16_colors" in self.__dict__:
+-            # same as above uint8 clause.
+-            mapped = self._uint16_colors[values]
++        mapper = self._get_mapping_from_cache(values.dtype)
++        if mapper is not None:
++            mapped = mapper[values]
+         else:
+-            background = self.background_as_type(values.dtype)
+-            # cast background to values dtype to support int8 and int16
+-            # negative backgrounds
+-            texture_dtype_values = _zero_preserving_modulo_numpy(
+-                values, len(self.colors) - 1, values.dtype, background
+-            )
+-            mapped = self.colors[texture_dtype_values]
+-            mapped[texture_dtype_values == 0] = 0
+-        if self.use_selection and apply_selection:
+-            selection = self.selection_as_type(values.dtype)
+-            # cast selection to values dtype to support int8 and int16
+-            # negative backgrounds
+-            mapped[(values != selection)] = 0
++            mapped = self._map_without_cache(values)
++        if self.use_selection:
++            mapped[(values != self.selection)] = 0
+ 
+         return mapped
+ 
+@@ -306,65 +323,253 @@ class LabelColormap(Colormap):
+         self.events.colors(value=self.colors)
+ 
+ 
+-class DirectLabelColormap(Colormap):
++class DirectLabelColormap(LabelColormapBase):
+     """Colormap using a direct mapping from labels to color using a dict.
+ 
+     Attributes
+     ----------
+-    color_dict : defaultdict
++    color_dict: dict from int to (3,) or (4,) array
+         The dictionary mapping labels to colors.
+     use_selection : bool
+         Whether to color using the selected label.
+-    selection : float
++    selection : int
+         The selected label.
+     """
+ 
+-    color_dict: defaultdict = Field(
++    color_dict: DefaultDict[Optional[int], np.ndarray] = Field(
+         default_factory=lambda: defaultdict(lambda: np.zeros(4))
+     )
+     use_selection: bool = False
+-    selection: float = 0.0
++    selection: int = 0
+ 
+-    def map(self, values):
+-        # Convert to float32 to match the current GL shader implementation
+-        values = np.atleast_1d(values).astype(np.float32)
++    def __init__(self, *args, **kwargs) -> None:
++        if "colors" not in kwargs and not args:
++            kwargs["colors"] = np.zeros(3)
++        super().__init__(*args, **kwargs)
++
++    def _selection_as_minimum_dtype(self, dtype: np.dtype) -> int:
++        return int(
++            _cast_labels_data_to_texture_dtype_direct(
++                dtype.type(self.selection), self
++            )
++        )
++
++    def map(self, values) -> np.ndarray:
++        """Map values to colors.
++
++        Parameters
++        ----------
++        values : np.ndarray or int
++            Values to be mapped.
++
++        Returns
++        -------
++        np.ndarray of same shape as values, but with last dimension of size 4
++            Mapped colors.
++        """
++        values = np.atleast_1d(values)
++        if values.dtype.kind in {'f', 'U'}:
++            raise TypeError("DirectLabelColormap can only be used with int")
++        mapper = self._get_mapping_from_cache(values.dtype)
++        if mapper is not None:
++            mapped = mapper[values]
++        else:
++            values_cast = _labels_raw_to_texture_direct(values, self)
++            mapped = self._map_precast(values_cast, apply_selection=True)
++
++        if self.use_selection:
++            mapped[(values != self.selection)] = 0
++        return mapped
++
++    def _map_without_cache(self, values: np.ndarray) -> np.ndarray:
++        cmap = self._cmap_without_selection()
++        cast = _labels_raw_to_texture_direct(values, cmap)
++        return self._map_precast(cast, apply_selection=False)
++
++    def _map_precast(self, values, apply_selection) -> np.ndarray:
++        """Map values to colors.
++
++        Parameters
++        ----------
++        values : np.ndarray
++            Values to be mapped. It need to be already cast using
++            cast_labels_to_minimum_type_auto
++
++        Returns
++        -------
++        np.ndarray of shape (N, M, 4)
++            Mapped colors.
++
++        Notes
++        -----
++        it is implemented for thumbnail labels,
++        where we already have cast values
++        """
+         mapped = np.zeros(values.shape + (4,), dtype=np.float32)
++        colors = self._values_mapping_to_minimum_values_set(apply_selection)[1]
+         for idx in np.ndindex(values.shape):
+             value = values[idx]
+-            if value in self.color_dict:
+-                color = self.color_dict[value]
+-                if len(color) == 3:
+-                    color = np.append(color, 1)
+-                mapped[idx] = color
+-            else:
+-                mapped[idx] = self.default_color
+-        # If using selected, disable all others
+-        if self.use_selection:
+-            mapped[~np.isclose(values, self.selection)] = 0
++            mapped[idx] = colors[value]
+         return mapped
+ 
++    @cached_property
++    def _num_unique_colors(self) -> int:
++        """Count the number of unique colors in the colormap."""
++        return len({tuple(x) for x in self.color_dict.values()})
++
++    def _clear_cache(self):
++        super()._clear_cache()
++        if "_num_unique_colors" in self.__dict__:
++            del self.__dict__["_num_unique_colors"]
++        if "_label_mapping_and_color_dict" in self.__dict__:
++            del self.__dict__["_label_mapping_and_color_dict"]
++        if "_array_map" in self.__dict__:
++            del self.__dict__["_array_map"]
++
++    def _values_mapping_to_minimum_values_set(
++        self, apply_selection=True
++    ) -> Tuple[Dict[Optional[int], int], Dict[int, np.ndarray]]:
++        """Create mapping from original values to minimum values set.
++        To use minimum possible dtype for labels.
++
++        Returns
++        -------
++        Dict[Optional[int], int]
++            Mapping from original values to minimum values set.
++        Dict[int, np.ndarray]
++            Mapping from new values to colors.
++
++        """
++        if self.use_selection and apply_selection:
++            return {self.selection: 1, None: 0}, {
++                0: np.array((0, 0, 0, 0)),
++                1: self.color_dict.get(
++                    self.selection,
++                    self.default_color,
++                ),
++            }
++
++        return self._label_mapping_and_color_dict
++
++    @cached_property
++    def _label_mapping_and_color_dict(
++        self,
++    ) -> Tuple[Dict[Optional[int], int], Dict[int, np.ndarray]]:
++        color_to_labels: Dict[Tuple[int, ...], List[Optional[int]]] = {}
++        labels_to_new_labels: Dict[Optional[int], int] = {
++            None: MAPPING_OF_UNKNOWN_VALUE
++        }
++        new_color_dict: Dict[int, np.ndarray] = {
++            MAPPING_OF_UNKNOWN_VALUE: self.default_color,
++        }
++
++        for label, color in self.color_dict.items():
++            if label is None:
++                continue
++            color_tup = tuple(color)
++            if color_tup not in color_to_labels:
++                color_to_labels[color_tup] = [label]
++                labels_to_new_labels[label] = len(new_color_dict)
++                new_color_dict[labels_to_new_labels[label]] = color
++            else:
++                color_to_labels[color_tup].append(label)
++                labels_to_new_labels[label] = labels_to_new_labels[
++                    color_to_labels[color_tup][0]
++                ]
++
++        return labels_to_new_labels, new_color_dict
++
++    def _get_typed_dict_mapping(self, data_dtype: np.dtype) -> 'typed.Dict':
++        """Create mapping from label values to texture values of smaller dtype.
++
++        In https://github.com/napari/napari/issues/6397, we noticed that using
++        float32 textures was much slower than uint8 or uint16 textures. When
++        labels data is (u)int(8,16), we simply use the labels data directly.
++        But when it is higher-precision, we need to compress the labels into
++        the smallest dtype that can still achieve the goal of the
++        visualisation. This corresponds to the smallest dtype that can map to
++        the number of unique colors in the colormap. Even if we have a
++        million labels, if they map to one of two colors, we can map them to
++        a uint8 array with values 1 and 2; then, the texture can map those
++        two values to each of the two possible colors.
++
++        Returns
++        -------
++        Dict[Optional[int], int]
++            Mapping from original values to minimal texture value set.
++        """
++
++        # we cache the result to avoid recomputing it on each slice;
++        # check first if it's already in the cache.
++        key = f"_{data_dtype}_typed_dict"
++        if key in self._cache_other:
++            return self._cache_other[key]
++
++        from numba import typed, types
++
++        # num_unique_colors + 2 because we need to map None and background
++        target_type = minimum_dtype_for_labels(self._num_unique_colors + 2)
++
++        dkt = typed.Dict.empty(
++            key_type=getattr(types, data_dtype.name),
++            value_type=getattr(types, target_type.name),
++        )
++        for k, v in self._label_mapping_and_color_dict[0].items():
++            if k is None:
++                continue
++            dkt[data_dtype.type(k)] = target_type.type(v)
++
++        self._cache_other[key] = dkt
++
++        return dkt
++
++    @cached_property
++    def _array_map(self):
++        """Create an array to map labels to texture values of smaller dtype."""
++        max_value = max(x for x in self.color_dict if x is not None)
++        if max_value > 2**16:
++            raise RuntimeError(  # pragma: no cover
++                "Cannot use numpy implementation for large values of labels "
++                "direct colormap. Please install numba."
++            )
++        dtype = minimum_dtype_for_labels(self._num_unique_colors + 2)
++        label_mapping = self._values_mapping_to_minimum_values_set()[0]
++
++        # We need 2 + the max value: one because we will be indexing with the
++        # max value, and an extra one so that higher values get clipped to
++        # that index and map to the default value, rather than to the max
++        # value in the map.
++        mapper = np.full(
++            (max_value + 2), MAPPING_OF_UNKNOWN_VALUE, dtype=dtype
++        )
++        for key, val in label_mapping.items():
++            if key is None:
++                continue
++            mapper[key] = val
++        return mapper
++
+     @property
+-    def default_color(self):
+-        if self.use_selection:
+-            return 0, 0, 0, 0
+-        return self.color_dict.get(None, (0, 0, 0, 0))
++    def default_color(self) -> np.ndarray:
++        return self.color_dict.get(None, np.array((0, 0, 0, 0)))
+         # we provided here default color for backward compatibility
+         # if someone is using DirectLabelColormap directly, not through Label layer
+ 
+ 
+-def _convert_small_ints_to_unsigned(data: np.ndarray) -> np.ndarray:
++def _convert_small_ints_to_unsigned(
++    data: Union[np.ndarray, np.integer],
++) -> Union[np.ndarray, np.integer]:
+     """Convert (u)int8 to uint8 and (u)int16 to uint16.
+ 
+     Otherwise, return the original array.
+ 
+     Parameters
+     ----------
+-    data : np.ndarray
++    data : np.ndarray | np.integer
+         Data to be converted.
+ 
+     Returns
+     -------
+-    np.ndarray
++    np.ndarray | np.integer
+         Converted data.
+     """
+     if data.dtype.itemsize == 1:
+@@ -376,10 +581,26 @@ def _convert_small_ints_to_unsigned(data: np.ndarray) -> np.ndarray:
+     return data
+ 
+ 
+-def _cast_labels_data_to_texture_dtype(
++@overload
++def _cast_labels_data_to_texture_dtype_auto(
+     data: np.ndarray,
+     colormap: LabelColormap,
+ ) -> np.ndarray:
++    ...
++
++
++@overload
++def _cast_labels_data_to_texture_dtype_auto(
++    data: np.integer,
++    colormap: LabelColormap,
++) -> np.integer:
++    ...
++
++
++def _cast_labels_data_to_texture_dtype_auto(
++    data: Union[np.ndarray, np.integer],
++    colormap: LabelColormap,
++) -> Union[np.ndarray, np.integer]:
+     """Convert labels data to the data type used in the texture.
+ 
+     In https://github.com/napari/napari/issues/6397, we noticed that using
+@@ -404,12 +625,14 @@ def _cast_labels_data_to_texture_dtype(
+ 
+     Returns
+     -------
+-    np.ndarray
++    np.ndarray | np.integer
+         Converted labels data.
+     """
++    original_shape = np.shape(data)
+     if data.itemsize <= 2:
+         return _convert_small_ints_to_unsigned(data)
+ 
++    data_arr = np.atleast_1d(data)
+     num_colors = len(colormap.colors) - 1
+ 
+     dtype = minimum_dtype_for_labels(num_colors + 1)
+@@ -419,14 +642,14 @@ def _cast_labels_data_to_texture_dtype(
+             np.array([colormap.selection]), num_colors, dtype
+         )
+         converted = np.where(
+-            data == colormap.selection, selection_in_texture, dtype.type(0)
++            data_arr == colormap.selection, selection_in_texture, dtype.type(0)
+         )
+     else:
+         converted = _zero_preserving_modulo(
+-            data, num_colors, dtype, colormap.background_value
++            data_arr, num_colors, dtype, colormap.background_value
+         )
+ 
+-    return converted
++    return np.reshape(converted, original_shape)
+ 
+ 
+ def _zero_preserving_modulo_numpy(
+@@ -460,91 +683,213 @@ def _zero_preserving_modulo_numpy(
+     return res
+ 
+ 
+-try:
+-    import numba
+-except ModuleNotFoundError:
+-    _zero_preserving_modulo = _zero_preserving_modulo_numpy
+-else:
++def _zero_preserving_modulo_loop(
++    values: np.ndarray, n: int, dtype: np.dtype, to_zero: int = 0
++) -> np.ndarray:
++    """``(values - 1) % n + 1``, but with one specific value mapped to 0.
+ 
+-    def _zero_preserving_modulo(
+-        values: np.ndarray,
+-        n: int,
+-        dtype: np.dtype,
+-        to_zero: int = 0,
+-    ) -> np.ndarray:
+-        """``(values - 1) % n + 1``, but with one specific value mapped to 0.
++    This ensures (1) an output value in [0, n] (inclusive), and (2) that
++    no nonzero values in the input are zero in the output, other than the
++    ``to_zero`` value.
+ 
+-        This ensures (1) an output value in [0, n] (inclusive), and (2) that
+-        no nonzero values in the input are zero in the output, other than the
+-        ``to_zero`` value.
++    Parameters
++    ----------
++    values : np.ndarray
++        The dividend of the modulo operator.
++    n : int
++        The divisor.
++    dtype : np.dtype
++        The desired dtype for the output array.
++    to_zero : int, optional
++        A specific value to map to 0. (By default, 0 itself.)
+ 
+-        Parameters
+-        ----------
+-        values : np.ndarray
+-            The dividend of the modulo operator.
+-        n : int
+-            The divisor.
+-        dtype : np.dtype
+-            The desired dtype for the output array.
+-        to_zero : int, optional
+-            A specific value to map to 0. (By default, 0 itself.)
++    Returns
++    -------
++    np.ndarray
++        The result: 0 for the ``to_zero`` value, ``values % n + 1``
++        everywhere else.
++    """
++    result = np.empty_like(values, dtype=dtype)
++    # need to preallocate numpy array for asv memory benchmarks
++    return _zero_preserving_modulo_inner_loop(values, n, to_zero, out=result)
+ 
+-        Returns
+-        -------
+-        np.ndarray
+-            The result: 0 for the ``to_zero`` value, ``values % n + 1``
+-            everywhere else.
+-        """
+-        result = np.empty_like(values, dtype=dtype)
+-        _zero_preserving_modulo_impl(
+-            values,
+-            n,
+-            result,
+-            to_zero,
+-        )
+-        return result
+ 
+-    @numba.njit(parallel=True)
+-    def _zero_preserving_modulo_impl(
+-        values: np.ndarray,
+-        n: int,
+-        out: np.ndarray,
+-        to_zero: int = 0,
+-    ) -> np.ndarray:
+-        """``(values - 1) % n + 1``, but with one specific value mapped to 0.
++def _zero_preserving_modulo_inner_loop(
++    values: np.ndarray, n: int, to_zero: int, out: np.ndarray
++) -> np.ndarray:
++    """``(values - 1) % n + 1``, but with one specific value mapped to 0.
+ 
+-        This ensures (1) an output value in [0, n] (inclusive), and (2) that
+-        no nonzero values in the input are zero in the output, other than the
+-        ``to_zero`` value.
++    This ensures (1) an output value in [0, n] (inclusive), and (2) that
++    no nonzero values in the input are zero in the output, other than the
++    ``to_zero`` value.
+ 
+-        Parameters
+-        ----------
+-        values : np.ndarray
+-            The dividend of the modulo operator.
+-        n : int
+-            The divisor.
+-        out : np.ndarray
+-            output array
+-        to_zero : int, optional
+-            A specific value to map to 0. (By default, 0 itself.)
++    Parameters
++    ----------
++    values : np.ndarray
++        The dividend of the modulo operator.
++    n : int
++        The divisor.
++    to_zero : int
++        A specific value to map to 0. (Usually, 0 itself.)
++    out : np.ndarray
++        Preallocated output array
+ 
+-        Returns
+-        -------
+-        np.ndarray
+-            The out: 0 for the ``to_zero`` value, ``values % n + 1``
+-            everywhere else.
+-        """
+-        for i in numba.prange(values.size):
+-            if values.flat[i] == to_zero:
+-                out.flat[i] = 0
+-            else:
+-                out.flat[i] = (values.flat[i] - 1) % n + 1
++    Returns
++    -------
++    np.ndarray
++        The result: 0 for the ``to_zero`` value, ``values % n + 1``
++        everywhere else.
++    """
++    for i in prange(values.size):
++        if values.flat[i] == to_zero:
++            out.flat[i] = 0
++        else:
++            out.flat[i] = (values.flat[i] - 1) % n + 1
+ 
+-        return out
++    return out
++
++
++@overload
++def _cast_labels_data_to_texture_dtype_direct(
++    data: np.ndarray, direct_colormap: DirectLabelColormap
++) -> np.ndarray:
++    ...
++
++
++@overload
++def _cast_labels_data_to_texture_dtype_direct(
++    data: np.integer, direct_colormap: DirectLabelColormap
++) -> np.integer:
++    ...
++
++
++def _cast_labels_data_to_texture_dtype_direct(
++    data: Union[np.ndarray, np.integer], direct_colormap: DirectLabelColormap
++) -> Union[np.ndarray, np.integer]:
++    """Convert labels data to the data type used in the texture.
++
++    In https://github.com/napari/napari/issues/6397, we noticed that using
++    float32 textures was much slower than uint8 or uint16 textures. Here we
++    convert the labels data to uint8 or uint16, based on the following rules:
++
++    - uint8 and uint16 labels data are unchanged. (No copy of the arrays.)
++    - int8 and int16 data are converted with a *view* to uint8 and uint16.
++      (This again does not involve a copy so is fast, and lossless.)
++    - higher precision integer data (u)int{32,64} are mapped to an intermediate
++      space of sequential values based on the colors they map to. As an
++      example, if the values are [1, 2**25, and 2**50], and the direct
++      colormap maps them to ['red', 'green', 'red'], then the intermediate map
++      is {1: 1, 2**25: 2, 2**50: 1}. The labels can then be converted to a
++      uint8 texture and a smaller direct colormap with only two values.
++
++    This function calls `_labels_raw_to_texture_direct`, but makes sure that
++    signed ints are first viewed as their unsigned counterparts.
++
++    Parameters
++    ----------
++    data : np.ndarray | np.integer
++        Labels data to be converted.
++    direct_colormap : LabelColormap
++        Colormap used to display the labels data.
++
++    Returns
++    -------
++    np.ndarray | np.integer
++        Converted labels data.
++    """
++    data = _convert_small_ints_to_unsigned(data)
++
++    if data.itemsize <= 2:
++        return data
++
++    original_shape = np.shape(data)
++    array_data = np.atleast_1d(data)
++    return np.reshape(
++        _labels_raw_to_texture_direct(array_data, direct_colormap),
++        original_shape,
++    )
++
++
++def _labels_raw_to_texture_direct_numpy(
++    data: np.ndarray, direct_colormap: DirectLabelColormap
++) -> np.ndarray:
++    """Convert labels data to the data type used in the texture.
++
++    This implementation uses numpy vectorized operations.
++
++    See `_cast_labels_data_to_texture_dtype_direct` for more details.
++    """
++    mapper = direct_colormap._array_map
++
++    if data.dtype.itemsize > 2:
++        data = np.clip(data, 0, mapper.shape[0] - 1)
++    return mapper[data]
++
++
++def _labels_raw_to_texture_direct_loop(
++    data: np.ndarray, direct_colormap: DirectLabelColormap
++) -> np.ndarray:
++    """
++    Cast direct labels to the minimum type.
++
++    Parameters
++    ----------
++    data : np.ndarray
++        The input data array.
++    direct_colormap : DirectLabelColormap
++        The direct colormap.
++
++    Returns
++    -------
++    np.ndarray
++        The cast data array.
++    """
++    if direct_colormap.use_selection:
++        return (data == direct_colormap.selection).astype(np.uint8)
++
++    dkt = direct_colormap._get_typed_dict_mapping(data.dtype)
++    target_dtype = minimum_dtype_for_labels(
++        direct_colormap._num_unique_colors + 2
++    )
++    result_array = np.full_like(
++        data, MAPPING_OF_UNKNOWN_VALUE, dtype=target_dtype
++    )
++    return _labels_raw_to_texture_direct_inner_loop(data, dkt, result_array)
++
++
++def _labels_raw_to_texture_direct_inner_loop(
++    data: np.ndarray, dkt: 'typed.Dict', out: np.ndarray
++) -> np.ndarray:
++    """
++    Relabel data using typed dict with mapping unknown labels to default value
++    """
++    # The numba typed dict does not provide official Api for
++    # determine key and value types
++    for i in prange(data.size):
++        val = data.flat[i]
++        if val in dkt:
++            out.flat[i] = dkt[data.flat[i]]
++
++    return out
++
++
++def _texture_dtype(num_colors: int, dtype: np.dtype) -> np.dtype:
++    """Compute VisPy texture dtype given number of colors and raw data dtype.
++
++    - for data of type int8 and uint8 we can use uint8 directly, with no copy.
++    - for int16 and uint16 we can use uint16 with no copy.
++    - for any other dtype, we fall back on `minimum_dtype_for_labels`, which
++      will require on-CPU mapping between the raw data and the texture dtype.
++    """
++    if dtype.itemsize == 1:
++        return np.dtype(np.uint8)
++    if dtype.itemsize == 2:
++        return np.dtype(np.uint16)
++    return minimum_dtype_for_labels(num_colors)
+ 
+ 
+ def minimum_dtype_for_labels(num_colors: int) -> np.dtype:
+-    """Return the minimum dtype that can hold the number of colors.
++    """Return the minimum texture dtype that can hold given number of colors.
+ 
+     Parameters
+     ----------
+@@ -561,3 +906,23 @@ def minimum_dtype_for_labels(num_colors: int) -> np.dtype:
+     if num_colors <= np.iinfo(np.uint16).max:
+         return np.dtype(np.uint16)
+     return np.dtype(np.float32)
++
++
++try:
++    import numba
++except ModuleNotFoundError:
++    _zero_preserving_modulo = _zero_preserving_modulo_numpy
++    _labels_raw_to_texture_direct = _labels_raw_to_texture_direct_numpy
++    prange = range
++else:
++    _zero_preserving_modulo_inner_loop = numba.njit(parallel=True)(
++        _zero_preserving_modulo_inner_loop
++    )
++    _zero_preserving_modulo = _zero_preserving_modulo_loop
++    _labels_raw_to_texture_direct = _labels_raw_to_texture_direct_loop
++    _labels_raw_to_texture_direct_inner_loop = numba.njit(parallel=True)(
++        _labels_raw_to_texture_direct_inner_loop
++    )
++    prange = numba.prange  # type: ignore [misc]
++
++    del numba
+-- 
+2.34.1
+
