@@ -83,6 +83,7 @@ use case is supported before pulling out the rug. 🤝 If you are using the
 `qt_viewer` because we don't have another public API to do what you need,
 please [raise an issue](https://github.com/napari/napari/issues/new) so we can
 make sure your use case is supported before we remove it.
+([#6283](https://github.com/napari/napari/pull/6283))
 
 Finally, although we still use pydantic 1.0 objects internally, napari
 installs correctly with both pydantic v1 and pydantic v2. If you wanted to

@@ -1,0 +1,40 @@
+From dfb1246aece54ebdddcd115ccdddfc596463ee36 Mon Sep 17 00:00:00 2001
+From: Juan Nunez-Iglesias <jni@fastmail.com>
+Date: Wed, 31 Jan 2024 15:04:58 +0100
+Subject: [PATCH] Update conf.py to display the announcement banner (#342)
+
+# References and relevant issues
+
+Together with #341, this PR supersedes #332.
+
+# Description
+
+The announcement banner text html was added in #341. This PR now points
+our
+config to it, allowing the banner to be displayed.
+
+Note: #332 also has a CSS fix. However, that fix is included in the
+latest
+release of the napari-sphinx-theme, so I think it's best to leave it out
+of
+this PR. (I would be happy to make a separate PR for it if we don't want
+to
+wait until the dependencies are updated.)
+
+Co-authored-by: Grzegorz Bokota <bokota+github@gmail.com>
+---
+ docs/conf.py | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/docs/conf.py b/docs/conf.py
+index 6c70bd64..c7660abb 100644
+--- a/docs/conf.py
++++ b/docs/conf.py
+@@ -110,6 +110,7 @@
+     "secondary_sidebar_items": ["page-toc"],
+     "pygment_light_style": "napari",
+     "pygment_dark_style": "napari",
++    "announcement": "https://napari.org/dev/_static/announcement.html",
+ }
+ 
+ # Add any paths that contain custom static files (such as style sheets) here,

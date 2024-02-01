@@ -252,7 +252,7 @@ for section, pull_request_dicts in highlights.items():
             continue
         repo_str = pull_request_info["repo"]
         print(
-            f'- {pull_request_info["summary"]} ([napari/{repo_str}/#{number}](https://{GH}/{GH_USER}/{repo_str}/pull/{number}))',
+            f'- {pull_request_info["summary"]} ([napari/{repo_str}#{number}](https://{GH}/{GH_USER}/{repo_str}/pull/{number}))',
             file=file_handle,
         )
     print("", file=file_handle)

@@ -1,0 +1,47 @@
+From dac704217de84a752c0235a572531bd6772c14a8 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Melissa=20Weber=20Mendon=C3=A7a?= <melissawm@gmail.com>
+Date: Wed, 31 Jan 2024 08:59:51 -0300
+Subject: [PATCH] Close calendar event popover when clicking outside it (#337)
+
+# References and relevant issues
+Closes napari/napari-sphinx-theme#138, together with
+https://github.com/napari/napari-sphinx-theme/pull/147
+
+# Description
+Clicking outside of the calendar event modal or pressing the ESC key
+closes the modal.
+
+---------
+
+Co-authored-by: Grzegorz Bokota <bokota+github@gmail.com>
+---
+ docs/community/meeting_schedule.md | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
+
+diff --git a/docs/community/meeting_schedule.md b/docs/community/meeting_schedule.md
+index 5669410d..fc0bfdb4 100644
+--- a/docs/community/meeting_schedule.md
++++ b/docs/community/meeting_schedule.md
+@@ -52,10 +52,21 @@ If you are using napari or interested in how napari could be used in your work,
+         modal.style.display = "block";
+         var eventTitle = eventObj.title.charAt(0).toUpperCase() + eventObj.title.slice(1);
+         document.getElementById("details").innerHTML = '<b>' + eventTitle + '</b>' + '<br>' + eventObj.extendedProps.description;
+-        //When the user clicks on <span> (x), close the modal
++        // When the user clicks on <span> (x), close the modal
+         span.onclick = function() {
+           modal.style.display = "none";
+         }
++        // When the user clicks anywhere outside of the modal, close it
++        modal.onclick = function(event) {
++          if (event.target.id == "myModal") {
++            modal.style.display = "none";
++          }
++        }
++        window.addEventListener('keydown', function (event) {
++          if (event.key === 'Escape') {
++            modal.style.display = 'none'
++          }
++        })
+       },
+       eventDisplay: 'block',
+     });
