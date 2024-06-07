@@ -125,10 +125,11 @@ def get_commit_counts_from_ancestor(release, rev="main"):
 
 def get_milestone(
     milestone_name: str | None,
+    repo: str = f"{GH_USER}/{GH_REPO}",
 ) -> Milestone.Milestone | None:
     if milestone_name is None:
         return None
-    repository = get_repo()
+    repository = get_repo(*repo.split("/"))
     with contextlib.suppress(ValueError):
         return repository.get_milestone(int(milestone_name))
 

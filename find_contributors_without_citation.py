@@ -11,6 +11,7 @@ the missing entries based on GitHub data.
 """
 
 import argparse
+import os
 
 from tqdm import tqdm
 from yaml import safe_load
@@ -30,6 +31,10 @@ from release_utils import (
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--milestone", help="The milestone to check")
+    parser.add_argument("--repo", help="The repo to check", default="napari/napari")
+    parser.add_argument(
+        "--additional-repo", help="The additional repo to check", action="append"
+    )
     parser.add_argument(
         "--correction-file",
         help="The file with the corrections",
@@ -38,7 +43,7 @@ def main():
     parser.add_argument(
         "--citation-path",
         help="",
-        default=str(REPO_DIR_NAME / "CITATION.cff"),
+        default=str(os.path.join(REPO_DIR_NAME, "CITATION.cff")),
         type=existing_file,
     )
     parser.add_argument(
@@ -51,10 +56,13 @@ def main():
     with args.citation_path.open() as f:
         citation = safe_load(f)
 
-    if args.milestone is not None:
-        missing_authors = find_missing_authors_for_milestone(citation, args.milestone)
-    else:
-        missing_authors = find_missing_authors(citation)
+    missing_authors = find_missing_authors_for_milestone(
+        citation, args.repo, args.milestone
+    )
+
+    if args.additional_repo:
+        for repo in args.additional_repo:
+            missing_authors |= find_missing_authors_for_milestone(citation, repo)
 
     if args.generate:
         for login, name in sorted(missing_authors):
@@ -70,7 +78,7 @@ def main():
     print()
 
 
-def find_missing_authors(citation) -> set[tuple[str, str]]:
+def find_missing_authors(citation, repository: str) -> set[tuple[str, str]]:
     author_dict = {}
 
     for author in citation["authors"]:
@@ -79,7 +87,7 @@ def find_missing_authors(citation) -> set[tuple[str, str]]:
     setup_cache()
     missing_authors = set()
 
-    contributors = get_repo().get_contributors()
+    contributors = get_repo(*repository.split("/")).get_contributors()
 
     for creator in tqdm(contributors, total=contributors.totalCount):
         if creator.login in BOT_LIST:
@@ -90,15 +98,18 @@ def find_missing_authors(citation) -> set[tuple[str, str]]:
 
 
 def find_missing_authors_for_milestone(
-    citation, milestone_str: str
+    citation, repository: str, milestone_str: str = ""
 ) -> set[tuple[str, str]]:
+    if not milestone_str:
+        return find_missing_authors(citation, repository)
+
     author_dict = {}
 
     for author in citation["authors"]:
         author_dict[author["alias"]] = author
 
     setup_cache()
-    milestone = get_milestone(milestone_str)
+    milestone = get_milestone(milestone_str, repository)
     missing_authors = set()
 
     for pull in iter_pull_request(f"milestone:{milestone.title} is:merged"):
