@@ -64,14 +64,6 @@ GH_USER = os.environ.get("GH_USER", "napari")
 GH_REPO = os.environ.get("GH_REPO", "napari")
 GH_DOCS_REPO = os.environ.get("GH_REPO", "docs")
 GH_TOKEN = os.environ.get("GH_TOKEN")
-if GH_TOKEN is None:
-    raise RuntimeError(
-        "It is necessary that the environment variable `GH_TOKEN` "
-        "be set to avoid running into problems with rate limiting. "
-        "One can be acquired at https://github.com/settings/tokens.\n\n"
-        "You do not need to select any permission boxes while generating "
-        "the token."
-    )
 
 _G = None
 
@@ -79,6 +71,14 @@ _G = None
 def get_github():
     global _G
     if _G is None:
+        if GH_TOKEN is None:
+            raise RuntimeError(
+                "It is necessary that the environment variable `GH_TOKEN` "
+                "be set to avoid running into problems with rate limiting. "
+                "One can be acquired at https://github.com/settings/tokens.\n\n"
+                "You do not need to select any permission boxes while generating "
+                "the token."
+            )
         _G = Github(GH_TOKEN)
     return _G
 
