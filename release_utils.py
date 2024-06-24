@@ -156,7 +156,7 @@ def iter_pull_request(additional_query, user=GH_USER, repo=GH_REPO):
     )
     for pull_issue in tqdm(
         iterable,
-        desc="Pull Requests...",
+        desc=f"Pull Requests ({user}/{repo})...",
         total=iterable.totalCount,
     ):
         yield pull_issue.as_pull_request()

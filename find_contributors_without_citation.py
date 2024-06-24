@@ -30,11 +30,11 @@ from release_utils import (
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--milestone", help="The milestone to check")
-    parser.add_argument("--repo", help="The repo to check", default="napari/napari")
-    parser.add_argument(
-        "--additional-repo", help="The additional repo to check", action="append"
-    )
+    parser.add_argument("--milestone", help="The milestone to check", default="")
+    parser.add_argument("--repo", help="The repo to check", action="append")
+    # parser.add_argument(
+    #     "--additional-repo", help="The additional repo to check", action="append"
+    # )
     parser.add_argument(
         "--correction-file",
         help="The file with the corrections",
@@ -53,16 +53,18 @@ def main():
     )
 
     args = parser.parse_args()
+    if args.repo is None:
+        args.repo = ["napari/napari", "napari/docs"]
+
     with args.citation_path.open() as f:
         citation = safe_load(f)
 
-    missing_authors = find_missing_authors_for_milestone(
-        citation, args.repo, args.milestone
-    )
+    missing_authors = set()
 
-    if args.additional_repo:
-        for repo in args.additional_repo:
-            missing_authors |= find_missing_authors_for_milestone(citation, repo)
+    for repo in args.repo:
+        missing_authors |= find_missing_authors_for_milestone(
+            citation, repo, args.milestone
+        )
 
     if args.generate:
         for login, name in sorted(missing_authors):
@@ -89,7 +91,11 @@ def find_missing_authors(citation, repository: str) -> set[tuple[str, str]]:
 
     contributors = get_repo(*repository.split("/")).get_contributors()
 
-    for creator in tqdm(contributors, total=contributors.totalCount):
+    for creator in tqdm(
+        contributors,
+        total=contributors.totalCount,
+        desc=f"finding authors for {repository}",
+    ):
         if creator.login in BOT_LIST:
             continue
         if creator.login not in author_dict:
@@ -112,7 +118,9 @@ def find_missing_authors_for_milestone(
     milestone = get_milestone(milestone_str, repository)
     missing_authors = set()
 
-    for pull in iter_pull_request(f"milestone:{milestone.title} is:merged"):
+    user, repo = repository.split("/")
+
+    for pull in iter_pull_request(f"milestone:{milestone.title} is:merged", user, repo):
         issue = pull.as_issue()
         creator = issue.user
         if creator.login in BOT_LIST:
