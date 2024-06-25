@@ -234,6 +234,13 @@ https://napari.org/stable/
     file=file_handle,
 )
 
+if not (LOCAL_DIR / "additional_notes" / args.milestone).glob():
+    print(
+        "There is no prepared sections in the additional_notes directory.",
+        file=sys.stderr,
+    )
+
+
 for section, pull_request_dicts in highlights.items():
     print(f"## {section}\n", file=file_handle)
     section_path = (
