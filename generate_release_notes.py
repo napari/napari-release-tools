@@ -28,6 +28,10 @@ import argparse
 import re
 import sys
 from pathlib import Path
+from typing import NamedTuple
+
+from github.PullRequest import PullRequest
+from github.Repository import Repository
 
 from release_utils import (
     BOT_LIST,
@@ -45,6 +49,23 @@ from release_utils import (
 
 LOCAL_DIR = Path(__file__).parent
 
+PR_REGEXP = re.compile(r"(?P<user>[\w-]+)/(?P<repo>[\w-]+)#(?P<pr>\d+)")
+
+
+class PRInfo(NamedTuple):
+    user: str
+    repo: str
+    pr: int
+
+
+def parse_pr_num(pr_num):
+    if match := PR_REGEXP.match(pr_num):
+        return PRInfo(match.group("user"), match.group("repo"), int(match.group("pr")))
+    try:
+        return int(pr_num)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{pr_num} is not a valid PR number.")
+
 
 parser = argparse.ArgumentParser(usage=__doc__)
 parser.add_argument("milestone", help="The milestone to list")
@@ -57,7 +78,7 @@ parser.add_argument(
 parser.add_argument(
     "--with-pr",
     help="Include PR numbers for not merged PRs",
-    type=int,
+    type=parse_pr_num,
     default=None,
     nargs="+",
 )
@@ -120,10 +141,10 @@ label_to_section = {
 }
 
 
-def parse_pull(pull):
-    assert pull.merged or pull.number in args.with_pr
+def parse_pull(pull: PullRequest, repo_: Repository = repo):
+    # assert pull.merged or pull.number in args.with_pr
 
-    commit = repo.get_commit(pull.merge_commit_sha)
+    commit = repo_.get_commit(pull.merge_commit_sha)
 
     if commit.committer is not None:
         add_to_users(users, commit.committer)
@@ -142,20 +163,32 @@ def parse_pull(pull):
     pr_labels = {label.name.lower() for label in pull.labels}
     for label_name, section in label_to_section.items():
         if label_name in pr_labels:
-            highlights[section][pull.number] = {"summary": summary, "repo": GH_REPO}
+            highlights[section][pull.number] = {
+                "summary": summary,
+                "repo": repo_.full_name.split("/")[1],
+            }
             assigned_to_section = True
 
     if not assigned_to_section:
-        other_pull_requests[pull.number] = {"summary": summary, "repo": GH_REPO}
+        other_pull_requests[pull.number] = {
+            "summary": summary,
+            "repo": repo_.full_name.split("/")[1],
+        }
 
 
-for pull_ in iter_pull_request(f"milestone:{args.milestone} is:merged"):
-    parse_pull(pull_)
+# for pull_ in iter_pull_request(f"milestone:{args.milestone} is:merged"):
+#     parse_pull(pull_)
 
 if args.with_pr is not None:
     for pr_num in args.with_pr:
-        pull = repo.get_pull(pr_num)
-        parse_pull(pull)
+        if isinstance(pr_num, int):
+            pull = repo.get_pull(pr_num)
+            r = repo
+        else:
+            r = get_repo(pr_num.user, pr_num.repo)
+            pull = r.get_pull(pr_num.pr)
+
+        parse_pull(pull, r)
 
 for pull in iter_pull_request(
     f"milestone:{args.milestone} is:merged", repo=GH_DOCS_REPO
@@ -234,7 +267,7 @@ https://napari.org/stable/
     file=file_handle,
 )
 
-if not (LOCAL_DIR / "additional_notes" / args.milestone).glob():
+if not (LOCAL_DIR / "additional_notes" / args.milestone).glob("*.md"):
     print(
         "There is no prepared sections in the additional_notes directory.",
         file=sys.stderr,
