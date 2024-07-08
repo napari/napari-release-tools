@@ -248,31 +248,28 @@ else:
 title = f"# napari {args.milestone}"
 print(title, file=file_handle)
 
-print(
-    f"""
-We're happy to announce the release of napari {args.milestone}!
-napari is a fast, interactive, multi-dimensional image viewer for Python.
-It's designed for browsing, annotating, and analyzing large multi-dimensional
-images. It's built on top of Qt (for the GUI), vispy (for performant GPU-based
-rendering), and the scientific Python stack (numpy, scipy).
-""",
-    file=file_handle,
-)
-
-print(
-    """
-For more information, examples, and documentation, please visit our website:
-https://napari.org/stable/
-""",
-    file=file_handle,
-)
-
-if not (LOCAL_DIR / "additional_notes" / args.milestone).glob("*.md"):
+notes_dir = LOCAL_DIR / "additional_notes" / args.milestone
+if not notes_dir.glob("*.md"):
     print(
         "There is no prepared sections in the additional_notes directory.",
         file=sys.stderr,
     )
 
+if (fn := notes_dir / 'header.md').exists():
+    intro = fn.open().read()
+else:
+    intro = f"""
+We're happy to announce the release of napari {args.milestone}!
+napari is a fast, interactive, multi-dimensional image viewer for Python.
+It's designed for browsing, annotating, and analyzing large multi-dimensional
+images. It's built on top of Qt (for the GUI), vispy (for performant GPU-based
+rendering), and the scientific Python stack (numpy, scipy).
+
+For more information, examples, and documentation, please visit our website,
+https://napari.org.
+"""
+
+print(intro, file=file_handle)
 
 for section, pull_request_dicts in highlights.items():
     print(f"## {section}\n", file=file_handle)
