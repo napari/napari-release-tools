@@ -291,8 +291,9 @@ for section, pull_request_dicts in highlights.items():
         if number in mentioned_pr:
             continue
         repo_str = pull_request_info["repo"]
+        repo_prefix = repo_str if repo_str != 'napari' else ''
         print(
-            f'- {pull_request_info["summary"]} ([napari/{repo_str}#{number}](https://{GH}/{GH_USER}/{repo_str}/pull/{number}))',
+            f'- {pull_request_info["summary"]} ([{repo_prefix}#{number}](https://{GH}/{GH_USER}/{repo_str}/pull/{number}))',
             file=file_handle,
         )
     print("", file=file_handle)
