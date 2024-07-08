@@ -293,27 +293,23 @@ for section, pull_request_dicts in highlights.items():
         repo_str = pull_request_info["repo"]
         repo_prefix = repo_str if repo_str != 'napari' else ''
         print(
-            f'- {pull_request_info["summary"]} ([{repo_prefix}#{number}](https://{GH}/{GH_USER}/{repo_str}/pull/{number}))',
+            f'- {pull_request_info["summary"]} ([{repo_prefix}#{number}]'
+            f'(https://{GH}/{GH_USER}/{repo_str}/pull/{number}))',
             file=file_handle,
         )
     print("", file=file_handle)
 
 
 contributors = {
-    "authors": authors,
-    "reviewers": reviewers,
-    "docs authors": docs_authors,
-    "docs reviewers": docs_reviewers,
+    "authors": authors | docs_authors,
+    "reviewers": reviewers | docs_reviewers,
 }
 
 # ignore committers
 # contributors['committers'] = committers
+new_contributors = (authors | docs_authors) - old_contributors
 
 for section_name, contributor_set in contributors.items():
-    if section_name.startswith("docs"):
-        repo_name = GH_DOCS_REPO
-    else:
-        repo_name = GH_REPO
     print("", file=file_handle)
     if None in contributor_set:
         contributor_set.remove(None)
@@ -323,33 +319,23 @@ for section_name, contributor_set in contributors.items():
     )
     print(committer_str, file=file_handle)
     print("", file=file_handle)
+    print("(+) denotes first-time contributors 🥳")
 
     for c in sorted(contributor_set, key=lambda x: users[x].lower()):
-        commit_link = f"https://{GH}/{GH_USER}/{repo_name}/commits?author={c}"
-        print(f"- [{users[c]}]({commit_link}) - @{c}", file=file_handle)
-    print("", file=file_handle)
-
-new_contributors = (authors | docs_authors) - old_contributors
-
-
-if old_contributors and new_contributors:
-    print("## New Contributors", file=file_handle)
-    print("", file=file_handle)
-    print(
-        f"There are {len(new_contributors)} new contributors for this release:",
-        file=file_handle,
-    )
-    print("", file=file_handle)
-    for c in sorted(new_contributors, key=lambda x: users[x].lower()):
-        commit_link = f"https://{GH}/{GH_USER}/{GH_REPO}/commits?author={c}"
-        docs_commit_link = f"https://{GH}/{GH_USER}/docs/commits?author={c}"
         if c in authors and c in docs_authors:
-            print(
-                f"- {users[c]} [docs]({docs_commit_link}) "
-                f"[napari]({commit_link}) - @{c}",
-                file=file_handle,
-            )
+            first_repo_name = GH_REPO
+            second_repo_str = (f' ([docs](https://{GH}/{GH_USER}/'
+                               f'{GH_DOCS_REPO}/commits?author={c})) ')
         elif c in authors:
-            print(f"- {users[c]} [napari]({commit_link}) - @{c}", file=file_handle)
-        else:
-            print(f"- {users[c]} [docs]({docs_commit_link}) - @{c}", file=file_handle)
+            first_repo_name = GH_REPO
+            second_repo_str = ''
+        else:  # docs only
+            first_repo_name = GH_DOCS_REPO
+            second_repo_str = ''
+
+        first = ' +' if c in new_contributors else ''
+        commit_link = (f"https://{GH}/{GH_USER}/{first_repo_name}/'"
+                       f"commits?author={c}")
+        print(f"- [{users[c]}]({commit_link}){second_repo_str} - @{c}{first}",
+              file=file_handle)
+    print("", file=file_handle)
