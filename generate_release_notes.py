@@ -176,8 +176,8 @@ def parse_pull(pull: PullRequest, repo_: Repository = repo):
         }
 
 
-# for pull_ in iter_pull_request(f"milestone:{args.milestone} is:merged"):
-#     parse_pull(pull_)
+for pull_ in iter_pull_request(f"milestone:{args.milestone} is:merged"):
+    parse_pull(pull_)
 
 if args.with_pr is not None:
     for pr_num in args.with_pr:
