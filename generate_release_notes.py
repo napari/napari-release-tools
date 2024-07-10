@@ -331,7 +331,7 @@ for section_name, contributor_set in contributors.items():
             second_repo_str = ''
 
         first = ' +' if c in new_contributors else ''
-        commit_link = (f"https://{GH}/{GH_USER}/{first_repo_name}/'"
+        commit_link = (f"https://{GH}/{GH_USER}/{first_repo_name}/"
                        f"commits?author={c}")
         print(f"- [{users[c]}]({commit_link}){second_repo_str} - @{c}{first}",
               file=file_handle)
