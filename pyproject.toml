@@ -7,7 +7,7 @@ line-length = 79
 [tool.ruff.lint]
 # Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default.
 select = ["E", "F", "W", "I", "UP"]
-ignore = []
+ignore = ["E501"]
 
 [tool.ruff.format]
 quote-style = "single"
