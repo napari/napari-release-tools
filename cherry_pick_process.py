@@ -2,6 +2,7 @@
 """
 This is script to cherry-pick commits base on PR labels
 """
+
 from __future__ import annotations
 
 import argparse
@@ -28,32 +29,38 @@ from release_utils import (
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("base_branch", help="The base branch.")
-    parser.add_argument("milestone", help="The milestone to list")
+    parser.add_argument('base_branch', help='The base branch.')
+    parser.add_argument('milestone', help='The milestone to list')
     parser.add_argument(
-        "--first-commits", help="file with list of first commits to cherry pick"
+        '--first-commits',
+        help='file with list of first commits to cherry pick',
     )
-    parser.add_argument("--stop-after", help="Stop after this PR", default=0, type=int)
     parser.add_argument(
-        "--git-main-branch",
-        help="The git main branch",
-        default=os.environ.get("GIT_RELEASE_MAIN_BRANCH", "main"),
+        '--stop-after', help='Stop after this PR', default=0, type=int
+    )
+    parser.add_argument(
+        '--git-main-branch',
+        help='The git main branch',
+        default=os.environ.get('GIT_RELEASE_MAIN_BRANCH', 'main'),
     )
 
     parser.add_argument(
-        "--working-dir", help="path to repository", default=LOCAL_DIR, type=Path
+        '--working-dir',
+        help='path to repository',
+        default=LOCAL_DIR,
+        type=Path,
     )
     parser.add_argument(
-        "--skip-commits",
-        nargs="+",
-        help="list of commits to skip as they are already cherry-picked",
+        '--skip-commits',
+        nargs='+',
+        help='list of commits to skip as they are already cherry-picked',
         type=int,
     )
 
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
 
-    target_branch = f"v{args.milestone}x"
+    target_branch = f'v{args.milestone}x'
 
     if args.first_commits is not None:
         with open(args.first_commits) as f:
@@ -74,18 +81,23 @@ def main():
 
 
 def prepare_repo(
-    working_dir: Path, target_branch: str, base_branch: str, main_branch: str = "main"
+    working_dir: Path,
+    target_branch: str,
+    base_branch: str,
+    main_branch: str = 'main',
 ) -> Repo:
     if not working_dir.exists():
-        repo = Repo.clone_from(f"git@{GH}:{GH_USER}/{GH_REPO}.git", working_dir)
+        repo = Repo.clone_from(
+            f'git@{GH}:{GH_USER}/{GH_REPO}.git', working_dir
+        )
     else:
         repo = Repo(LOCAL_DIR / REPO_DIR_NAME)
 
     if target_branch not in repo.branches:
         repo.git.checkout(base_branch)
-        repo.git.checkout("HEAD", b=target_branch)
+        repo.git.checkout('HEAD', b=target_branch)
     else:
-        repo.git.reset("--hard", "HEAD")
+        repo.git.reset('--hard', 'HEAD')
         repo.git.checkout(main_branch)
         repo.git.pull()
         repo.git.checkout(target_branch)
@@ -101,7 +113,7 @@ def perform_cherry_pick(
     first_commits: set,
     stop_after: int | None,
     base_branch: str,
-    main_branch: str = "main",
+    main_branch: str = 'main',
     skip_commits: list[int] = None,
 ):
     """
@@ -141,13 +153,13 @@ def perform_cherry_pick(
     setup_cache()
 
     milestone = get_milestone(milestone_str)
-    patch_dir_path = working_dir / "patch_dir" / milestone.title
+    patch_dir_path = working_dir / 'patch_dir' / milestone.title
     patch_dir_path.mkdir(parents=True, exist_ok=True)
 
     # with short_cache(60):
     pr_targeted_for_release = [
         x
-        for x in iter_pull_request(f"milestone:{milestone.title} is:merged")
+        for x in iter_pull_request(f'milestone:{milestone.title} is:merged')
         if x.milestone == milestone
     ]
 
@@ -187,9 +199,9 @@ def perform_cherry_pick(
         # commit = repo.commit(pr_commits_dict[pull.number])
         # print("hash",  pr_commits_dict[pull.number])
         # break
-        patch_file = patch_dir_path / f"{pull.number}.patch"
+        patch_file = patch_dir_path / f'{pull.number}.patch'
         if patch_file.exists():
-            print(f"Apply patch {patch_file}")
+            print(f'Apply patch {patch_file}')
             repo.git.am(str(patch_file))
             continue
         try:
@@ -197,10 +209,10 @@ def perform_cherry_pick(
         except GitCommandError:
             print(pull, pr_commits_dict[pull.number])
             repo.git.mergetool()
-            repo.git.cherry_pick("--continue")
-            with open(patch_file, "w") as f:
-                f.write(repo.git.format_patch("HEAD~1", "--stdout"))
+            repo.git.cherry_pick('--continue')
+            with open(patch_file, 'w') as f:
+                f.write(repo.git.format_patch('HEAD~1', '--stdout'))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
