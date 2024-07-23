@@ -328,7 +328,7 @@ for section_name, contributor_set in contributors.items():
     )
     print(committer_str, file=file_handle)
     print('', file=file_handle)
-    print('(+) denotes first-time contributors 🥳')
+    print('(+) denotes first-time contributors 🥳', file=file_handle)
 
     for c in sorted(contributor_set, key=lambda x: users[x].lower()):
         if c in authors and c in docs_authors:
