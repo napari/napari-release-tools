@@ -1,7 +1,5 @@
-⚠️ *Note: these release notes are still in draft while 0.5.2 is in release
-candidate testing.* ⚠️
 
-*Monday, Aug 12, 2024*
+*Tuesday, Aug 13, 2024*
 
 We’re happy to announce the release of napari 0.5.2!
 
