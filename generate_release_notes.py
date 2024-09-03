@@ -1,29 +1,33 @@
 """Generate the release notes automatically from GitHub pull requests.
 
-Start with:
+1. Clone napari/napari locally.
+2. Install the requirements (PyGitHub and tqdm) with
+   ```
+   python -m pip install -r requirements.txt
+   ```
+
+3. Start with:
 ```
 export GH_TOKEN=<your-gh-api-token>
 ```
-Then, for to include everything from a certain release to main:
+(you don't need to select any permissions when creating this token.)
+Then, to include everything set for the a chosen milestone:
 ```
-python /path/to/generate_release_notes.py v0.14.0 main --version 0.15.0
+python generate_release_notes.py <milestone> --target-directory=/path/to/docs/release/
 ```
-Or two include only things between two releases:
+To include a PR that has not been merged, use the `--with-pr` option:
 ```
-python /path/to/generate_release_notes.py v.14.2 v0.14.3 --version 0.14.3
+python generate_release_notes.py <milestone> --target-directory=/path/to/docs/release/ --with-pr=org/repo#pr_number
 ```
-You should probably redirect the output with:
+To substitute GitHub handles for author names, use the `--correction-file` option:
 ```
-python /path/to/generate_release_notes.py [args] | tee release_notes.md
+python generate_release_notes.py <milestone> --target-directory=/path/to/docs/release/ --correction-file /path/to/name_corrections.yaml
 ```
-You'll require PyGitHub and tqdm, which you can install with:
-```
-python -m pip install -e ".[release]"
-```
-References
-https://github.com/scikit-image/scikit-image/blob/main/tools/generate_release_notes.py
-https://github.com/scikit-image/scikit-image/issues/3404
-https://github.com/scikit-image/scikit-image/issues/3405
+
+References:
+- https://github.com/scikit-image/scikit-image/blob/main/tools/generate_release_notes.py
+- https://github.com/scikit-image/scikit-image/issues/3404
+- https://github.com/scikit-image/scikit-image/issues/3405
 """
 
 import argparse
