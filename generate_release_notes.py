@@ -281,6 +281,8 @@ https://napari.org.
 print(intro, file=file_handle)
 
 for section, pull_request_dicts in highlights.items():
+    if not pull_request_dicts:
+        continue
     print(f'## {section}\n', file=file_handle)
     section_path = (
         LOCAL_DIR
