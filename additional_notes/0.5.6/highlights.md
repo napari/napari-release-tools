@@ -1,4 +1,3 @@
-
 ### Faster shapes 🚀
 
 For its whole history, napari has been a pure Python package. As we go deeper
