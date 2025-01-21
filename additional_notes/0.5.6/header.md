@@ -1,7 +1,5 @@
 
-*Fri, Jan 17, 2025*
-
-🚧 *These notes are under construction while in pre-release* 🚧
+*Tue, Jan 21, 2025*
 
 We’re happy to announce the release of napari 0.5.6!
 
