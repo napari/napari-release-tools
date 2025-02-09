@@ -90,6 +90,14 @@ parser.add_argument(
     default=None,
     nargs='+',
 )
+parser.add_argument(
+    '--without-open',
+    help='Do not include open PRs',
+    action='store_const',
+    const='is:merged',
+    default='',
+    dest='merged',
+)
 
 args = parser.parse_args()
 
@@ -186,7 +194,7 @@ def parse_pull(pull: PullRequest, repo_: Repository = repo):
         }
 
 
-for pull_ in iter_pull_request(f'milestone:{args.milestone} is:merged'):
+for pull_ in iter_pull_request(f'milestone:{args.milestone} {args.merged}'):
     parse_pull(pull_)
 
 if args.with_pr is not None:
@@ -201,7 +209,7 @@ if args.with_pr is not None:
         parse_pull(pull, r)
 
 for pull in iter_pull_request(
-    f'milestone:{args.milestone} is:merged', repo=GH_DOCS_REPO
+    f'milestone:{args.milestone} {args.merged}', repo=GH_DOCS_REPO
 ):
     issue = pull.as_issue()
     assert pull.merged
