@@ -48,6 +48,7 @@ from release_utils import (
     REPO_DIR_NAME,
     get_correction_dict,
     get_corrections_from_citation_cff,
+    get_milestone,
     get_repo,
     iter_pull_request,
     setup_cache,
@@ -281,6 +282,16 @@ if not notes_dir.glob('*.md'):
         'There is no prepared sections in the additional_notes directory.',
         file=sys.stderr,
     )
+
+milestone_obj = get_milestone(args.milestone)
+
+print(
+    f'⚠️ *Note: these release notes are still in draft while {args.milestone} is in release candidate testing.* ⚠️',
+    file=file_handle,
+)
+print('', file=file_handle)
+print(milestone_obj.due_on.strftime('%A, %b %d, %Y'), file=file_handle)
+print('', file=file_handle)
 
 if (fn := notes_dir / 'header.md').exists():
     intro = fn.open().read()
