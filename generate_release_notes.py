@@ -92,8 +92,8 @@ parser.add_argument(
     nargs='+',
 )
 parser.add_argument(
-    '--without-open',
-    help='Do not include open PRs',
+    '--only-merged',
+    help='Only include merged PRs, excluding open ones.',
     action='store_const',
     const='is:merged',
     default='',
