@@ -91,6 +91,14 @@ parser.add_argument(
     default=None,
     nargs='+',
 )
+parser.add_argument(
+    '--only-merged',
+    help='Only include merged PRs, excluding open ones.',
+    action='store_const',
+    const='is:merged',
+    default='',
+    dest='merged',
+)
 
 args = parser.parse_args()
 
@@ -124,6 +132,8 @@ reviewers = set()
 docs_reviewers = set()
 users = {}
 
+non_merged_pr = []
+
 highlights = {
     'Highlights': {},
     'New Features': {},
@@ -155,14 +165,15 @@ label_to_section = {
 def parse_pull(pull: PullRequest, repo_: Repository = repo):
     # assert pull.merged or pull.number in args.with_pr
 
-    commit = repo_.get_commit(pull.merge_commit_sha)
+    if pull.is_merged():
+        commit = repo_.get_commit(pull.merge_commit_sha)
 
-    if commit.committer is not None:
-        add_to_users(users, commit.committer)
-        committers.add(commit.committer.login)
-    if commit.author is not None:
-        add_to_users(users, commit.author)
-        authors.add(commit.author.login)
+        if commit.committer is not None:
+            add_to_users(users, commit.committer)
+            committers.add(commit.committer.login)
+        if commit.author is not None:
+            add_to_users(users, commit.author)
+            authors.add(commit.author.login)
 
     summary = pull.title
 
@@ -187,7 +198,9 @@ def parse_pull(pull: PullRequest, repo_: Repository = repo):
         }
 
 
-for pull_ in iter_pull_request(f'milestone:{args.milestone} is:merged'):
+for pull_ in iter_pull_request(f'milestone:{args.milestone} {args.merged}'):
+    if not pull_.is_merged():
+        non_merged_pr.append(pull_)
     parse_pull(pull_)
 
 if args.with_pr is not None:
@@ -202,10 +215,11 @@ if args.with_pr is not None:
         parse_pull(pull, r)
 
 for pull in iter_pull_request(
-    f'milestone:{args.milestone} is:merged', repo=GH_DOCS_REPO
+    f'milestone:{args.milestone} {args.merged}', repo=GH_DOCS_REPO
 ):
     issue = pull.as_issue()
-    assert pull.merged
+    if not pull.is_merged():
+        non_merged_pr.append(pull)
 
     add_to_users(users, issue.user)
     docs_authors.add(issue.user.login)
@@ -371,3 +385,21 @@ for section_name, contributor_set in contributors.items():
             file=file_handle,
         )
     print('', file=file_handle)
+
+
+if non_merged_pr:
+    if len(non_merged_pr) == 1:
+        pr = non_merged_pr[0]
+        print(
+            f"There is on unmerged PR ({pr.number} {pr.title} - {pr.html_url}). If it is release notes PR it's fine.",
+            file=sys.stderr,
+        )
+
+    else:
+        pr_info = [
+            f'{pr.base.repo.full_name}#{pr.number} - {pr.title} {pr.html_url}'
+            for pr in non_merged_pr
+        ]
+        print('#' * 50, file=sys.stderr)
+        print(f'There are {len(non_merged_pr)} unmerged PRs:', file=sys.stderr)
+        print('\n'.join(pr_info), file=sys.stderr)
