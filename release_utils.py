@@ -135,10 +135,10 @@ def get_milestone(
     with contextlib.suppress(ValueError):
         return repository.get_milestone(int(milestone_name))
 
-    for milestone in repository.get_milestones():
+    for milestone in repository.get_milestones(state='all'):
         if milestone.title == milestone_name:
             return milestone
-    raise RuntimeError(f'Milestone {milestone_name} not found')
+    raise RuntimeError(f'Milestone {milestone_name} for {repo} not found.')
 
 
 def get_split_date(previous_release, rev='main'):
