@@ -1,3 +1,11 @@
+# What's new in napari 0.6.0
+
+This note explains the new features and changes in napari 0.6.0.
+
+For full details, see the changelog.
+
+*Note Prerelease users should be aware that this document is currently in draft form. It will be updated substantially as napari 0.6.0 moves towards release, so it’s worth checking back even after reading earlier versions.*
+
 ## Summary - release highlights
 
 - Updated viewer handedness ✋
