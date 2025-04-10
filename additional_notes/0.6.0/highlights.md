@@ -1,19 +1,10 @@
-# What's new in napari 0.6.0
-
-This note explains the new features and changes in napari 0.6.0.
-
-For full details, see the changelog.
-
-*Note Prerelease users should be aware that this document is currently in draft form. It will be updated substantially as napari 0.6.0 moves towards release, so it’s worth checking back even after reading earlier versions.*
-
-## Summary - release highlights
+### Summary
 
 - Updated viewer handedness ✋
+- Command pallette 🎨
 - Display polygons with holes
-- New command pallette 🎨
-- Transition to npe2 plugin engine
-
-## New features
+- Transition to npe2 plugin engine by default
+- Many other GUI improvements
 
 ### Updated viewer handedness ✋
 
@@ -55,68 +46,124 @@ number), now is a good time to undo the workarounds for newer versions of
 napari! If you run into any issues please get in touch [on GitHub
 issues](https://github.com/napari/napari) or on our [Zulip chat room](https://napari.zulipchat.com)!
 
-### Polygons with holes
+On the user space, we now offer several options to orient the axes any way you
+like:
 
-Finally, napari is now able to display polygons with holes in them, which starts to open it up for use with mapping data, among other things. Implement polygon with holes in compiled triangulation (#7566)
+1. **Through the camera API:** the `Viewer.camera` instance gains two new
+  attributes: `orientation`, and `orientation2d`, which is just the last two
+  dimensions of `orientation`. You can set the direction that the *depth*,
+  *vertical*, and *horizontal* axes point to, respectively in that order, as
+  follows ([#7663](https://github.com/napari/napari/pull/7663)):
 
-### Addition of a command palette
+  ```python
+  # 2D
+  viewer.camera.orientation2d = ('up', 'right')
+  # 3D
+  viewer.camera.orientation = ('away', 'up', 'right')
+  ```
 
-The command palette is a new feature that allows you to search for and execute commands in napari. This is a powerful feature that allows you to quickly access and execute commands without having to navigate through the menus. Implement command palette widget (#5483)
+  See an example of this in action in
+  {ref}`sphx_glr_gallery_xarray-latlon-timeseries.py`.
+
+2. By right clicking on the dimension toggle in the viewer, and setting the
+  axis orientations using the drop-down menus
+  ([#7686](https://github.com/napari/napari/pull/7686)), which in 3D will
+  further indicate whether the resulting coordinate frame is [right-handed or
+  left-handed](https://en.wikipedia.org/wiki/Right-hand_rule)
+  ([#7770](https://github.com/napari/napari/pull/7770)):
+
+  ![axis orientation dialog](https://github.com/user-attachments/assets/f73898ec-9156-4f73-ab7f-ee2a7cc17fe1)
+
+3. If you want to use a specific axis orientation consistently, you can set the
+  default orientation on startup by changing the relevant settings
+  ([#7787](https://github.com/napari/napari/pull/7787):
+
+  ![napari settings panel with axis orientation options highlighted](https://github.com/user-attachments/assets/f5032320-8b03-4ff7-9cb7-8b182ab232af)
+
+### Command palette 🎨
+
+Tired of mousing around? Thanks to
+[#5483](https://github.com/napari/napari/pull/5483), napari gains a command
+palette! Press {kbd}`Ctrl/Command+Shift+P` and start typing the name of the
+action you want to use, and press {kbd}`Enter` when you've highlighted it. It
+even works with plugins! This is the culmination of many months of work porting
+napari's actions to Talley Lambert's
+[app-model](https://github.com/pyapp-kit/app-model). 🥳
+
+(video of command palette)
+
+There's still lots of work to be done here, but in the meantime, give it a try!
+We on the team have found it very hard to go back to using napari without the
+palette!
+
+### Feature improvements to Shapes layers
+
+⚠️ *In 0.6.0a1 and earlier, this only works when installing
+PartSegCore-compiled-backend and toggling the "use compiled triangulation"
+option in the advanced preferences. In 0.6.0 it will work wiht all
+triangulation backends.* ⚠️
+
+Finally, napari Shapes layers can now display polygons with holes in them,
+which starts to open it up for use with mapping data, among other things!
+([#7566](https://github.com/napari/napari/pull/7566),
+[#6654](https://github.com/napari/napari/pull/6654)]) Implementing this feature
+also eliminated a lot of bugs in our polygon drawing code, which could cause
+crashes. If you've had issues with Shapes layers before, now might be a good
+time to give them another try!
 
 ### Transition to npe2 plugin engine
 
-npe1 plugins will be automatically converted to npe2 by default (this may break some features if they rely on import-time behaviour).
-npe1 plugins will now be automatically converted to npe2 by default (with a warning), which should not change much but it will break plugins that rely on being imported at launch to modify viewer behaviour. You will be able to turn off this automatic conversion in the settings, but this will go away in 0.7.0 (planned for July),
-so this is your opportunity to work with plugin authors to migrate to npe2.
+npe2 was introduced over four years ago, with napari 0.4.12. npe2 has paved the
+way for new plugin functionality, such as [adding menu
+items](nap-6-contributable-menus) and the command palette. We are now beginning
+the process of deprecating npe1 (napari-plugin-engine) plugins, which we need
+to do to continue to improve npe2 functionality, for example in file readers,
+which is currently very entangled with npe1 code.
 
-## Improved modules and features
+To aid this migration, npe1 plugins will now be automatically converted to npe2
+by default. This may break some features if the plugins relied on import-time
+behavior. ([#7627](https://github.com/napari/napari/pull/7627))
 
-### Napari core improvements 🧠
+During the 0.6.x series, if some plugin functionality is broken by the
+automatic conversion, you can turn off this conversion in the plugin
+preferences. However, this option will go away in 0.7.0, which we anticipate to
+happen sometime in July. Therefore, if you encounter conversion issues in a
+plugin you rely on, please contact the plugin authors to encourage them to
+migrate their plugin to the npe2 system.
 
-- Implement polygon with holes in compiled triangulation (#7566)
-- Add Grid Mode Spacing to change distance between layers (#7597)
-- Add API to Camera model to flip axes (#7663)
-- Flip z axis on 3D camera to default to right-handed frame (#7488 redux) (#7554)
+If you are a plugin author and your plugin is not yet npe2-compatible, please
+see our [npe2 migration guide](npe2-migration-guide), and, if you encounter any
+issues, get in touch in our [Plugins Zulip chat
+channel](https://napari.zulipchat.com/#narrow/channel/309872-plugins) or by
+coming to one of our [community meetings](meeting-schedule).
 
-### GUI improvements 🎨
+### GUI improvements
 
-- Implement command palette widget (#5483)
-- Show layer status for all visible layers (#7673)
-- Enable creation of custom linear colormaps in layer controls (#7600)
-- Change ndisplay button to toggle-like to increase discoverability (#7608)
-- Expose additional Camera parameters in GUI with 3D popup widget (#7626)
-- Add right-click indicator to 3D, Roll, Grid, and Square push buttons (#7556)
-- Fix issues displaying polygons with holes in Shapes (#6654)
+You'll notice the main napari GUI is subtly (or not so subtly) different in
+0.6.0. Here are some of the improvements:
 
-### Plugins 
+- Buttons now have an indicator to show whether they contain an extra menu when
+  right-clicking. ([#7556](https://github.com/napari/napari/pull/7556))
+- The button to change between 2D and 3D views much more clearly shows
+  what it does. ([#7608](https://github.com/napari/napari/pull/7608))
+- … And it has an extra menu with lots of options to control the camera!
+  ([#7626](https://github.com/napari/napari/pull/7626))
+- You can now add a bit of spacing between layers in grid mode (and control it
+  in the grid mode right-click menu!)
+  ([#7597](https://github.com/napari/napari/pull/7597))
+- The colormap indicator in image layers is now a button, allowing you to
+  create a linear colormap with any color!
+  ([#7600](https://github.com/napari/napari/pull/7600))
+- If you select multiple layers in the layer list, you can now see the status
+  display of all the selected layers in the status bar
+  ([#7673](https://github.com/napari/napari/pull/7673))
 
-Turn on npe2 adaptor by default and add warning (#7627)
+### Other stuff
 
-npe1 plugins will be automatically converted to npe2 by default (this may break some features if they rely on import-time behaviour).
-npe1 plugins will now be automatically converted to npe2 by default (with a warning), which should not change much but it will break plugins that rely on being imported at launch to modify viewer behaviour.
-You will be able to turn off this automatic conversion in the settings,
-but this will go away in 0.7.0 (planned for July),
-so this is your opportunity to work with plugin authors to migrate to npe2.
+For developers: napari now depends on Python 3.10+ and Pydantic v2.2.
 
-### Performance and maintainability
-
-- Pydantic 2.0+ will be required. Remove pydantic v1 compatibility layer, depend on pydantic>=2.2 (#7589) We are requiring Pydantic version 2 and higher. Supporting Pydantic 1 and 2 together was a lot of effort, but by now most plugins and libraries using Pydantic are at version 2, which does bring significant speed and functionality advantages. If you know a library or plugin you use with napari and that is still strictly on Pydantic 1.x, please let us know!
-- Python 3.10+ will be required. Update configuration to drop python 3.9 and add python 3.13 (#7603). We are dropping Python 3.9 support. This is slightly earlier than Python 3.9's EOL date (October 2025), but we are still supporting Python 3.10 which is past its recommended window from SPEC0. The bundle follows SPEC0 strictly and so uses Python 3.11. We hope that serves most if not all of our user community!
-
-### Deprecated
-
-- Pending removal in 0.7.0
-
-### Removed
-
-- Removed deprecated items
-
-## Migrating to napari 0.6.0
-
-For napari 0.6.0a1, we recommend installing the preview release:
-
-```bash
-pip install napari[all] >= 0.6.0a1
-```
-
-*We recommend you update your plugins to npe2. If you have any issues, please let us know!*
+We've supported both pydantic 1 and 2 since 0.4.19, but we're now ready to take
+advantage of performance and API improvements of Pydantic 2. If your library
+depends on Pydantic 1.x, now would be a good time to upgrade, or it will not be
+compatible with napari going forward.
+([#7589](https://github.com/napari/napari/pull/7589))
