@@ -1,6 +1,4 @@
 
-*Thu, Apr 10, 2025*
-
 🚧 *These notes are under construction while in pre-release* 🚧
 
 We’re happy to announce the release of napari 0.6.0! The right-handed release! This release features major changes so read on to see how they might affect you!
