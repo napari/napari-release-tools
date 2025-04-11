@@ -290,7 +290,7 @@ print(
     file=file_handle,
 )
 print('*', file=file_handle)
-print(milestone_obj.due_on.strftime('%A, %b %d, %Y'), file=file_handle)
+print(milestone_obj.due_on.strftime('%a, %b %d, %Y'), file=file_handle)
 print('*', file=file_handle)
 
 if (fn := notes_dir / 'header.md').exists():
