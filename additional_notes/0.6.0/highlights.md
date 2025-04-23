@@ -2,9 +2,9 @@
 
 - Updated viewer handedness ✋
 - Command palette 🎨
-- Display polygons with holes
-- Transition to npe2 plugin engine by default
-- Many other GUI improvements
+- Display polygons with holes ⛳️
+- Transition to npe2 plugin engine by default 🔌
+- Many other GUI improvements 🖥️
 
 ### Updated viewer handedness ✋
 
@@ -36,7 +36,7 @@ like this in previous versions of napari:
 
 ![right shoe rendered as a left shoe in napari](https://github.com/user-attachments/assets/c9190e2c-f35a-44d1-95d5-f9877dd4c843)
 
-and in 0.5.6+, thanks to [#7488](https://github.com/napari/napari/pull/7488):
+and in 0.6.0, thanks to [#7554](https://github.com/napari/napari/pull/7554):
 
 ![right shoe correctly rendered as a right shoe in napari](https://github.com/user-attachments/assets/e187f5e7-8e4a-4526-bae9-80a9bec6fea3)
 
@@ -94,18 +94,17 @@ even works with plugins! This is the culmination of many months of work porting
 napari's actions to Talley Lambert's
 [app-model](https://github.com/pyapp-kit/app-model). 🥳
 
-(video of command palette)
+![command palette example](https://github.com/user-attachments/assets/a412c3d1-8d29-43a2-87a4-391f2ccec57e)
 
 There's still lots of work to be done here, but in the meantime, give it a try!
 We on the team have found it very hard to go back to using napari without the
 palette!
 
-### Feature improvements to Shapes layers
+### Feature improvements to Shapes layers ⛳️
 
-⚠️ *In 0.6.0a1 and earlier, this only works when installing
-PartSegCore-compiled-backend and toggling the "use compiled triangulation"
-option in the advanced preferences. In 0.6.0 it will work with all
-triangulation backends.* ⚠️
+⚠️  *When using numba for triangulation, some shapes will still not be drawn
+correctly, due to a bug in VisPy. We recommend installing `bermuda`, our new
+fast triangulation package, for the best performance.* ⚠️
 
 Finally, napari Shapes layers can now display polygons with holes in them,
 which starts to open it up for use with mapping data, among other things!
@@ -115,7 +114,17 @@ also eliminated a lot of bugs in our polygon drawing code, which could cause
 crashes. If you've had issues with Shapes layers before, now might be a good
 time to give them another try!
 
-### Transition to npe2 plugin engine
+As part of this work, napari gained the ability to select between different
+backends for triangulation, which means breaking up polygons into collections
+of triangles, which is what GPUs are good at drawing.
+([#7747](https://github.com/napari/napari/pull/7747)) To use the new backends,
+install the relevant package (for example, `bermuda`,
+`partsegcore-compiled-backend`, or `numba`), then go to Settings > Experimental
+|> triangulation backend. (If you use `napari[all]`, you will have bermuda
+installed and it will be used automatically, as the default option is "fastest
+available".)
+
+### Transition to npe2 plugin engine 🔌
 
 npe2 was introduced over four years ago, with napari 0.4.12. npe2 has paved the
 way for new plugin functionality, such as [adding menu
@@ -145,7 +154,7 @@ our [Plugins Zulip chat
 channel](https://napari.zulipchat.com/#narrow/channel/309872-plugins) or by
 coming to one of our [community meetings](meeting-schedule).
 
-### GUI improvements
+### GUI improvements 🖥️
 
 You'll notice the main napari GUI is subtly (or not so subtly) different in
 0.6.0. Here are some of the improvements:
@@ -165,13 +174,29 @@ You'll notice the main napari GUI is subtly (or not so subtly) different in
 - If you select multiple layers in the layer list, you can now see the status
   display of all the selected layers in the status bar
   ([#7673](https://github.com/napari/napari/pull/7673))
+- If you switch from 2D to 3D view and back again, your 3D viewing angle will
+  be preserved ([#7765](https://github.com/napari/napari/pull/7765))
+- Notice some weird behavior? Our new log handler and viewer might help! Access
+  it with Help > Show logs. ([#6900](https://github.com/napari/napari/pull/6900))
 
 ### Other stuff
 
-For developers: napari now depends on Python 3.10+ and Pydantic v2.2.
+For developers: napari now depends on Python 3.10+
+([#7603](https://github.com/napari/napari/pull/7603) and Pydantic v2.2
+([#7589](https://github.com/napari/napari/pull/7589)).
 
 We've supported both pydantic 1 and 2 since 0.4.19, but we're now ready to take
 advantage of performance and API improvements in Pydantic 2. If your library
 depends on Pydantic 1.x, now would be a good time to upgrade, or it will not be
 compatible with napari going forward.
-([#7589](https://github.com/napari/napari/pull/7589))
+
+
+If you were dreading 0.6.0 because you were relying on `_qt_viewer` features,
+worry not: we have again postponed that deprecation while we add the required
+APIs. 😅 ([#7730](https://github.com/napari/napari/pull/7730))
+
+Also, if you've been wanting to contribute that doc fix but found the process
+daunting, it's now easier than ever, because our default documentation preview
+build is now much faster! You can propose changes from the GitHub UI and see
+the rendered results in only two minutes!
+([napari/docs#669](https://github.com/napari/docs/pull/669))
