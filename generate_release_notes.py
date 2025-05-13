@@ -264,11 +264,11 @@ if args.target_directory is None:
     file_handle = sys.stdout
 else:
     res_file_name = f"release_{args.milestone.replace('.', '_')}.md"
-    file_handle = open(args.target_directory / res_file_name, 'w')
+    file_handle = open(args.target_directory / res_file_name, 'w', encoding='utf-8')
     for file_path in args.target_directory.glob('release_*.md'):
         if file_path.name == res_file_name:
             continue
-        with open(file_path) as f:
+        with open(file_path, encoding='utf-8') as f:
             old_contributors.update(user_name_pattern.findall(f.read()))
 
 
