@@ -305,7 +305,7 @@ print(milestone_obj.due_on.strftime('%a, %b %d, %Y'), file=file_handle)
 print('*', file=file_handle)
 
 if (fn := notes_dir / 'header.md').exists():
-    intro = fn.open().read()
+    intro = fn.open(encoding='utf-8').read()
 else:
     intro = f"""
 We're happy to announce the release of napari {args.milestone}!
@@ -332,7 +332,7 @@ for section, pull_request_dicts in highlights.items():
     )
     mentioned_pr = set()
     if section_path.exists():
-        with section_path.open() as f:
+        with section_path.open(encoding='utf-8') as f:
             text = f.read()
         for pr_number in pr_number_pattern.findall(text):
             mentioned_pr.add(int(pr_number))
