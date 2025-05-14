@@ -300,7 +300,9 @@ print(
     f'⚠️ *Note: these release notes are still in draft while {args.milestone} is in release candidate testing.* ⚠️',
     file=file_handle,
 )
-print(f'*{milestone_obj.due_on.strftime('%a, %b %d, %Y')}*', file=file_handle)
+print('', file=file_handle)
+print(f'*{milestone_obj.due_on.strftime("%a, %b %d, %Y")}*', file=file_handle)
+print('', file=file_handle)
 
 if (fn := notes_dir / 'header.md').exists():
     intro = fn.open(encoding='utf-8').read()
