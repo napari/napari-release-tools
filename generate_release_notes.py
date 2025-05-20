@@ -6,11 +6,22 @@
    python -m pip install -r requirements.txt
    ```
 
-3. Start with:
+3. Start by creating a GitHub API token. You can do this by going to
+GitHub settings -> Developer settings -> Personal access tokens -> Fine-grained tokens.
+Create a new token with read-only access to Public repositories;
+the token must expire in 365 days or less.
+
+4. Set the token as an environment variable:
+On Linux or MacOS:
 ```
-export GH_TOKEN=<your-gh-api-token>
+export GH_TOKEN='<your-gh-api-token>'
 ```
-(you don't need to select any permissions when creating this token.)
+or on Windows:
+```
+set GH_TOKEN=<your-gh-api-token>
+```
+
+5. Run the script:
 Then, to include everything set for the a chosen milestone:
 ```
 python generate_release_notes.py <milestone> --target-directory=/path/to/docs/release/
@@ -264,11 +275,13 @@ if args.target_directory is None:
     file_handle = sys.stdout
 else:
     res_file_name = f"release_{args.milestone.replace('.', '_')}.md"
-    file_handle = open(args.target_directory / res_file_name, 'w')
+    file_handle = open(
+        args.target_directory / res_file_name, 'w', encoding='utf-8'
+    )
     for file_path in args.target_directory.glob('release_*.md'):
         if file_path.name == res_file_name:
             continue
-        with open(file_path) as f:
+        with open(file_path, encoding='utf-8') as f:
             old_contributors.update(user_name_pattern.findall(f.read()))
 
 
@@ -289,12 +302,12 @@ print(
     f'⚠️ *Note: these release notes are still in draft while {args.milestone} is in release candidate testing.* ⚠️',
     file=file_handle,
 )
-print('*', file=file_handle)
-print(milestone_obj.due_on.strftime('%a, %b %d, %Y'), file=file_handle)
-print('*', file=file_handle)
+print('', file=file_handle)
+print(f'*{milestone_obj.due_on.strftime("%a, %b %d, %Y")}*', file=file_handle)
+print('', file=file_handle)
 
 if (fn := notes_dir / 'header.md').exists():
-    intro = fn.open().read()
+    intro = fn.open(encoding='utf-8').read()
 else:
     intro = f"""
 We're happy to announce the release of napari {args.milestone}!
@@ -321,7 +334,7 @@ for section, pull_request_dicts in highlights.items():
     )
     mentioned_pr = set()
     if section_path.exists():
-        with section_path.open() as f:
+        with section_path.open(encoding='utf-8') as f:
             text = f.read()
         for pr_number in pr_number_pattern.findall(text):
             mentioned_pr.add(int(pr_number))
