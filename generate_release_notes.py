@@ -1,17 +1,25 @@
 """Generate the release notes automatically from GitHub pull requests.
 
 1. Clone napari/napari locally.
-2. Install the requirements (PyGitHub and tqdm) with
+2. Install the requirements into a virtual environment (PyGitHub and tqdm) with
    ```
    python -m pip install -r requirements.txt
    ```
+3. Activate the virtual environment, for example:
+    ```
+    source .venv/bin/activate
+    ```
+    or on Windows:
+    ```
+    .venv\\Scripts\\activate
+    ```
 
-3. Start by creating a GitHub API token. You can do this by going to
+4. Start by creating a GitHub API token. You can do this by going to
 GitHub settings -> Developer settings -> Personal access tokens -> Fine-grained tokens.
 Create a new token with read-only access to Public repositories;
 the token must expire in 365 days or less.
 
-4. Set the token as an environment variable:
+5. Set the token as an environment variable:
 On Linux or MacOS:
 ```
 export GH_TOKEN='<your-gh-api-token>'
@@ -21,11 +29,15 @@ or on Windows:
 set GH_TOKEN=<your-gh-api-token>
 ```
 
-5. Run the script:
+6. Run the script:
 Then, to include everything set for the a chosen milestone:
 ```
 python generate_release_notes.py <milestone> --target-directory=/path/to/docs/release/
 ```
+For example:
+```
+python generate_release_notes.py 0.6.2 --target-directory=../napari-docs/docs/release/
+
 To include a PR that has not been merged, use the `--with-pr` option:
 ```
 python generate_release_notes.py <milestone> --target-directory=/path/to/docs/release/ --with-pr=org/repo#pr_number
