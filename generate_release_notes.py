@@ -255,6 +255,11 @@ for pull in iter_pull_request(
             docs_reviewers.add(review.user.login)
     assigned_to_section = False
     pr_labels = {label.name.lower() for label in pull.labels}
+    if 'highlight' in pr_labels:
+        highlights['Highlights'][pull.number] = {
+            'summary': summary,
+            'repo': GH_DOCS_REPO,
+        }
     if 'maintenance' in pr_labels:
         other_pull_requests[pull.number] = {
             'summary': summary,
