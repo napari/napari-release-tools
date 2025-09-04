@@ -8,6 +8,13 @@ This script could work in two modes:
 
 When pass `--generate` option then script will generate
 the missing entries based on GitHub data.
+
+A GH_TOKEN environment variable must be set for this to work.
+
+Example usage:
+```
+python find_contributors_without_citation.py --citation-path ../napari/CITATION.cff --generate --milestone 0.6.2
+```
 """
 
 import argparse
@@ -61,23 +68,32 @@ def main():
     with args.citation_path.open() as f:
         citation = safe_load(f)
 
-    missing_authors = set()
+    repo_missing_authors = {}
+    total_missing_authors = set()
 
     for repo in args.repo:
-        missing_authors |= find_missing_authors_for_milestone(
+        missing = find_missing_authors_for_milestone(
             citation, repo, args.milestone
         )
+        repo_missing_authors[repo] = missing
+        total_missing_authors |= missing
+        print(f"Repo '{repo}' has {len(missing)} missing contributors.")
 
     if args.generate:
-        for login, name in sorted(missing_authors):
+        for login, name in sorted(total_missing_authors):
             if name is None:
                 continue
-            name, sure_name = name.rsplit(' ', 1)
+            parts = name.rsplit(' ', 1)
+            if len(parts) == 2:
+                given_names, family_names = parts
+            else:
+                given_names = parts[0]
+                family_names = ''
             print(
-                f'- given-names: {name}\n  family-names: {sure_name}\n alias: {login}'
+                f'- given-names: {given_names}\n  family-names: {family_names}\n alias: {login}'
             )
     else:
-        for login, name in sorted(missing_authors):
+        for login, name in sorted(total_missing_authors):
             print(f'@{login} ', end='')  # ({name})")
     print()
 
