@@ -360,12 +360,12 @@ def detect_effver_type(milestone):
 effver_type = detect_effver_type(args.milestone)
 
 effver_info = {
-    "MACRO": "This is a **Macro** release containing awesome new features, but may require dedication of some significant time when upgrading projects to use this version.",
-    "MESO": "This is a **Meso** release containing awesome new features, but some small effort may be needed when updating previous projects to use version.",
-    "MICRO": "This is a **Micro** release containing awesome new features that are expected to be adoptable with no additional effort.",
+    "MACRO": "this is a **Macro** release containing awesome new features, but may require dedication of some significant time when upgrading projects to use this version.",
+    "MESO": "this is a **Meso** release containing awesome new features, but some small effort may be needed when updating previous projects to use version.",
+    "MICRO": "this is a **Micro** release containing awesome new features that are expected to be adoptable with no additional effort.",
 }
 effver_info = f"""
-napari follows [EffVer (Intended Effort Versioning)](https://effver.org/) for release numbering. {effver_info.get(effver_type)}
+napari follows [EffVer (Intended Effort Versioning)](https://effver.org/); {effver_info.get(effver_type)}
 
 """
 
