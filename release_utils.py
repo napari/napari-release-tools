@@ -232,12 +232,10 @@ def get_correction_dict(file_path: Path | None) -> dict[str, str]:
         return {}
 
     correction_dict = {}
-    with open(file_path) as f:
+    with open(file_path, encoding='utf-8') as f:
         corrections = safe_load(f)
         for correction in corrections['login_to_name']:
-            correction_dict[correction['login']] = unidecode(
-                correction['corrected_name'].lower()
-            )
+            correction_dict[correction['login']] = correction['corrected_name']
 
     return correction_dict
 
