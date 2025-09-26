@@ -24,9 +24,13 @@ On Linux or MacOS:
 ```
 export GH_TOKEN='<your-gh-api-token>'
 ```
-or on Windows:
+or in Windows cmd:
 ```
 set GH_TOKEN=<your-gh-api-token>
+```
+or set permanently with Windows PowerShell:
+```
+[Environment]::SetEnvironmentVariable("GH_TOKEN", "<your-gh-api-token>", "User")
 ```
 
 6. Run the script:
