@@ -363,7 +363,7 @@ effver_type = detect_effver_type(args.milestone)
 
 effver_info = {
     'MACRO': 'this is a **Macro** release containing awesome new features, but may require dedication of some significant time when upgrading projects to use this version.',
-    'MESO': 'this is a **Meso** release containing awesome new features, but some small effort may be needed when updating previous projects to use version.',
+    'MESO': 'this is a **Meso** release containing awesome new features, but some effort may be needed when updating previous projects to use this version.',
     'MICRO': 'this is a **Micro** release containing awesome new features that are expected to be adoptable with no additional effort.',
 }
 effver_info = f"""
