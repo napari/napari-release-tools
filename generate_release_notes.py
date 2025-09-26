@@ -345,18 +345,18 @@ def detect_effver_type(milestone):
     # Remove any pre-release suffixes (like 0.6.0rc1 -> 0.6.0)
     clean_version = milestone.split('rc')[0].split('a')[0].split('b')[0]
     parts = clean_version.split('.')
-    macro, meso, minor = int(parts[0]), int(parts[1]), int(parts[2])
-    if macro > 0:
-        if meso == 0 and minor == 0:
+    vinfo = int(parts[0]), int(parts[1]), int(parts[2])
+    match vinfo:
+        case 0, _, 0:
             return 'MACRO'
-        elif minor == 0:
+        case 0, _, _:
             return 'MESO'
-        else:
+        case _, 0, 0:
+            return 'MACRO'
+        case _, _, 0:
+            return 'MESO'
+        case _:
             return 'MICRO'
-    elif minor == 0:
-        return 'MACRO'
-    else:
-        return 'MICRO'
 
 
 effver_type = detect_effver_type(args.milestone)
