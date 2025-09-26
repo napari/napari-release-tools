@@ -34,12 +34,12 @@ for layer in layers:
 TODO: image here
 
 ### Task manager will now try to save your unfinished work
-We added a new task manager ([#8211](https://github.com/napari/napari/pull/8211)) which automatically register any running `thread_worker`, showing a confirmation dialog if you attempt to close napari while a task is running.
+We added a new task manager ([#8211](https://github.com/napari/napari/pull/8211)) which automatically registers any running `thread_worker`, showing a confirmation dialog if you attempt to close napari while a task is running.
 
 ### New `remove()` and `pop()` methods for Points and Shapes
 Points and Shapes can now be easily removed, not just added :P ([#8031](https://github.com/napari/napari/pull/8031) and [#8072](https://github.com/napari/napari/pull/8072)).
 
 ### A new and updated guide on napari Preferences
-Our documentation on the napari Preferences has received a major overhaul! [Check it out here](preferences).
+Our documentation on the napari Preferences has received a major overhaul! [Check it out here](https://napari.org/stable/guides/preferences.html#preferences)!
 
 TODO: does this link work?
