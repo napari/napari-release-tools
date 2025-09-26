@@ -24,9 +24,13 @@ On Linux or MacOS:
 ```
 export GH_TOKEN='<your-gh-api-token>'
 ```
-or on Windows:
+or in Windows cmd:
 ```
 set GH_TOKEN=<your-gh-api-token>
+```
+or set permanently with Windows PowerShell:
+```
+[Environment]::SetEnvironmentVariable("GH_TOKEN", "<your-gh-api-token>", "User")
 ```
 
 6. Run the script:
@@ -338,6 +342,40 @@ https://napari.org.
 """
 
 print(intro, file=file_handle)
+
+
+def detect_effver_type(milestone):
+    """Detect if this is a MACRO, MESO, or MICRO release based on version number."""
+    # Remove any pre-release suffixes (like 0.6.0rc1 -> 0.6.0)
+    clean_version = milestone.split('rc')[0].split('a')[0].split('b')[0]
+    parts = clean_version.split('.')
+    vinfo = int(parts[0]), int(parts[1]), int(parts[2])
+    match vinfo:
+        case 0, _, 0:
+            return 'MACRO'
+        case 0, _, _:
+            return 'MESO'
+        case _, 0, 0:
+            return 'MACRO'
+        case _, _, 0:
+            return 'MESO'
+        case _:
+            return 'MICRO'
+
+
+effver_type = detect_effver_type(args.milestone)
+
+effver_info = {
+    'MACRO': 'this is a **Macro** release containing awesome new features, but may require dedication of some significant time when upgrading projects to use this version.',
+    'MESO': 'this is a **Meso** release containing awesome new features, but some effort may be needed when updating previous projects to use this version.',
+    'MICRO': 'this is a **Micro** release containing awesome new features that are expected to be adoptable with no additional effort.',
+}
+effver_info = f"""
+napari follows [EffVer (Intended Effort Versioning)](https://effver.org/); {effver_info.get(effver_type)}
+
+"""
+
+print(effver_info, file=file_handle)
 
 for section, pull_request_dicts in highlights.items():
     if not pull_request_dicts:
