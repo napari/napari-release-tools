@@ -33,7 +33,7 @@ for layer in layers:
 
 TODO: image here
 
-### Task manager will now try to save your unfinished work
+### Task manager will now try to prevent losing unfinished work
 We added a new task manager ([#8211](https://github.com/napari/napari/pull/8211)) which automatically registers any running `thread_worker`, showing a confirmation dialog if you attempt to close napari while a task is running.
 
 ### New `remove()` and `pop()` methods for Points and Shapes
