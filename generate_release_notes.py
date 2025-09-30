@@ -330,8 +330,7 @@ print('', file=file_handle)
 if (fn := notes_dir / 'header.md').exists():
     intro = fn.open(encoding='utf-8').read()
 else:
-    intro = f"""
-We're happy to announce the release of napari {args.milestone}!
+    intro = f"""We're happy to announce the release of napari {args.milestone}!
 napari is a fast, interactive, multi-dimensional image viewer for Python.
 It's designed for browsing, annotating, and analyzing large multi-dimensional
 images. It's built on top of Qt (for the GUI), vispy (for performant GPU-based
@@ -370,9 +369,7 @@ effver_info = {
     'MESO': 'this is a **Meso** release containing awesome new features, but some effort may be needed when updating previous projects to use this version.',
     'MICRO': 'this is a **Micro** release containing awesome new features that are expected to be adoptable with no additional effort.',
 }
-effver_info = f"""
-napari follows [EffVer (Intended Effort Versioning)](https://effver.org/); {effver_info.get(effver_type)}
-
+effver_info = f"""napari follows [EffVer (Intended Effort Versioning)](https://effver.org/); {effver_info.get(effver_type)}
 """
 
 print(effver_info, file=file_handle)
@@ -452,7 +449,6 @@ for section_name, contributor_set in contributors.items():
             f'- [{users[c]}]({commit_link}){second_repo_str} - @{c}{first}',
             file=file_handle,
         )
-    print('', file=file_handle)
 
 
 if non_merged_pr:
