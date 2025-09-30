@@ -1,4 +1,4 @@
-This a sizeable release containing a few new exiting features and a lot of bugfixes.
+This a sizeable release containing a few new exciting features and a lot of bugfixes.
 
 ### EffVer and no more _alpha_
 It is our first release officially following the [EffVer versioning scheme](https://effver.org/). We also took this occasion to (finally!) remove the `Alpha` qualifier from the project ([#8288](https://github.com/napari/napari/pull/8288)), to better reflect the reality of the extensive production use of napari. Note that these changes are just formally bringing up to date the state of the project: our development continues as before!
@@ -38,10 +38,8 @@ We added a new task manager ([#8211](https://github.com/napari/napari/pull/8211)
 ### New *remove* and *pop* methods for Points and Shapes
 Points and Shapes can now be easily removed, not just added :P ([#8031](https://github.com/napari/napari/pull/8031) and [#8072](https://github.com/napari/napari/pull/8072)).
 
-### A new and updated guide on napari Preferences
-Our documentation on the napari Preferences has received a major overhaul ([docs#834](https://github.com/napari/docs/pull/834))! [Check it out here](https://napari.org/stable/guides/preferences.html#preferences)!
-
-### A fancy new release notes timeline
+### A few shiny new updates to our website
+[napari.org](https://napari.org/) can now be visited in *dark mode* ([docs#840](https://github.com/napari/docs/pull/840))! You could try out this new relaxing colorscheme while exploring the new overhauled [Preferences documentation](https://napari.org/stable/guides/preferences.html#preferences) section 😉. ([docs#834](https://github.com/napari/docs/pull/834)).
 Our [release notes page](https://napari.org/dev/release/index.html) also received a glow-up ([docs#838](https://github.com/napari/docs/pull/838)), displaying past release highlights in collapsible boxes in the timeline. This should make it easier to quickly catch up when updating across multiple releases!
 
 ### Extra dependencies for development moved to dependency groups
