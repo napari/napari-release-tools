@@ -453,6 +453,21 @@ for section_name, contributor_set in contributors.items():
             file=file_handle,
         )
 
+if args.target_directory:
+    toc_path = args.target_directory.parent / '_toc.yml'
+    with open(toc_path) as f:
+        toc = f.read()
+    # add new notes to release
+    new_version = args.milestone.replace('.', '_')
+    if not re.search(rf'release_{new_version}', toc):
+        toc = re.sub(
+            r'(\s+- file: release/release)(.*)',
+            rf'\1_{new_version}\1\2',
+            toc,
+            count=1,
+        )
+        with open(toc_path, 'w') as f:
+            toc = f.write(toc)
 
 if non_merged_pr:
     if len(non_merged_pr) == 1:
