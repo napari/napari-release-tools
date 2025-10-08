@@ -375,15 +375,18 @@ effver_info = f"""napari follows [EffVer (Intended Effort Versioning)](https://e
 print(effver_info, file=file_handle)
 
 for section, pull_request_dicts in highlights.items():
-    if not pull_request_dicts:
-        continue
-    print(f'## {section}\n', file=file_handle)
     section_path = (
         LOCAL_DIR
         / 'additional_notes'
         / args.milestone
         / f'{section.lower()}.md'
     )
+
+    if not section_path.exists() and not pull_request_dicts:
+        continue
+
+    print(f'## {section}\n', file=file_handle)
+
     mentioned_pr = set()
     if section_path.exists():
         with section_path.open(encoding='utf-8') as f:
