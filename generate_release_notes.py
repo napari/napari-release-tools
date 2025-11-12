@@ -375,15 +375,18 @@ effver_info = f"""napari follows [EffVer (Intended Effort Versioning)](https://e
 print(effver_info, file=file_handle)
 
 for section, pull_request_dicts in highlights.items():
-    if not pull_request_dicts:
-        continue
-    print(f'## {section}\n', file=file_handle)
     section_path = (
         LOCAL_DIR
         / 'additional_notes'
         / args.milestone
         / f'{section.lower()}.md'
     )
+
+    if not section_path.exists() and not pull_request_dicts:
+        continue
+
+    print(f'## {section}\n', file=file_handle)
+
     mentioned_pr = set()
     if section_path.exists():
         with section_path.open(encoding='utf-8') as f:
@@ -450,6 +453,21 @@ for section_name, contributor_set in contributors.items():
             file=file_handle,
         )
 
+if args.target_directory:
+    toc_path = args.target_directory.parent / '_toc.yml'
+    with open(toc_path) as f:
+        toc = f.read()
+    # add new notes to release
+    new_version = args.milestone.replace('.', '_')
+    if not re.search(rf'release_{new_version}', toc):
+        toc = re.sub(
+            r'(\s+- file: release/release)(.*)',
+            rf'\1_{new_version}\1\2',
+            toc,
+            count=1,
+        )
+        with open(toc_path, 'w') as f:
+            toc = f.write(toc)
 
 if non_merged_pr:
     if len(non_merged_pr) == 1:
