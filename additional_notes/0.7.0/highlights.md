@@ -46,6 +46,9 @@ tiles, each small enough to fit on the GPU, and rendered as separate vispy `Imag
 
 ### Features galore
 
+### Imitation is the highest form of flattery - smarter new layer buttons
+
+
 ### Negative axis labels? A real positive
 
 ### Lightning-like labels
