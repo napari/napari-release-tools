@@ -41,8 +41,13 @@ tiles, each small enough to fit on the GPU, and rendered as separate vispy `Imag
 
 ![Image with a screenshot of napari 0.6.6 on the left and napari 0.7.0 on the right displaying a DeCAM image of the Milky Way. The image on the left is pixelated, while the image on the right is displayed at full resolution.]( https://github.com/user-attachments/assets/d0a115a8-49d5-432c-b561-f29fe9ac8116)
 
-
 ### What's my metadata? Where's my metadata? `napari-metadata` to the rescue
+
+With a lot of work from our community contributor, Carlos Mario Rodriguez Reza (@carlosmariorr), and
+our venerable community manager Tim Monko (@TimMonko), `napari` now has a metadata viewing and editing plugin
+included in our `napari[all]` installation and our bundle.
+
+
 
 ### Features galore
 
