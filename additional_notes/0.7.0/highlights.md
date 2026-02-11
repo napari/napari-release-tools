@@ -104,7 +104,7 @@ viewer axis labels now use negative indexing by default, just like Python's own 
 semantics. The last axis is always `-1`, the second-to-last is always `-2`, and so on:
 
 ```
-axes  | -3 | -2 | -1
+axes  | 0  | 1  | 2
 volume| -3 | -2 | -1
 segmt |    | -2 | -1
 ```
@@ -118,7 +118,16 @@ You'll notice this change in the dims slider labels, the axis overlay, and the d
 popup widget. If you already label your axes with your own names (e.g. `z`, `y`, `x`),
 nothing's changed. For everyone else, we have consistency at last!
 
-### Lightning-like labels
+### Lightning labels
+
+Labels painting on large images used to be sluggish. Polygon fills on a 10000x10000
+label array took over 22 seconds, and large brush sizes would lock up the viewer entirely.
+
+With [#8592](https://github.com/napari/napari/pull/8592), polygon rasterization now uses
+PIL instead of scikit-image's `polygon2mask`, giving us an up to 6x speedup,
+and `data_setitem` now uses numpy's `min`/`max`, giving us an up to 4x speedup!
+
+Small changes, big wins!
 
 ### Grid mode -- bigger, better, faster 📈
 
