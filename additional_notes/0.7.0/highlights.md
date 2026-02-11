@@ -83,7 +83,7 @@ TODO: add image of the different button visual, once merged, and note
 
 If you wish to recover the original behavior, deselect all existing layers before creating your new layer.
 
-PS - You can now also create these new layers from the `File -> New Layer` menu!
+PS -- You can now also create these new layers from the `File -> New Layer` menu!
 
 ### Negative axis labels? A real positive
 
@@ -193,8 +193,20 @@ using `viewer.camera.angles = (z, y, x)` will now produce a different view than 
 
 ### Delete layers without delay
 
+[#8479](https://github.com/napari/napari/pull/8479) made a number of improvements to
+our layer and overlay clean-up, addressing a number of issues large numbers of layers
+in the viewer - adding them, deleting them, and even closing the viewer is now snappy
+and smooth!
+
 ### Infrastucture & dependencies
 
+A couple of notes on big changes in our dependencies:
 
-- Remove PySide2 support #8450
-- Remove numpy doc #8338
+- TODO on merge: Python 3.14 and Pydantic v2 support #8509
+- In [#8450](https://github.com/napari/napari/pull/8450) we dropped support for PySide2. If you
+were using napari with PySide for your Qt bindings, you'll need to upgrade to PySide6. Good news
+is that PySide6 is looking pretty stable, while PySide2 had some compatibility issues with numpy2,
+and had to be built from source for Python 3.11+.
+- In [#8338](https://github.com/napari/napari/pull/8338) we replaced `numpydoc` with `docstring_parser`
+for parsing our docstrings. This will be a pretty invisible change from a user's perspective, but
+it saves more than 50MB of disk space for a napari install!
