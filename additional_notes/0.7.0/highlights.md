@@ -198,7 +198,7 @@ our layer and overlay clean-up, addressing a number of issues large numbers of l
 in the viewer - adding them, deleting them, and even closing the viewer is now snappy
 and smooth!
 
-### Infrastucture & dependencies
+### Infrastructure & dependencies
 
 A couple of notes on big changes in our dependencies:
 
