@@ -80,9 +80,13 @@ or Points layer (Labels coming soon!) that inherits from a selected layer
 your new layer will copy all spatial information from its ancestor, ready for annotating!
 If you have multiple layers selected, only scale is copied.
 
-TODO: add image of the different button visual, once merged, and note
-
 If you wish to recover the original behavior, deselect all existing layers before creating your new layer.
+
+[#8649](https://github.com/napari/napari/pull/8649) ensures this change is not invisible!
+When you have layers selected, the Points and Shapes buttons will be highlighted. You
+can also hover over the buttons to get details about the behaviour.
+
+![GIF displaying the highlights on the Shapes and Points new layer buttons when one or more layers are selected in the layerlist](https://github.com/user-attachments/assets/dba88d45-baa9-47df-80e9-5c7b1f2a711d)
 
 PS -- You can now also create these new layers from the `File -> New Layer` menu!
 
@@ -190,18 +194,59 @@ If you had scripts or notebooks setting up angles for screenshots, or if you've 
 materials or tutorials with preset angles, they'll need to be updated. Any existing code
 using `viewer.camera.angles = (z, y, x)` will now produce a different view than before.
 
-### Delete layers without delay
+### Add & delete layers without delay
 
-[#8479](https://github.com/napari/napari/pull/8479) made a number of improvements to
-our layer and overlay clean-up, addressing a number of issues large numbers of layers
+[#8479](https://github.com/napari/napari/pull/8479) and [#8443](https://github.com/napari/napari/pull/8443)
+made a number of improvements to
+our layer and overlay clean-up, addressing a number of issues with large numbers of layers
 in the viewer - adding them, deleting them, and even closing the viewer is now snappy
 and smooth!
+
+### Better text overalys 🔡
+
+With [#8236](https://github.com/napari/napari/pull/8236), we've not only refactored text overlays
+so they're easier to implement, but we've also introduced two new long-requested overlays:
+the layer name overlay, and an overlay for the current slice. Together, they make generating
+publication-ready figures much easier!
+
+![Image showing the napari viewer with two layers in grid mode. Each layer has its name displayed in the top left, and the current slice displayed in the bottom right.](https://github.com/user-attachments/assets/3c96b38d-44c1-432b-b294-aa9c0934a553)
+
+Try it yourself:
+
+```python
+import napari
+v = napari.Viewer()
+v.grid.enabled = True
+ll = v.open_sample('napari', 'cells3d')
+for l in ll:
+    l.name_overlay.visible = True
+v.scale_bar.visible = True
+v.scale_bar.gridded = True
+v._overlays['current_slice'].visible = True
+v._overlays['current_slice'].gridded = True
+v.dims.axis_labels = ['z', 'y', 'x']
+```
+
+### Points - any size you like 🟣
+
+On MacOS, the points layer has never been able to reach its full potential, as OpenGL
+drivers limit the size of an individual marker to a certain number of screen pixels.
+
+With [#8552](https://github.com/napari/napari/pull/8552) and the release of `vispy v0.16`,
+this long-standing issue has finally been resolved. Across all operating systems, you can
+make your points as big as you want!
+
+This change has also propagated to the zoom behaviour on MacOS -- we believe the new
+behaviour is correct, but here's a video showing the difference:
+
+TODO: video from Juan
 
 ### Infrastructure & dependencies
 
 A couple of notes on big changes in our dependencies:
 
-- TODO on merge: Python 3.14 and Pydantic v2 support #8509
+- With #8509 we improved our support for `pydantic v2`, allowing us to enable support for Python 3.14!
+This brings us one step closer to fully adopting `psygnal` as our event library.
 - In [#8450](https://github.com/napari/napari/pull/8450) we dropped support for PySide2. If you
 were using napari with PySide for your Qt bindings, you'll need to upgrade to PySide6. Good news
 is that PySide6 is looking pretty stable, while PySide2 had some compatibility issues with numpy2,
