@@ -30,19 +30,9 @@ our [Plugins Zulip chat
 channel](https://napari.zulipchat.com/#narrow/channel/309872-plugins) or by
 coming to one of our [community meetings](meeting-schedule).
 
-### More pixels to play with - texture tiling
+### New features & widgets
 
-Ever loaded a large 2D image in napari just to zoom in and find it's blurrier
-than a JPEG from the year 2000? That's no longer the case!
-
-Courtesy of our community contributor, Guillaume Witz (@guiwitz), and his PR for
-texture tiling ([PR #8395](https://github.com/napari/napari/pull/8395)) 2D
-images that exceed OpenGL's maximum texture size will be split into multiple
-tiles, each small enough to fit on the GPU.
-
-![Image with a screenshot of napari 0.6.6 on the left and napari 0.7.0 on the right displaying a DeCAM image of the Milky Way. The image on the left is pixelated, while the image on the right is displayed at full resolution.](https://github.com/user-attachments/assets/d0a115a8-49d5-432c-b561-f29fe9ac8116)
-
-### What's my metadata? Where's my metadata? `napari-metadata` to the rescue
+#### What's my metadata? Where's my metadata? `napari-metadata` to the rescue
 
 With a lot of work from our community contributor, Carlos Mario Rodriguez Reza (@carlosmariorr), and
 our venerable community manager Tim Monko (@TimMonko), `napari` now has a metadata viewing and editing plugin
@@ -56,19 +46,19 @@ axis labels, translation and scale! You can also use the widget to copy specifie
 Check out the [README](https://github.com/napari/napari-metadata) for some usage documentation, and feel
 free to open an issue to request new features -- we're actively improving this plugin so, more to come!
 
-### (Layer) Features galore
+#### (Layer) Features galore
 
 Prior to 0.7.0, our Features table widget only supported showing individual selected layer features.
 
-With [#8189](https://github.com/napari/napari/pull/8189), courtesy of our community 
+With [#8189](https://github.com/napari/napari/pull/8189), courtesy of our community
 contributor Marcelo Zoccoler (@zoccoler), the widget will display
-features of all selected layers! The layer's name is displayed in an additional column, so you 
+features of all selected layers! The layer's name is displayed in an additional column, so you
 always know what you're looking at, and you can choose to display only the shared feature columns
 across all layers. Pretty slick!
 
 ![GIF displaying the usage of the features table with multiple selected layers.](https://github.com/user-attachments/assets/e06fd403-ed03-4edd-9192-a4e287d25ff7)
 
-### Smarter new layer buttons - inheriting from selected layers
+#### Smarter new layer buttons - inheriting from selected layers
 
 Prior to 0.7.0, creating a new layer Points, Shapes or Labels layer would give you a layer
 with extent and dimensionality equal to the union of all currently open layers, and with
@@ -76,7 +66,7 @@ none of the other spatial information (scale, units, etc.) inherited.
 
 Now, with [#8357](https://github.com/napari/napari/pull/8357) you can create a new Shapes
 or Points layer (Labels coming soon!) that inherits from a selected layer
-(or a combination of selected layers). If you have one layer selected, 
+(or a combination of selected layers). If you have one layer selected,
 your new layer will copy all spatial information from its ancestor, ready for annotating!
 If you have multiple layers selected, only scale is copied.
 
@@ -89,6 +79,138 @@ can also hover over the buttons to get details about the behaviour.
 ![GIF displaying the highlights on the Shapes and Points new layer buttons when one or more layers are selected in the layerlist](https://github.com/user-attachments/assets/dba88d45-baa9-47df-80e9-5c7b1f2a711d)
 
 PS -- You can now also create these new layers from the `File -> New Layer` menu!
+
+#### Better text overalys 🔡
+
+With [#8236](https://github.com/napari/napari/pull/8236), we've not only refactored text overlays
+so they're easier to implement, but we've also introduced two new long-requested overlays:
+the layer name overlay, and an overlay for the current slice. Together, they make generating
+publication-ready figures much easier!
+
+![Image showing the napari viewer with two layers in grid mode. Each layer has its name displayed in the top left, and the current slice displayed in the bottom right.](https://github.com/user-attachments/assets/3c96b38d-44c1-432b-b294-aa9c0934a553)
+
+Try it yourself:
+
+```python
+import napari
+v = napari.Viewer()
+v.grid.enabled = True
+ll = v.open_sample('napari', 'cells3d')
+for l in ll:
+    l.name_overlay.visible = True
+v.scale_bar.visible = True
+v.scale_bar.gridded = True
+v._overlays['current_slice'].visible = True
+v._overlays['current_slice'].gridded = True
+v.dims.axis_labels = ['z', 'y', 'x']
+```
+
+### Rendering & display
+
+#### More pixels to play with - texture tiling
+
+Ever loaded a large 2D image in napari just to zoom in and find it's blurrier
+than a JPEG from the year 2000? That's no longer the case!
+
+Courtesy of our community contributor, Guillaume Witz (@guiwitz), and his PR for
+texture tiling ([PR #8395](https://github.com/napari/napari/pull/8395)) 2D
+images that exceed OpenGL's maximum texture size will be split into multiple
+tiles, each small enough to fit on the GPU.
+
+![Image with a screenshot of napari 0.6.6 on the left and napari 0.7.0 on the right displaying a DeCAM image of the Milky Way. The image on the left is pixelated, while the image on the right is displayed at full resolution.](https://github.com/user-attachments/assets/d0a115a8-49d5-432c-b561-f29fe9ac8116)
+
+#### Points - any size you like 🟣
+
+On MacOS, the points layer has never been able to reach its full potential, as OpenGL
+drivers limit the size of an individual marker to a certain number of screen pixels.
+
+With [#8552](https://github.com/napari/napari/pull/8552) and the release of `vispy v0.16`,
+this long-standing issue has finally been resolved. Across all operating systems, you can
+make your points as big as you want!
+
+This change has also propagated to the zoom behaviour on MacOS -- we believe the new
+behaviour is correct, but here's a video showing the difference:
+
+TODO: video from Juan
+
+
+### Performance
+
+#### Lightning labels
+
+Labels painting on large images used to be sluggish. Polygon fills on a 10000x10000
+label array took over 22 seconds, and large brush sizes would lock up the viewer entirely.
+
+With [#8592](https://github.com/napari/napari/pull/8592), polygon rasterization now uses
+PIL instead of scikit-image's `polygon2mask`, giving us an up to 6x speedup,
+and `data_setitem` now uses numpy's `min`/`max`, giving us an up to 4x speedup!
+
+Small changes, big wins!
+
+#### Grid mode -- bigger, better, faster 📈
+
+If you've been playing with our new grid mode since 0.6.5, you
+may have stumbled into performance issues when progressively adding
+new layers to the viewer. Stumble no longer! Our grid mode is now wicked fast and buttery smooth 🧈.
+
+We've also fixed some issues with mouse interactions and deleting
+layers, so you can tile to your heart's content. Try it out:
+
+```py
+import napari
+
+viewer = napari.Viewer()
+
+# enable grid with stride 2 to get layers split two-by-two
+viewer.grid.enabled = True
+viewer.grid.stride = 2
+
+# set the scale bar to gridded mode so it appears in each grid box
+viewer.scale_bar.visible = True
+viewer.scale_bar.gridded = True
+
+layers = viewer.open_sample('napari', 'lily')
+
+# enable color bars
+for layer in layers:
+    layer.colorbar.visible = True
+```
+
+#### Add & delete layers without delay
+
+[#8479](https://github.com/napari/napari/pull/8479) and [#8443](https://github.com/napari/napari/pull/8443)
+made a number of improvements to
+our layer and overlay clean-up, addressing a number of issues with large numbers of layers
+in the viewer - adding them, deleting them, and even closing the viewer is now snappy
+and smooth!
+
+#### Shapes layers -- select, zoom, delete, repeat
+
+If you've ever tried working with thousands of shapes in napari, you'll know
+it could get... painful. Selecting 10,000 shapes with a box took over 50 seconds,
+deleting 5,000 shapes took over a minute, and zooming with shapes selected
+would lock up the viewer entirely. Not anymore!
+
+0.7.0 brings a flurry of performance improvements:
+
+- Box selection now uses bounding boxes and vectorized intersection tests,
+  delivering a more than 100x speedup ([#8378](https://github.com/napari/napari/pull/8378)).
+  Selecting 10,000 shapes goes from >50s to ~0.3s.
+- Batch deletion replaces one-by-one removal for another 100x speedup
+  ([#8375](https://github.com/napari/napari/pull/8375))! Deleting 50,000 shapes
+  now takes under half a second.
+- Outline computation is batched and cached, so zooming and panning with
+  selected shapes no longer blocks
+  ([#8403](https://github.com/napari/napari/pull/8403),
+  [#8536](https://github.com/napari/napari/pull/8536)).
+- Highlight updates are throttled for large layers, enabling smooth zoom
+  even with 200,000+ shapes ([#8404](https://github.com/napari/napari/pull/8404)).
+- Mode switching no longer triggers unnecessary redraws, giving another
+  ~3x speedup when many shapes are selected
+  ([#8551](https://github.com/napari/napari/pull/8551)).
+
+There's still more to do (drawing and drag-moving large selections remain
+slow), but the days of the viewer locking up on a big shapes layer are over.
 
 ### Negative axis labels? A real positive
 
@@ -121,49 +243,10 @@ You'll notice this change in the dims slider labels, the axis overlay, and the d
 popup widget. If you already label your axes with your own names (e.g. `z`, `y`, `x`),
 nothing's changed. For everyone else, we have consistency at last!
 
-### Lightning labels
-
-Labels painting on large images used to be sluggish. Polygon fills on a 10000x10000
-label array took over 22 seconds, and large brush sizes would lock up the viewer entirely.
-
-With [#8592](https://github.com/napari/napari/pull/8592), polygon rasterization now uses
-PIL instead of scikit-image's `polygon2mask`, giving us an up to 6x speedup,
-and `data_setitem` now uses numpy's `min`/`max`, giving us an up to 4x speedup!
-
-Small changes, big wins!
-
-### Grid mode -- bigger, better, faster 📈
-
-If you've been playing with our new grid mode since 0.6.5, you 
-may have stumbled into performance issues when progressively adding
-new layers to the viewer. Stumble no longer! Our grid mode is now wicked fast and buttery smooth 🧈.
-
-We've also fixed some issues with mouse interactions and deleting
-layers, so you can tile to your heart's content. Try it out:
-
-```py
-import napari
-
-viewer = napari.Viewer()
-
-# enable grid with stride 2 to get layers split two-by-two
-viewer.grid.enabled = True
-viewer.grid.stride = 2
-
-# set the scale bar to gridded mode so it appears in each grid box
-viewer.scale_bar.visible = True
-viewer.scale_bar.gridded = True
-
-layers = viewer.open_sample('napari', 'lily')
-
-# enable color bars
-for layer in layers:
-    layer.colorbar.visible = True
-```
 
 ### What's in an angle? The truth! Fixed camera angles 🎥
 
-If you've ever set up the camera to take that perfect publication-worthy photo of 
+If you've ever set up the camera to take that perfect publication-worthy photo of
 your data (and taken the time to query the camera angles), you may have noticed they seemed... off.
 That's because they were! Very... off. This was due to a long-standing bug in how we calculated our
 camera angles, fueled in part by some arcane vispy axis-swapping tomfoolery, and in part by napari's
@@ -194,81 +277,6 @@ If you had scripts or notebooks setting up angles for screenshots, or if you've 
 materials or tutorials with preset angles, they'll need to be updated. Any existing code
 using `viewer.camera.angles = (z, y, x)` will now produce a different view than before.
 
-### Add & delete layers without delay
-
-[#8479](https://github.com/napari/napari/pull/8479) and [#8443](https://github.com/napari/napari/pull/8443)
-made a number of improvements to
-our layer and overlay clean-up, addressing a number of issues with large numbers of layers
-in the viewer - adding them, deleting them, and even closing the viewer is now snappy
-and smooth!
-
-### Better text overalys 🔡
-
-With [#8236](https://github.com/napari/napari/pull/8236), we've not only refactored text overlays
-so they're easier to implement, but we've also introduced two new long-requested overlays:
-the layer name overlay, and an overlay for the current slice. Together, they make generating
-publication-ready figures much easier!
-
-![Image showing the napari viewer with two layers in grid mode. Each layer has its name displayed in the top left, and the current slice displayed in the bottom right.](https://github.com/user-attachments/assets/3c96b38d-44c1-432b-b294-aa9c0934a553)
-
-Try it yourself:
-
-```python
-import napari
-v = napari.Viewer()
-v.grid.enabled = True
-ll = v.open_sample('napari', 'cells3d')
-for l in ll:
-    l.name_overlay.visible = True
-v.scale_bar.visible = True
-v.scale_bar.gridded = True
-v._overlays['current_slice'].visible = True
-v._overlays['current_slice'].gridded = True
-v.dims.axis_labels = ['z', 'y', 'x']
-```
-
-### Points - any size you like 🟣
-
-On MacOS, the points layer has never been able to reach its full potential, as OpenGL
-drivers limit the size of an individual marker to a certain number of screen pixels.
-
-With [#8552](https://github.com/napari/napari/pull/8552) and the release of `vispy v0.16`,
-this long-standing issue has finally been resolved. Across all operating systems, you can
-make your points as big as you want!
-
-This change has also propagated to the zoom behaviour on MacOS -- we believe the new
-behaviour is correct, but here's a video showing the difference:
-
-TODO: video from Juan
-
-### Shapes layers -- select, zoom, delete, repeat
-
-If you've ever tried working with thousands of shapes in napari, you'll know
-it could get... painful. Selecting 10,000 shapes with a box took over 50 seconds,
-deleting 5,000 shapes took over a minute, and zooming with shapes selected
-would lock up the viewer entirely. Not anymore!
-
-0.7.0 brings a flurry of performance improvements:
-
-- Box selection now uses bounding boxes and vectorized intersection tests,
-  delivering a more than 100x speedup ([#8378](https://github.com/napari/napari/pull/8378)).
-  Selecting 10,000 shapes goes from >50s to ~0.3s.
-- Batch deletion replaces one-by-one removal for another 100x speedup
-  ([#8375](https://github.com/napari/napari/pull/8375))! Deleting 50,000 shapes
-  now takes under half a second.
-- Outline computation is batched and cached, so zooming and panning with
-  selected shapes no longer blocks
-  ([#8403](https://github.com/napari/napari/pull/8403),
-  [#8536](https://github.com/napari/napari/pull/8536)).
-- Highlight updates are throttled for large layers, enabling smooth zoom
-  even with 200,000+ shapes ([#8404](https://github.com/napari/napari/pull/8404)).
-- Mode switching no longer triggers unnecessary redraws, giving another
-  ~3x speedup when many shapes are selected
-  ([#8551](https://github.com/napari/napari/pull/8551)).
-
-There's still more to do (drawing and drag-moving large selections remain
-slow), but the days of the viewer locking up on a big shapes layer are over.
-
 ### Infrastructure & dependencies
 
 A couple of notes on big changes in our dependencies:
@@ -282,5 +290,3 @@ and had to be built from source for Python 3.11+.
 - In [#8338](https://github.com/napari/napari/pull/8338) we replaced `numpydoc` with `docstring_parser`
 for parsing our docstrings. This will be a pretty invisible change from a user's perspective, but
 it saves more than 50MB of disk space for a napari install!
-
-- grouping
