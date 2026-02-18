@@ -1,5 +1,3 @@
-More detail coming soon...
-
 ### Transition to npe2 plugin engine 🔌
 
 In 0.6.0 we began the process of deprecating npe1 (napari-plugin-engine).
@@ -128,10 +126,16 @@ With [#8552](https://github.com/napari/napari/pull/8552) and the release of `vis
 this long-standing issue has finally been resolved. Across all operating systems, you can
 make your points as big as you want!
 
-This change has also propagated to the zoom behaviour on MacOS -- we believe the new
-behaviour is correct, but here's a video showing the difference:
+This change has also propagated to the zoom behaviour on MacOS -- points now zoom
+proportionally to the data, rather than staying the same size in screen pixels.
 
-TODO: video from Juan
+Here's the behaviour pre 0.7.0:
+
+![Video with a points layer on a grid of white squares. When zooming, the points stay the same size in screen pixels.](../_static/images/points_zoom_066.webm)
+
+And now:
+
+![Video with a points layer on a grid of white squares. When zooming, the points scale proportionally to the data.](../_static/images/points_zoom_070.webm)
 
 
 ### Performance
