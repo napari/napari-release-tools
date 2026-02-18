@@ -241,6 +241,34 @@ behaviour is correct, but here's a video showing the difference:
 
 TODO: video from Juan
 
+### Shapes layers -- select, zoom, delete, repeat
+
+If you've ever tried working with thousands of shapes in napari, you'll know
+it could get... painful. Selecting 10,000 shapes with a box took over 50 seconds,
+deleting 5,000 shapes took over a minute, and zooming with shapes selected
+would lock up the viewer entirely. Not anymore!
+
+0.7.0 brings a flurry of performance improvements:
+
+- Box selection now uses bounding boxes and vectorized intersection tests,
+  delivering a more than 100x speedup ([#8378](https://github.com/napari/napari/pull/8378)).
+  Selecting 10,000 shapes goes from >50s to ~0.3s.
+- Batch deletion replaces one-by-one removal for another 100x speedup
+  ([#8375](https://github.com/napari/napari/pull/8375))! Deleting 50,000 shapes
+  now takes under half a second.
+- Outline computation is batched and cached, so zooming and panning with
+  selected shapes no longer blocks
+  ([#8403](https://github.com/napari/napari/pull/8403),
+  [#8536](https://github.com/napari/napari/pull/8536)).
+- Highlight updates are throttled for large layers, enabling smooth zoom
+  even with 200,000+ shapes ([#8404](https://github.com/napari/napari/pull/8404)).
+- Mode switching no longer triggers unnecessary redraws, giving another
+  ~3x speedup when many shapes are selected
+  ([#8551](https://github.com/napari/napari/pull/8551)).
+
+There's still more to do (drawing and drag-moving large selections remain
+slow), but the days of the viewer locking up on a big shapes layer are over.
+
 ### Infrastructure & dependencies
 
 A couple of notes on big changes in our dependencies:
@@ -255,6 +283,4 @@ and had to be built from source for Python 3.11+.
 for parsing our docstrings. This will be a pretty invisible change from a user's perspective, but
 it saves more than 50MB of disk space for a napari install!
 
-
 - grouping
-- shapes performance PRs
