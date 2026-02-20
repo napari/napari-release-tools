@@ -285,6 +285,9 @@ This brings us one step closer to fully adopting `psygnal` as our event library.
 were using napari with PySide for your Qt bindings, you'll need to upgrade to PySide6. Good news
 is that PySide6 is looking pretty stable, while PySide2 had some compatibility issues with numpy2,
 and had to be built from source for Python 3.11+.
+- In ([#8665](https://github.com/napari/napari/pull/8665)) we updated the default qt
+binding to PyQt6. PyQt6 will now be installed with `napari[all]` installations. Windows users
+should see improvements to their display with better support for fractional scaling!
 - In [#8338](https://github.com/napari/napari/pull/8338) we replaced `numpydoc` with `docstring_parser`
 for parsing our docstrings. This will be a pretty invisible change from a user's perspective, but
 it saves more than 50MB of disk space for a napari install!
