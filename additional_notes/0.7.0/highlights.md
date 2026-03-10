@@ -95,6 +95,41 @@ If you had scripts or notebooks setting up angles for screenshots, or if you've 
 materials or tutorials with preset angles, they'll need to be updated. Any existing code
 using `viewer.camera.angles = (z, y, x)` will now produce a different view than before.
 
+#### Limiting `self.events` callbacks
+
+In [#8672](https://github.com/napari/napari/pull/8672), we changed how we emit events from
+the parent `self.events` group.
+
+Previously, connecting a callback to an `EventedModel`'s top-level event group
+(e.g. `model.events.connect(callback)`) would cause that callback to fire multiple times
+when a single assignment triggered multiple dependent fields. For example:
+
+```python
+class MyModel(EventedModel):
+    a: int
+
+    @property
+    def b(self):
+        return self.a * 2
+
+    @b.setter
+    def b(self, value):
+        self.a = value // 2
+
+model = MyModel(a=1)
+model.events.connect(my_callback)
+
+model.a = 4  # previously called my_callback twice (once for 'a', once for 'b')
+             # now calls my_callback once
+```
+
+The callback connected to `model.events` will now be called exactly once, with the event `type`
+set to the first changed field and `value` set to its new value. Callbacks connected to specific
+field events (e.g. `model.events.a.connect(...)`) are unaffected and continue to work as before.
+
+If you connect to `model.events` directly and relied on receiving one call per dependent field
+change, you will need to connect to the individual field events instead.
+
 ### New features & widgets
 
 #### What's my metadata? Where's my metadata? `napari-metadata` to the rescue
@@ -131,19 +166,24 @@ Prior to 0.7.0, creating a new layer Points, Shapes or Labels layer would give y
 with extent and dimensionality equal to the union of all currently open layers, and with
 none of the other spatial information (scale, units, etc.) inherited.
 
-Now, with [#8357](https://github.com/napari/napari/pull/8357) you can create a new Shapes
-or Points layer (Labels coming soon!) that inherits from a selected layer
+Now, with [#8357](https://github.com/napari/napari/pull/8357) and [#8702](https://github.com/napari/napari/pull/8702)
+you can create new Shapes, Points or Labels layer that inherits from a selected layer
 (or a combination of selected layers). If you have one layer selected,
 your new layer will copy all spatial information from its ancestor, ready for annotating!
 If you have multiple layers selected, only scale is copied.
 
-If you wish to recover the original behavior, deselect all existing layers before creating your new layer.
+If you wish to recover the original behavior, select all existing layers before creating your new layer.
+For `Shapes` and `Points`, deselecting all layers gives you a layer with only ndim inherited,
+and no other properties.
+For `Labels`, the button is disabled when layers are present in the viewer and none are selected.
+(You can still create a (512 x 512) `Labels` layer when there are no layers open).
 
-[#8649](https://github.com/napari/napari/pull/8649) ensures this change is not invisible!
-When you have layers selected, the Points and Shapes buttons will be highlighted. You
+[#8723](https://github.com/napari/napari/pull/8723) ensures this change is not invisible!
+When you have a layer selected, the Points, Shapes and Labels buttons will be highlighted.
+The highlight color will become brighter when multiple layers are selected. You
 can also hover over the buttons to get details about the behaviour.
 
-![GIF displaying the highlights on the Shapes and Points new layer buttons when one or more layers are selected in the layerlist](https://github.com/user-attachments/assets/dba88d45-baa9-47df-80e9-5c7b1f2a711d)
+![GIF displaying the highlights on the Shapes, Points and Labels new layer buttons when one or more layers are selected in the layerlist](https://github.com/user-attachments/assets/9e39b42d-97f6-4186-8c1c-db03d7cda1bb)
 
 PS -- You can now also create these new layers from the `File -> New Layer` menu!
 
@@ -297,6 +337,26 @@ would lock up the viewer entirely. Not anymore!
 
 Beware: there's still more to do, because drawing and drag-moving large selections
 remain slow!
+
+#### Multiscale -- less to update, more to celebrate
+
+PR [#8678](https://github.com/napari/napari/pull/8678) introduced a small change
+with a big effect! Now, zooming in (and panning while zoomed in), will only trigger
+a data refresh if the multiscale level has changed **or** if the new view falls outside
+of already loaded data.
+
+#### Delete the launch codes -- no more macOS hacks on launch
+
+In 0.6.6 and below, we had some macOS specific launch code that skirted around some
+issues (which are now no longer relevant), and hackily "relaunched" napari to make
+sure the application name was correct.
+
+This code added up to a whole second to our launch time, as well as being potentially
+problematic for some users. PR [#8705](https://github.com/napari/napari/pull/8705)
+removed this code, making our start-up a little less hacky and a little more snappy.
+The downside is that when launching napari on macOS, the app name may be listed as
+Python, instead of napari. We think the trade-off is worth it.
+
 
 ### Infrastructure & dependencies
 
