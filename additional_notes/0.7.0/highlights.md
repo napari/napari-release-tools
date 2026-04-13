@@ -277,30 +277,30 @@ Here's the behaviour pre 0.7.0:
 
 ```{raw} html
 <figure>
-  <video width="100%" controls autoplay loop muted playsinline> 
-    <source src="../_static/images/points_zoom_066.webm" type="video/webm" /> 
-    <source src="../_static/images/points_zoom_066.mp4" type="video/mp4" /> 
-    <img src="../_static/images/points_zoom_066.png" 
-      title="Your browser does not support the video tag" 
-      alt="Video with a points layer on a grid of white squares. When zooming, the points stay the same size in screen pixels." 
-    > 
-  </video> 
-</figure> 
-``` 
+  <video width="100%" controls autoplay loop muted playsinline>
+    <source src="../_static/images/points_zoom_066.webm" type="video/webm" />
+    <source src="../_static/images/points_zoom_066.mp4" type="video/mp4" />
+    <img src="../_static/images/points_zoom_066.png"
+      title="Your browser does not support the video tag"
+      alt="Video with a points layer on a grid of white squares. When zooming, the points stay the same size in screen pixels."
+    >
+  </video>
+</figure>
+```
 
 And now:
 
 ```{raw} html
-<figure> 
-  <video width="100%" controls autoplay loop muted playsinline> 
-    <source src="../_static/images/points_zoom_070.webm" type="video/webm" /> 
-    <source src="../_static/images/points_zoom_070.mp4" type="video/mp4" /> 
-    <img src="../_static/images/points_zoom_070.png" 
-      title="Your browser does not support the video tag" 
-      alt="Video with a points layer on a grid of white squares. When zooming, the points scale proportionally to the data." 
-    > 
-  </video> 
-</figure> 
+<figure>
+  <video width="100%" controls autoplay loop muted playsinline>
+    <source src="../_static/images/points_zoom_070.webm" type="video/webm" />
+    <source src="../_static/images/points_zoom_070.mp4" type="video/mp4" />
+    <img src="../_static/images/points_zoom_070.png"
+      title="Your browser does not support the video tag"
+      alt="Video with a points layer on a grid of white squares. When zooming, the points scale proportionally to the data."
+    >
+  </video>
+</figure>
 ```
 
 ### Performance
