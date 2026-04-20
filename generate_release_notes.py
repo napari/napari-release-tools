@@ -325,9 +325,10 @@ if not notes_dir.glob('*.md'):
 
 milestone_obj = get_milestone(args.milestone)
 
+# prerelease includes alpha and rc versions
 if version.is_prerelease:
     print(
-        f'⚠️ *Note: these release notes are still in draft while {version} is prerelease for testing purposes.* ⚠️',
+        f'⚠️ *Note: these release notes are still in draft while {version} is in prerelease testing.* ⚠️',
         file=file_handle,
     )
 print('', file=file_handle)
