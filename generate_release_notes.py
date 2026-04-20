@@ -136,7 +136,6 @@ version = parse_version(args.tag)
 args.milestone = version.base_version
 
 
-
 setup_cache()
 repo = get_repo()
 correction_dict = get_correction_dict(
@@ -302,7 +301,7 @@ old_contributors = set()
 if args.target_directory is None:
     file_handle = sys.stdout
 else:
-    res_file_name = f"release_{args.milestone.replace('.', '_')}.md"
+    res_file_name = f'release_{args.milestone.replace(".", "_")}.md'
     file_handle = open(
         args.target_directory / res_file_name, 'w', encoding='utf-8'
     )
@@ -410,7 +409,7 @@ for section, pull_request_dicts in highlights.items():
         repo_prefix = repo_str if repo_str != 'napari' else ''
         print(
             f'- {pull_request_info["summary"]} ([{repo_prefix}#{number}]'
-            f"(https://{GH}/{GH_USER}/{repo_str}/pull/{number}))",
+            f'(https://{GH}/{GH_USER}/{repo_str}/pull/{number}))',
             file=file_handle,
         )
     print('', file=file_handle)
@@ -454,7 +453,7 @@ for section_name, contributor_set in contributors.items():
 
         first = ' +' if c in new_contributors else ''
         commit_link = (
-            f'https://{GH}/{GH_USER}/{first_repo_name}/' f'commits?author={c}'
+            f'https://{GH}/{GH_USER}/{first_repo_name}/commits?author={c}'
         )
         print(
             f'- [{users[c]}]({commit_link}){second_repo_str} - @{c}{first}',

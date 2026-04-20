@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [tool.ruff]
-target-version = "py13"
+target-version = "py313"
 fix = true
 
 line-length = 79
@@ -27,4 +27,3 @@ ignore = ["E501"]
 
 [tool.ruff.format]
 quote-style = "single"
-

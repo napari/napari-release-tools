@@ -1,6 +1,6 @@
 repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0  # Use the ref you want to point at
+    rev: v6.0.0  # Use the ref you want to point at
     hooks:
       - id: trailing-whitespace
         exclude: patch_dir
@@ -9,9 +9,8 @@ repos:
         exclude: patch_dir
       - id: check-yaml
 -   repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.4.8
+    rev: v0.15.11
     hooks:
-      - id: ruff
-        exclude: _vendor|vendored
+      - id: ruff-check
         args: [--output-format, github]
       - id: ruff-format
