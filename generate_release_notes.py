@@ -65,6 +65,7 @@ from typing import NamedTuple
 
 from github.PullRequest import PullRequest
 from github.Repository import Repository
+from packaging.version import parse as parse_version
 
 from release_utils import (
     BOT_LIST,
@@ -104,7 +105,7 @@ def parse_pr_num(pr_num):
 
 
 parser = argparse.ArgumentParser(usage=__doc__)
-parser.add_argument('milestone', help='The milestone to list')
+parser.add_argument('tag', help='The tag that will be released, e.g. 0.6.2')
 parser.add_argument('--target-directory', type=Path, default=None)
 parser.add_argument(
     '--correction-file',
@@ -128,6 +129,12 @@ parser.add_argument(
 )
 
 args = parser.parse_args()
+
+
+version = parse_version(args.tag)
+
+args.milestone = version.base_version
+
 
 
 setup_cache()
@@ -319,10 +326,11 @@ if not notes_dir.glob('*.md'):
 
 milestone_obj = get_milestone(args.milestone)
 
-print(
-    f'⚠️ *Note: these release notes are still in draft while {args.milestone} is in release candidate testing.* ⚠️',
-    file=file_handle,
-)
+if version.is_prerelease:
+    print(
+        f'⚠️ *Note: these release notes are still in draft while {version} is prerelease for testing purposes.* ⚠️',
+        file=file_handle,
+    )
 print('', file=file_handle)
 print(f'*{milestone_obj.due_on.strftime("%a, %b %d, %Y")}*', file=file_handle)
 print('', file=file_handle)
