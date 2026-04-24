@@ -158,12 +158,14 @@ def iter_pull_request(additional_query, user=GH_USER, repo=GH_REPO):
         f' for repo {user}/{repo}',
         file=sys.stderr,
     )
-    for pull_issue in tqdm(
-        iterable,
-        desc=f'Pull Requests ({user}/{repo})...',
-        total=iterable.totalCount,
-    ):
-        yield pull_issue.as_pull_request()
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        yield from tqdm(
+            executor.map(lambda x: x.as_pull_request(), iterable),
+            desc=f'Pull Requests ({user}/{repo})...',
+            total=iterable.totalCount,
+        )
 
 
 def get_pr_commits_dict(repo: Repo, branch: str = 'main') -> dict[int, str]:

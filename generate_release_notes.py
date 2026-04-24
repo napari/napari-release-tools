@@ -60,6 +60,8 @@ References:
 import argparse
 import re
 import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import NamedTuple
 
@@ -79,7 +81,6 @@ from release_utils import (
     get_milestone,
     get_repo,
     iter_pull_request,
-    setup_cache,
 )
 
 LOCAL_DIR = Path(__file__).parent
@@ -136,7 +137,7 @@ version = parse_version(args.tag)
 args.milestone = version.base_version
 
 
-setup_cache()
+# setup_cache()
 repo = get_repo()
 correction_dict = get_correction_dict(
     args.correction_file
@@ -145,16 +146,20 @@ correction_dict = get_correction_dict(
 )
 
 
+users_lock = threading.Lock()
+
+
 def add_to_users(users_dkt, new_user):
-    if new_user.login in users_dkt:
-        # reduce obsolete requests to GitHub API
-        return
-    if new_user.login in correction_dict:
-        users_dkt[new_user.login] = correction_dict[new_user.login]
-    elif new_user.name is None:
-        users_dkt[new_user.login] = new_user.login
-    else:
-        users_dkt[new_user.login] = new_user.name
+    with users_lock:
+        if new_user.login in users_dkt:
+            # reduce obsolete requests to GitHub API
+            return
+        if new_user.login in correction_dict:
+            users_dkt[new_user.login] = correction_dict[new_user.login]
+        elif new_user.name is None:
+            users_dkt[new_user.login] = new_user.login
+        else:
+            users_dkt[new_user.login] = new_user.name
 
 
 authors = set()
@@ -197,44 +202,56 @@ label_to_section = {
 
 def parse_pull(pull: PullRequest, repo_: Repository = repo):
     # assert pull.merged or pull.number in args.with_pr
+    is_merged = pull.raw_data.get('merged')
+    if is_merged is None:
+        # Fallback if raw_data doesn't have it, though as_pull_request usually does
+        is_merged = pull.merged
 
-    if pull.is_merged():
-        commit = repo_.get_commit(pull.merge_commit_sha)
-
-        if commit.committer is not None:
-            add_to_users(users, commit.committer)
-            committers.add(commit.committer.login)
-        if commit.author is not None:
-            add_to_users(users, commit.author)
-            authors.add(commit.author.login)
+    if is_merged:
+        # Use merged_by and user from raw_data if possible to avoid extra API calls
+        if pull.merged_by is not None:
+            add_to_users(users, pull.merged_by)
+            with users_lock:
+                committers.add(pull.merged_by.login)
+        if pull.user is not None:
+            add_to_users(users, pull.user)
+            with users_lock:
+                authors.add(pull.user.login)
 
     summary = pull.title
 
     for review in pull.get_reviews():
         if review.user is not None:
             add_to_users(users, review.user)
-            reviewers.add(review.user.login)
+            with users_lock:
+                reviewers.add(review.user.login)
     assigned_to_section = False
     pr_labels = {label.name.lower() for label in pull.labels}
     for label_name, section in label_to_section.items():
         if label_name in pr_labels:
-            highlights[section][pull.number] = {
-                'summary': summary,
-                'repo': repo_.full_name.split('/')[1],
-            }
+            with users_lock:
+                highlights[section][pull.number] = {
+                    'summary': summary,
+                    'repo': repo_.full_name.split('/')[1],
+                }
             assigned_to_section = True
 
     if not assigned_to_section:
-        other_pull_requests[pull.number] = {
-            'summary': summary,
-            'repo': repo_.full_name.split('/')[1],
-        }
+        with users_lock:
+            other_pull_requests[pull.number] = {
+                'summary': summary,
+                'repo': repo_.full_name.split('/')[1],
+            }
 
 
+pulls_to_parse = []
 for pull_ in iter_pull_request(f'milestone:{args.milestone} {args.merged}'):
-    if not pull_.is_merged():
+    is_merged = pull_.raw_data.get('merged')
+    if is_merged is None:
+        is_merged = pull_.merged
+    if not is_merged:
         non_merged_pr.append(pull_)
-    parse_pull(pull_)
+    pulls_to_parse.append((pull_, repo))
 
 if args.with_pr is not None:
     for pr_num in args.with_pr:
@@ -245,24 +262,40 @@ if args.with_pr is not None:
             r = get_repo(pr_num.user, pr_num.repo)
             pull = r.get_pull(pr_num.pr)
 
-        parse_pull(pull, r)
+        pulls_to_parse.append((pull, r))
 
-for pull in iter_pull_request(
-    f'milestone:{args.milestone} {args.merged}', repo=GH_DOCS_REPO
-):
-    issue = pull.as_issue()
-    if not pull.is_merged():
+doc_pulls = list(
+    iter_pull_request(
+        f'milestone:{args.milestone} {args.merged}', repo=GH_DOCS_REPO
+    )
+)
+
+for pull in doc_pulls:
+    is_merged = pull.raw_data.get('merged')
+    if is_merged is None:
+        is_merged = pull.merged
+    if not is_merged:
         non_merged_pr.append(pull)
 
+with ThreadPoolExecutor(max_workers=10) as executor:
+    executor.map(lambda x: parse_pull(*x), pulls_to_parse)
+
+for pull in doc_pulls:
+    issue = pull.as_issue()
     add_to_users(users, issue.user)
     docs_authors.add(issue.user.login)
 
     summary = pull.title
 
-    for review in pull.get_reviews():
-        if review.user is not None:
-            add_to_users(users, review.user)
-            docs_reviewers.add(review.user.login)
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        # We need reviews for docs PRs too
+        reviews = list(pull.get_reviews())
+        for review in reviews:
+            if review.user is not None:
+                add_to_users(users, review.user)
+                with users_lock:
+                    docs_reviewers.add(review.user.login)
+
     assigned_to_section = False
     pr_labels = {label.name.lower() for label in pull.labels}
     if 'highlight' in pr_labels:
