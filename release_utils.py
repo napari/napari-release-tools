@@ -55,7 +55,10 @@ def setup_cache(timeout=3600):
 
     """setup cache for requests"""
     requests_cache.install_cache(
-        'github_cache', backend='sqlite', expire_after=timeout
+        'github_cache',
+        backend='filesystem',
+        expire_after=timeout,
+        allowable_methods=['GET', 'POST'],
     )
 
 

@@ -1,5 +1,6 @@
 issue.md
 github_cache.sqlite
+github_cache/*
 napari_repo
 project_repo
 .python-version

@@ -60,7 +60,6 @@ References:
 import argparse
 import re
 import sys
-import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import NamedTuple
@@ -81,6 +80,7 @@ from release_utils import (
     get_milestone,
     get_repo,
     iter_pull_request,
+    setup_cache,
 )
 
 LOCAL_DIR = Path(__file__).parent
@@ -137,7 +137,7 @@ version = parse_version(args.tag)
 args.milestone = version.base_version
 
 
-# setup_cache()
+setup_cache()
 repo = get_repo()
 correction_dict = get_correction_dict(
     args.correction_file
@@ -146,20 +146,16 @@ correction_dict = get_correction_dict(
 )
 
 
-users_lock = threading.Lock()
-
-
 def add_to_users(users_dkt, new_user):
-    with users_lock:
-        if new_user.login in users_dkt:
-            # reduce obsolete requests to GitHub API
-            return
-        if new_user.login in correction_dict:
-            users_dkt[new_user.login] = correction_dict[new_user.login]
-        elif new_user.name is None:
-            users_dkt[new_user.login] = new_user.login
-        else:
-            users_dkt[new_user.login] = new_user.name
+    if new_user.login in users_dkt:
+        # reduce obsolete requests to GitHub API
+        return
+    if new_user.login in correction_dict:
+        users_dkt[new_user.login] = correction_dict[new_user.login]
+    elif new_user.name is None:
+        users_dkt[new_user.login] = new_user.login
+    else:
+        users_dkt[new_user.login] = new_user.name
 
 
 authors = set()
@@ -211,37 +207,32 @@ def parse_pull(pull: PullRequest, repo_: Repository = repo):
         # Use merged_by and user from raw_data if possible to avoid extra API calls
         if pull.merged_by is not None:
             add_to_users(users, pull.merged_by)
-            with users_lock:
-                committers.add(pull.merged_by.login)
+            committers.add(pull.merged_by.login)
         if pull.user is not None:
             add_to_users(users, pull.user)
-            with users_lock:
-                authors.add(pull.user.login)
+            authors.add(pull.user.login)
 
     summary = pull.title
 
     for review in pull.get_reviews():
         if review.user is not None:
             add_to_users(users, review.user)
-            with users_lock:
-                reviewers.add(review.user.login)
+            reviewers.add(review.user.login)
     assigned_to_section = False
     pr_labels = {label.name.lower() for label in pull.labels}
     for label_name, section in label_to_section.items():
         if label_name in pr_labels:
-            with users_lock:
-                highlights[section][pull.number] = {
-                    'summary': summary,
-                    'repo': repo_.full_name.split('/')[1],
-                }
-            assigned_to_section = True
-
-    if not assigned_to_section:
-        with users_lock:
-            other_pull_requests[pull.number] = {
+            highlights[section][pull.number] = {
                 'summary': summary,
                 'repo': repo_.full_name.split('/')[1],
             }
+            assigned_to_section = True
+
+    if not assigned_to_section:
+        other_pull_requests[pull.number] = {
+            'summary': summary,
+            'repo': repo_.full_name.split('/')[1],
+        }
 
 
 pulls_to_parse = []
@@ -293,8 +284,7 @@ for pull in doc_pulls:
         for review in reviews:
             if review.user is not None:
                 add_to_users(users, review.user)
-                with users_lock:
-                    docs_reviewers.add(review.user.login)
+                docs_reviewers.add(review.user.login)
 
     assigned_to_section = False
     pr_labels = {label.name.lower() for label in pull.labels}
