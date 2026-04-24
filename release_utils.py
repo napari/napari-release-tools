@@ -243,7 +243,7 @@ def get_correction_dict(file_path: Path | None) -> dict[str, str]:
 def get_corrections_from_citation_cff(
     cff_data: str | Path | dict,
 ) -> dict[str, str]:
-    if isinstance(cff_data, (str, Path)):
+    if isinstance(cff_data, str | Path):
         cff_data = Path(cff_data)
         if not cff_data.exists():
             return {}
@@ -261,7 +261,7 @@ def get_corrections_from_citation_cff(
 def get_corrections_from_citation_cff2(
     cff_data: str | Path | dict,
 ) -> dict[str, str]:
-    if isinstance(cff_data, (str, Path)):
+    if isinstance(cff_data, str | Path):
         cff_data = Path(cff_data)
         if not cff_data.exists():
             return {}

@@ -65,6 +65,7 @@ from typing import NamedTuple
 
 from github.PullRequest import PullRequest
 from github.Repository import Repository
+from packaging.version import parse as parse_version
 
 from release_utils import (
     BOT_LIST,
@@ -104,7 +105,7 @@ def parse_pr_num(pr_num):
 
 
 parser = argparse.ArgumentParser(usage=__doc__)
-parser.add_argument('milestone', help='The milestone to list')
+parser.add_argument('tag', help='The tag that will be released, e.g. 0.6.2')
 parser.add_argument('--target-directory', type=Path, default=None)
 parser.add_argument(
     '--correction-file',
@@ -128,6 +129,11 @@ parser.add_argument(
 )
 
 args = parser.parse_args()
+
+
+version = parse_version(args.tag)
+
+args.milestone = version.base_version
 
 
 setup_cache()
@@ -295,7 +301,7 @@ old_contributors = set()
 if args.target_directory is None:
     file_handle = sys.stdout
 else:
-    res_file_name = f"release_{args.milestone.replace('.', '_')}.md"
+    res_file_name = f'release_{args.milestone.replace(".", "_")}.md'
     file_handle = open(
         args.target_directory / res_file_name, 'w', encoding='utf-8'
     )
@@ -319,10 +325,12 @@ if not notes_dir.glob('*.md'):
 
 milestone_obj = get_milestone(args.milestone)
 
-print(
-    f'⚠️ *Note: these release notes are still in draft while {args.milestone} is in release candidate testing.* ⚠️',
-    file=file_handle,
-)
+# prerelease includes alpha and rc versions
+if version.is_prerelease:
+    print(
+        f'⚠️ *Note: these release notes are still in draft while {version} is in prerelease testing.* ⚠️',
+        file=file_handle,
+    )
 print('', file=file_handle)
 print(f'*{milestone_obj.due_on.strftime("%a, %b %d, %Y")}*', file=file_handle)
 print('', file=file_handle)
@@ -402,7 +410,7 @@ for section, pull_request_dicts in highlights.items():
         repo_prefix = repo_str if repo_str != 'napari' else ''
         print(
             f'- {pull_request_info["summary"]} ([{repo_prefix}#{number}]'
-            f"(https://{GH}/{GH_USER}/{repo_str}/pull/{number}))",
+            f'(https://{GH}/{GH_USER}/{repo_str}/pull/{number}))',
             file=file_handle,
         )
     print('', file=file_handle)
@@ -446,7 +454,7 @@ for section_name, contributor_set in contributors.items():
 
         first = ' +' if c in new_contributors else ''
         commit_link = (
-            f'https://{GH}/{GH_USER}/{first_repo_name}/' f'commits?author={c}'
+            f'https://{GH}/{GH_USER}/{first_repo_name}/commits?author={c}'
         )
         print(
             f'- [{users[c]}]({commit_link}){second_repo_str} - @{c}{first}',

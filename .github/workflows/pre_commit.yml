@@ -3,7 +3,7 @@
 name: pre-commit
 on:
   push:
-    branches: [ main, "0.4.18_release" ]
+    branches: [ main, "0.7.1_release" ]
   pull_request:
     branches: [ main ]
 
