@@ -64,8 +64,6 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import NamedTuple
 
-from github.PullRequest import PullRequest
-from github.Repository import Repository
 from packaging.version import parse as parse_version
 
 from release_utils import (
@@ -196,15 +194,15 @@ label_to_section = {
 }
 
 
-def parse_pull(pull: PullRequest, repo_: Repository = repo):
-    # assert pull.merged or pull.number in args.with_pr
+def parse_pull(pull_number: int, repo_full_name: str):
+    repo_ = get_repo(*repo_full_name.split('/'))
+    pull = repo_.get_pull(pull_number)
+
     is_merged = pull.raw_data.get('merged')
     if is_merged is None:
-        # Fallback if raw_data doesn't have it, though as_pull_request usually does
         is_merged = pull.merged
 
     if is_merged:
-        # Use merged_by and user from raw_data if possible to avoid extra API calls
         if pull.merged_by is not None:
             add_to_users(users, pull.merged_by)
             committers.add(pull.merged_by.login)
@@ -222,16 +220,16 @@ def parse_pull(pull: PullRequest, repo_: Repository = repo):
     pr_labels = {label.name.lower() for label in pull.labels}
     for label_name, section in label_to_section.items():
         if label_name in pr_labels:
-            highlights[section][pull.number] = {
+            highlights[section][pull_number] = {
                 'summary': summary,
-                'repo': repo_.full_name.split('/')[1],
+                'repo': repo_full_name.split('/')[1],
             }
             assigned_to_section = True
 
     if not assigned_to_section:
-        other_pull_requests[pull.number] = {
+        other_pull_requests[pull_number] = {
             'summary': summary,
-            'repo': repo_.full_name.split('/')[1],
+            'repo': repo_full_name.split('/')[1],
         }
 
 
@@ -242,18 +240,15 @@ for pull_ in iter_pull_request(f'milestone:{args.milestone} {args.merged}'):
         is_merged = pull_.merged
     if not is_merged:
         non_merged_pr.append(pull_)
-    pulls_to_parse.append((pull_, repo))
+    pulls_to_parse.append((pull_.number, repo.full_name))
 
 if args.with_pr is not None:
     for pr_num in args.with_pr:
         if isinstance(pr_num, int):
-            pull = repo.get_pull(pr_num)
-            r = repo
+            pulls_to_parse.append((pr_num, repo.full_name))
         else:
             r = get_repo(pr_num.user, pr_num.repo)
-            pull = r.get_pull(pr_num.pr)
-
-        pulls_to_parse.append((pull, r))
+            pulls_to_parse.append((pr_num.pr, r.full_name))
 
 doc_pulls = list(
     iter_pull_request(
@@ -269,7 +264,7 @@ for pull in doc_pulls:
         non_merged_pr.append(pull)
 
 with ThreadPoolExecutor(max_workers=10) as executor:
-    executor.map(lambda x: parse_pull(*x), pulls_to_parse)
+    list(executor.map(lambda x: parse_pull(*x), pulls_to_parse))
 
 for pull in doc_pulls:
     issue = pull.as_issue()

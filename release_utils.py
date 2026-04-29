@@ -9,6 +9,8 @@ from datetime import datetime
 from pathlib import Path
 
 from git import Repo
+import threading
+
 from github import Github, Milestone
 from tqdm import tqdm
 from unidecode import unidecode
@@ -70,12 +72,11 @@ GH_REPO = os.environ.get('GH_REPO', 'napari')
 GH_DOCS_REPO = os.environ.get('GH_REPO', 'docs')
 GH_TOKEN = os.environ.get('GH_TOKEN')
 
-_G = None
+_thread_local = threading.local()
 
 
 def get_github():
-    global _G
-    if _G is None:
+    if not hasattr(_thread_local, 'github'):
         if GH_TOKEN is None:
             raise RuntimeError(
                 'It is necessary that the environment variable `GH_TOKEN` '
@@ -84,8 +85,8 @@ def get_github():
                 'You do not need to select any permission boxes while generating '
                 'the token.'
             )
-        _G = Github(GH_TOKEN)
-    return _G
+        _thread_local.github = Github(GH_TOKEN)
+    return _thread_local.github
 
 
 def get_repo(user=GH_USER, repo=GH_REPO):
