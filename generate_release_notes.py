@@ -60,11 +60,10 @@ References:
 import argparse
 import re
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import NamedTuple
 
-from github.PullRequest import PullRequest
-from github.Repository import Repository
 from packaging.version import parse as parse_version
 
 from release_utils import (
@@ -195,18 +194,21 @@ label_to_section = {
 }
 
 
-def parse_pull(pull: PullRequest, repo_: Repository = repo):
-    # assert pull.merged or pull.number in args.with_pr
+def parse_pull(pull_number: int, repo_full_name: str):
+    repo_ = get_repo(*repo_full_name.split('/'))
+    pull = repo_.get_pull(pull_number)
 
-    if pull.is_merged():
-        commit = repo_.get_commit(pull.merge_commit_sha)
+    is_merged = pull.raw_data.get('merged')
+    if is_merged is None:
+        is_merged = pull.merged
 
-        if commit.committer is not None:
-            add_to_users(users, commit.committer)
-            committers.add(commit.committer.login)
-        if commit.author is not None:
-            add_to_users(users, commit.author)
-            authors.add(commit.author.login)
+    if is_merged:
+        if pull.merged_by is not None:
+            add_to_users(users, pull.merged_by)
+            committers.add(pull.merged_by.login)
+        if pull.user is not None:
+            add_to_users(users, pull.user)
+            authors.add(pull.user.login)
 
     summary = pull.title
 
@@ -218,51 +220,67 @@ def parse_pull(pull: PullRequest, repo_: Repository = repo):
     pr_labels = {label.name.lower() for label in pull.labels}
     for label_name, section in label_to_section.items():
         if label_name in pr_labels:
-            highlights[section][pull.number] = {
+            highlights[section][pull_number] = {
                 'summary': summary,
-                'repo': repo_.full_name.split('/')[1],
+                'repo': repo_full_name.split('/')[1],
             }
             assigned_to_section = True
 
     if not assigned_to_section:
-        other_pull_requests[pull.number] = {
+        other_pull_requests[pull_number] = {
             'summary': summary,
-            'repo': repo_.full_name.split('/')[1],
+            'repo': repo_full_name.split('/')[1],
         }
 
 
+pulls_to_parse = []
 for pull_ in iter_pull_request(f'milestone:{args.milestone} {args.merged}'):
-    if not pull_.is_merged():
+    is_merged = pull_.raw_data.get('merged')
+    if is_merged is None:
+        is_merged = pull_.merged
+    if not is_merged:
         non_merged_pr.append(pull_)
-    parse_pull(pull_)
+    pulls_to_parse.append((pull_.number, repo.full_name))
 
 if args.with_pr is not None:
     for pr_num in args.with_pr:
         if isinstance(pr_num, int):
-            pull = repo.get_pull(pr_num)
-            r = repo
+            pulls_to_parse.append((pr_num, repo.full_name))
         else:
             r = get_repo(pr_num.user, pr_num.repo)
-            pull = r.get_pull(pr_num.pr)
+            pulls_to_parse.append((pr_num.pr, r.full_name))
 
-        parse_pull(pull, r)
+doc_pulls = list(
+    iter_pull_request(
+        f'milestone:{args.milestone} {args.merged}', repo=GH_DOCS_REPO
+    )
+)
 
-for pull in iter_pull_request(
-    f'milestone:{args.milestone} {args.merged}', repo=GH_DOCS_REPO
-):
-    issue = pull.as_issue()
-    if not pull.is_merged():
+for pull in doc_pulls:
+    is_merged = pull.raw_data.get('merged')
+    if is_merged is None:
+        is_merged = pull.merged
+    if not is_merged:
         non_merged_pr.append(pull)
 
+with ThreadPoolExecutor(max_workers=10) as executor:
+    list(executor.map(lambda x: parse_pull(*x), pulls_to_parse))
+
+for pull in doc_pulls:
+    issue = pull.as_issue()
     add_to_users(users, issue.user)
     docs_authors.add(issue.user.login)
 
     summary = pull.title
 
-    for review in pull.get_reviews():
-        if review.user is not None:
-            add_to_users(users, review.user)
-            docs_reviewers.add(review.user.login)
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        # We need reviews for docs PRs too
+        reviews = list(pull.get_reviews())
+        for review in reviews:
+            if review.user is not None:
+                add_to_users(users, review.user)
+                docs_reviewers.add(review.user.login)
+
     assigned_to_section = False
     pr_labels = {label.name.lower() for label in pull.labels}
     if 'highlight' in pr_labels:

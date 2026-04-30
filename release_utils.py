@@ -4,6 +4,7 @@ import contextlib
 import os
 import re
 import sys
+import threading
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -55,7 +56,10 @@ def setup_cache(timeout=3600):
 
     """setup cache for requests"""
     requests_cache.install_cache(
-        'github_cache', backend='sqlite', expire_after=timeout
+        'github_cache',
+        backend='filesystem',
+        expire_after=timeout,
+        allowable_methods=['GET', 'POST'],
     )
 
 
@@ -67,12 +71,11 @@ GH_REPO = os.environ.get('GH_REPO', 'napari')
 GH_DOCS_REPO = os.environ.get('GH_REPO', 'docs')
 GH_TOKEN = os.environ.get('GH_TOKEN')
 
-_G = None
+_thread_local = threading.local()
 
 
 def get_github():
-    global _G
-    if _G is None:
+    if not hasattr(_thread_local, 'github'):
         if GH_TOKEN is None:
             raise RuntimeError(
                 'It is necessary that the environment variable `GH_TOKEN` '
@@ -81,8 +84,8 @@ def get_github():
                 'You do not need to select any permission boxes while generating '
                 'the token.'
             )
-        _G = Github(GH_TOKEN)
-    return _G
+        _thread_local.github = Github(GH_TOKEN)
+    return _thread_local.github
 
 
 def get_repo(user=GH_USER, repo=GH_REPO):
@@ -158,12 +161,14 @@ def iter_pull_request(additional_query, user=GH_USER, repo=GH_REPO):
         f' for repo {user}/{repo}',
         file=sys.stderr,
     )
-    for pull_issue in tqdm(
-        iterable,
-        desc=f'Pull Requests ({user}/{repo})...',
-        total=iterable.totalCount,
-    ):
-        yield pull_issue.as_pull_request()
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        yield from tqdm(
+            executor.map(lambda x: x.as_pull_request(), iterable),
+            desc=f'Pull Requests ({user}/{repo})...',
+            total=iterable.totalCount,
+        )
 
 
 def get_pr_commits_dict(repo: Repo, branch: str = 'main') -> dict[int, str]:
