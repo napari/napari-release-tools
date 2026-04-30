@@ -4,13 +4,12 @@ import contextlib
 import os
 import re
 import sys
+import threading
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
 from git import Repo
-import threading
-
 from github import Github, Milestone
 from tqdm import tqdm
 from unidecode import unidecode
