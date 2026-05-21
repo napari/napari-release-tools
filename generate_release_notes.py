@@ -126,6 +126,11 @@ parser.add_argument(
     default='',
     dest='merged',
 )
+parser.add_argument(
+    '--disable-cache',
+    help='Disable caching of GitHub API requests. This may lead to slower execution and more requests to the GitHub API, but ensures that you are getting the most up-to-date information.',
+    action='store_true',
+)
 
 args = parser.parse_args()
 
@@ -134,8 +139,8 @@ version = parse_version(args.tag)
 
 args.milestone = version.base_version
 
-
-setup_cache()
+if not args.disable_cache:
+    setup_cache()
 repo = get_repo()
 correction_dict = get_correction_dict(
     args.correction_file
@@ -420,8 +425,9 @@ for section, pull_request_dicts in highlights.items():
         for pr_number in pr_number_pattern.findall(text):
             mentioned_pr.add(int(pr_number))
         print(text, file=file_handle)
+        print('', file=file_handle)
 
-    for number, pull_request_info in pull_request_dicts.items():
+    for number, pull_request_info in sorted(pull_request_dicts.items(), key=lambda x: x[0]):
         if number in mentioned_pr:
             continue
         repo_str = pull_request_info['repo']
