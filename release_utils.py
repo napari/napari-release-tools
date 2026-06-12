@@ -224,6 +224,7 @@ BOT_LIST = {
     'github-actions[bot]',
     'pre-commit-ci[bot]',
     'dependabot[bot]',
+    'github-advanced-security[bot]',
     'napari-bot',
     None,
 }

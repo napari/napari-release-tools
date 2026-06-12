@@ -127,7 +127,7 @@ parser.add_argument(
     dest='merged',
 )
 parser.add_argument(
-    '--disable-cache',
+    '--no-cache',
     help='Disable caching of GitHub API requests. This may lead to slower execution and more requests to the GitHub API, but ensures that you are getting the most up-to-date information.',
     action='store_true',
 )
@@ -139,7 +139,7 @@ version = parse_version(args.tag)
 
 args.milestone = version.base_version
 
-if not args.disable_cache:
+if not args.no_cache:
     setup_cache()
 repo = get_repo()
 correction_dict = get_correction_dict(
