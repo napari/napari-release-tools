@@ -427,7 +427,9 @@ for section, pull_request_dicts in highlights.items():
         print(text, file=file_handle)
         print('', file=file_handle)
 
-    for number, pull_request_info in sorted(pull_request_dicts.items(), key=lambda x: x[0]):
+    for number, pull_request_info in sorted(
+        pull_request_dicts.items(), key=lambda x: x[0]
+    ):
         if number in mentioned_pr:
             continue
         repo_str = pull_request_info['repo']
