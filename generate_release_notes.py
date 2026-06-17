@@ -43,20 +43,20 @@ uv run generate_release_notes.py <milestone> --target-directory=/path/to/docs/re
 
 The default correction file is `name_corrections.yaml` in the same directory as this script.
 
-By default the script is caching GitHub API requests to speed 
-up execution and reduce the number of requests to the GitHub API. 
-It means that if you edit som PR titles or labels, you may not see 
+By default the script is caching GitHub API requests to speed
+up execution and reduce the number of requests to the GitHub API.
+It means that if you edit som PR titles or labels, you may not see
 the changes in the generated release notes until the cache expires (after 1h by default).
 
-Cache is used to avoid hitting GitHub API rate limits, which can be a 
-problem when generating release notes for a large number of pull requests. 
+Cache is used to avoid hitting GitHub API rate limits, which can be a
+problem when generating release notes for a large number of pull requests.
 
 Script can be run with the `--no-cache` option to disable caching of GitHub API requests.
 
 To clean the cache, you can delete the `github_cache` directory in the current working directory.
 
-There is a known problem with using cache on conda environments, because 
-we use threads to speed up the execution, and 
+There is a known problem with using cache on conda environments, because
+we use threads to speed up the execution, and
 access to sqlite database used by cache is not thread-safe.
 Even if we use `filesystem` backend for cache, it still uses sqlite database under the hood.
 
@@ -440,7 +440,9 @@ for section, pull_request_dicts in highlights.items():
         print(text, file=file_handle)
         print('', file=file_handle)
 
-    for number, pull_request_info in sorted(pull_request_dicts.items(), key=lambda x: x[0]):
+    for number, pull_request_info in sorted(
+        pull_request_dicts.items(), key=lambda x: x[0]
+    ):
         if number in mentioned_pr:
             continue
         repo_str = pull_request_info['repo']
