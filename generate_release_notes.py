@@ -317,7 +317,6 @@ docs_authors -= BOT_LIST
 
 
 USER_NAME_PATTERN = re.compile(r'@([\w-]+)')  # pattern for GitHub usernames
-PR_NUMBER_PATTERN = re.compile(r'#(\d+)')  # pattern for GitHub PR numbers
 GITHUB_PR_LINK_PATTERN = re.compile(
     GH + r'/(?P<owner>[\w-]+)/(?P<repo>[\w-]+)/pull/(?P<number>\d+)'
 )  # pattern for GitHub PR link
