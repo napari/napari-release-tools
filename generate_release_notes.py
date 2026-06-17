@@ -1,7 +1,7 @@
 """Generate the release notes automatically from GitHub pull requests.
 
 We recoment using uv for runing this script.
-1. cloane the napari/docs repository to read prevoius contributors and to write the release notes to the correct location.
+1. clone the napari/docs repository to read previous contributors and to write the release notes to the correct location.
 
 2. Install the requirements into a virtual environment (PyGitHub and tqdm) with
    ```
@@ -41,11 +41,11 @@ To substitute GitHub handles for author names, use the `--correction-file` optio
 uv run generate_release_notes.py <milestone> --target-directory=/path/to/docs/release/ --correction-file /path/to/name_corrections.yaml
 ```
 
-The default correction file is `name_corrections.yaml` in the same directory as this script.
+The default correction file is `name_corrections.yaml` in the same directory as this script, so the argument is not needed.
 
 By default the script is caching GitHub API requests to speed
 up execution and reduce the number of requests to the GitHub API.
-It means that if you edit som PR titles or labels, you may not see
+It means that if you edit some PR titles or labels, you may not see
 the changes in the generated release notes until the cache expires (after 1h by default).
 
 Cache is used to avoid hitting GitHub API rate limits, which can be a
@@ -60,7 +60,7 @@ we use threads to speed up the execution, and
 access to sqlite database used by cache is not thread-safe.
 Even if we use `filesystem` backend for cache, it still uses sqlite database under the hood.
 
-Hoever, when using `uv` it works and speed up the execution significantly, so we recommend using `uv` for running this script.
+Hoever, when using `uv` it works and speeds up the execution significantly, so we recommend using `uv` for running this script.
 
 
 
