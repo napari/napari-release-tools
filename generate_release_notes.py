@@ -318,12 +318,9 @@ docs_authors -= BOT_LIST
 
 USER_NAME_PATTERN = re.compile(r'@([\w-]+)')  # pattern for GitHub usernames
 PR_NUMBER_PATTERN = re.compile(r'#(\d+)')  # pattern for GitHub PR numbers
-GITHUB_PR_LINK_PATTERN = re.compile(GH+r'/(?P<owner>[\w-]+)/(?P<repo>[\w-]+)/pull/(?P<number>\d+)')  # pattern for GitHub PR link
-
-class PRInfo(NamedTuple):
-    user: str
-    repo: str
-    pr: int
+GITHUB_PR_LINK_PATTERN = re.compile(
+    GH + r'/(?P<owner>[\w-]+)/(?P<repo>[\w-]+)/pull/(?P<number>\d+)'
+)  # pattern for GitHub PR link
 
 
 old_contributors = set()
@@ -434,8 +431,13 @@ for section, pull_request_dicts in highlights.items():
         print(text, file=file_handle)
         print('', file=file_handle)
 
-    for number, pull_request_info in sorted(pull_request_dicts.items(), key=lambda x: x[0]):
-        if PRInfo(user=GH_USER, repo=pull_request_info['repo'], pr=number) in mentioned_pr:
+    for number, pull_request_info in sorted(
+        pull_request_dicts.items(), key=lambda x: x[0]
+    ):
+        if (
+            PRInfo(user=GH_USER, repo=pull_request_info['repo'], pr=number)
+            in mentioned_pr
+        ):
             continue
         repo_str = pull_request_info['repo']
         repo_prefix = repo_str if repo_str != 'napari' else ''
