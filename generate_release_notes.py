@@ -327,7 +327,8 @@ committers -= BOT_LIST
 authors -= BOT_LIST
 docs_committers -= BOT_LIST
 docs_authors -= BOT_LIST
-
+reviewers -= BOT_LIST
+docs_reviewers -= BOT_LIST
 
 USER_NAME_PATTERN = re.compile(r'@([\w-]+)')  # pattern for GitHub usernames
 GITHUB_PR_LINK_PATTERN = re.compile(
