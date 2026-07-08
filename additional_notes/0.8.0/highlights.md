@@ -1,4 +1,4 @@
-The napari 0.8.0 is released that drops support for python 3.10 [#9104](https://github.com/napari/napari/pull/9104) and deprecate support for pyqt5 [#9079](https://github.com/napari/napari/pull/9079). But we also ship some new fetures and improvements. Here are some of the highlights:
+The napari 0.8.0 is release that drops support for python 3.10 [#9104](https://github.com/napari/napari/pull/9104) and deprecate support for pyqt5 [#9079](https://github.com/napari/napari/pull/9079). But we also ship some new features and improvements. Here are some of the highlights:
 
 ### Drop of support for python 3.10 and pyqt5
 
