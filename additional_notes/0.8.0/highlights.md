@@ -40,6 +40,13 @@ at large remote data. Try it out!
 </figure>
 ```
 
+### Paint into more arrays faster!
+
+Labels painting is now much faster for zarr arrays, and you can now paint into
+other array types such as dask and tensorstore! Painting with very large brush
+sizes (e.g. 1,000) is now possible where it used to be extremely choppy. Give
+it a whirl! ([#8636](https://github.com/napari/napari/pull/8636))
+
 ### Floating axes overlay
 
 Ever feel disoriented looking at your data? You're not alone. Until
