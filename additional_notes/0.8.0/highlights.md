@@ -27,6 +27,19 @@ You can access the brightness of the current slice (default), or the full
 layer, *and* it will sample progressively from remote chunks if you are looking
 at large remote data. Try it out!
 
+```{raw} html
+<figure>
+  <video width="100%" controls autoplay loop muted playsinline>
+    <source src="../_static/images/histogram.webm" type="video/webm" />
+    <source src="../_static/images/histogram.mp4" type="video/mp4" />
+    <img src="../_static/images/histogram.jpg"
+      title="Your browser does not support the video tag"
+      alt="Video showing a napari viewer with a 2D canvas showing a slice of a large 3D image. The layer controls include a histogram of image intensities that updates as you pan around the canvas, and also, when selecting the full image, as pixels are drawn from remote data."
+    >
+  </video>
+</figure>
+```
+
 ### Floating axes overlay
 
 Ever feel disoriented looking at your data? You're not alone. Until
