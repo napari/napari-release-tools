@@ -76,7 +76,7 @@ WCAG-compliant theme? Try out the new WCAG table in
 [`examples/theme_sample.py`][theme-sample]
 ([#9175](https://github.com/napari/napari/pull/9175))!
 
-![sample showing the theme sample widget along with a WCAG compliance table](https://github.com/user-attachments/assets/56634e96-c162-42ae-a2c7-efdef808bfa1)
+![sample showing the theme sample widget along with a WCAG compliance table](https://github.com/user-attachments/assets/44510228-1163-4532-9945-aea5f7657ff0)
 
 [WCAG]: https://en.wikipedia.org/wiki/Web_Content_Accessibility_Guidelines
 [theme-sample]: https://github.com/napari/napari/blob/700a36f148dc073d281b5a9e42bb28cd18ed6a32/examples/theme_sample.py
