@@ -62,14 +62,6 @@ have the top left corner of your data on the canvas. Now you can have a little
 2- or 3-axis compass always on in a corner of the canvas. Find it in the View
 menu!
 
-### Fixing the drawing circle and square shapes
-
-For a *lot* of people, annotating involves drawing squares and circles around
-things in images. napari *used* to make this quite difficult, because if you
-held shift to draw a perfect square/circle, you could only grow it towards the
-bottom left. Now, with [#9018](https://github.com/napari/napari/pull/9018) draw
-them in any direction!
-
 ### Improving the napari theme
 
 Like many things in community-run open source, napari's theme grew organically
