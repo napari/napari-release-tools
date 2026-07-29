@@ -1,0 +1,8 @@
+- Canvas model ([#8633](https://github.com/napari/napari/pull/8633))
+- Implement fuzzy find for the command palette ([#8661](https://github.com/napari/napari/pull/8661))
+- Implement Surface slicing with async request/response ([#8783](https://github.com/napari/napari/pull/8783))
+- Remove translations code ([#8935](https://github.com/napari/napari/pull/8935))
+- Add builtin Wavefront OBJ to surfaces reader ([#9228](https://github.com/napari/napari/pull/9228))
+- fix: adjust the layout based on the hidden layers in grid ([#9244](https://github.com/napari/napari/pull/9244))
+- publicly expose auto contrast limits ([#9271](https://github.com/napari/napari/pull/9271))
+- update dims axis labels from layers axis labels ([#9282](https://github.com/napari/napari/pull/9282))
