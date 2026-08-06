@@ -187,6 +187,7 @@ non_merged_pr = []
 highlights = {
     'Highlights': {},
     'New Features': {},
+    'Breaking Changes': {},
     'Improvements': {},
     'Performance': {},
     'Bug Fixes': {},
@@ -209,6 +210,8 @@ label_to_section = {
     'deprecation': 'Deprecations',
     'dependencies': 'Build Tools',
     'documentation': 'Documentation',
+    'example': 'Documentation',
+    'release:breaking change': 'Breaking Changes',
 }
 
 
