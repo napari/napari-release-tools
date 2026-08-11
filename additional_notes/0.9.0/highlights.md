@@ -128,4 +128,3 @@ from napari.utils import translations as trans
 ```
 
 Please remove it. (For now, `trans._()` is a no-op.)
-
