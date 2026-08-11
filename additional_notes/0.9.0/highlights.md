@@ -66,6 +66,9 @@ grouping related concepts and APIs. Some examples:
 - Grid mode is now accessed at `viewer.canvas.grid` (e.g.
   `viewer.canvas.grid.enabled = True`).
 
+This has also enabled a new public API: you can now query the canvas size (in
+pixels) without accessing private napari APIs! Check `viewer.canvas.size`!
+
 ### Adjust grid rendering with hidden layers
 
 Speaking of grid mode: grid mode with hidden layers is much improved: empty
@@ -109,17 +112,14 @@ instantly.
 
 ### Removal of translation code
 
-This item is only important when contributing to napari or developing plugins.
-If that sounds like you, read on!
+Several years ago, we started working on implementing localization machinery
+into napari. Unfortunately, this work has been sitting unfinished and unused,
+while making maintaining napari harder. Given the extra maintenance burden
+without benefit, we made the difficult decision to remove it from our codebase
+([#8935](https://github.com/napari/napari/pull/8935)), with the hope that in
+the future we might restart this effort with a better plan.
 
-Did you know that napari had the beginnings of some localization work?
-Unfortunately, that work has been a long-standing maintenance burden and we did
-not have the ability to push it to the point where we could have made a
-significant translation effort. In
-[#8935](https://github.com/napari/napari/pull/8935), we made the difficult
-decision to drop the localization work for now.
-
-We aim to revisit when napari's foundations are more solid, but for now,
+We do aim to revisit when napari's foundations are more solid, but for now,
 `napari.utils.translations` is deprecated. If you have this code in your
 codebase:
 
@@ -127,4 +127,4 @@ codebase:
 from napari.utils import translations as trans
 ```
 
-Please remove it. (For now, `trans._()` is a no-op.)
+please remove it. (For now, `trans._()` is a no-op.)
