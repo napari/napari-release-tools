@@ -69,6 +69,24 @@ grouping related concepts and APIs. Some examples:
 This has also enabled a new public API: you can now query the canvas size (in
 pixels) without accessing private napari APIs! Check `viewer.canvas.size`!
 
+The TL;DR:
+
+```python
+# Canvas Model
+viewer.scale_bar -> viewer.canvas.overlays.scale_bar
+viewer.text_overlay -> viewer.canvas.overlays.text
+viewer.floating_axes -> viewer.canvas.overlays.axes
+viewer.grid -> viewer.canvas.grid
+NOW EXPOSED -> viewer.canvas.overlays.current_slice
+NEW -> viewer.canvas.overlay_tiling
+NEW -> viewer.canvas.background_color & viewer.canvas.background_color_override
+NEW -> viewer.canvas.size
+
+# Scene Model
+viewer.camera -> viewer.scene.camera
+viewer.axes -> viewer.scene.overlays.axes
+```
+
 ### Adjust grid rendering with hidden layers
 
 Speaking of grid mode: grid mode with hidden layers is much improved: empty
