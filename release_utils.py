@@ -89,8 +89,13 @@ def get_github():
 
 
 def get_repo(user=GH_USER, repo=GH_REPO):
-    g = get_github()
-    return g.get_repo(f'{user}/{repo}')
+    if not hasattr(_thread_local, 'repo_mapping'):
+        _thread_local.repo_mapping = {}
+    if (user, repo) not in _thread_local.repo_mapping:
+        _thread_local.repo_mapping[(user, repo)] = get_github().get_repo(
+            f'{user}/{repo}'
+        )
+    return _thread_local.repo_mapping[(user, repo)]
 
 
 def get_local_repo(path=None):
