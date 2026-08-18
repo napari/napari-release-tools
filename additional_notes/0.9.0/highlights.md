@@ -94,9 +94,9 @@ viewer.axes -> viewer.scene.overlays.axes
 ### Adjust grid rendering with hidden layers
 
 Speaking of grid mode: grid mode with hidden layers is much improved: empty
-grid spaces will never be shown, regardless of stride, but stride operates on
-the *full* layer list, to prevent layer grouping from changing when layers are
-shown/hidden. ([#9244](https://github.com/napari/napari/pull/9244))
+grid spaces are never shown and stride operates on the *full* layer list, so
+layer grouping doesn't change when you show or hide layers.
+([#9244](https://github.com/napari/napari/pull/9244))
 
 ### Public API for auto contrast limit
 
