@@ -33,14 +33,6 @@ There's also an experimental setting, *Generate GUI layer controls dynamically
 instead of using premade panels*, that makes napari use the new dynamic
 controls even for single layers.
 
-### Status bar coordinates as floats
-
-Continuing on the theme of improved metadata, when scale and/or unit metadata
-is set on the layer, the status bar coordinates now have increased precision,
-where before they were limited to just integers. This means you can have more
-accurate physical estimates of your data coordinates when exploring data.
-([#9287](https://github.com/napari/napari/pull/9287))
-
 ### Xarray metadata is now inherited
 
 If you work with [Xarray](https://docs.xarray.dev/) — common in climate,
@@ -51,6 +43,14 @@ object to the viewer, napari will use its dimension names as axis labels, infer
 CF-convention `units` attributes on coordinates ([#9316](https://github.com/napari/napari/pull/9316)).
 This closed an 8-year old issue: [#14](https://github.com/napari/napari/issues/14)!
 
+### Status bar coordinates as floats
+
+Continuing on the theme of improved metadata, when scale and/or unit metadata
+is set on the layer, the status bar coordinates now have increased precision,
+where before they were limited to just integers. This means you can have more
+accurate physical estimates of your data coordinates when exploring data.
+([#9287](https://github.com/napari/napari/pull/9287))
+
 ### Take a guided tour of the viewer
 
 New to napari, or just want a quick refresher on where everything lives? There's
@@ -60,6 +60,29 @@ viewer buttons, the dimension sliders, and the status bar — so you can get you
 bearings in seconds. If the viewer is empty, napari opens the built-in *Balls*
 (3D) sample data so the walkthrough has something to show ([#9290](https://github.com/napari/napari/pull/9290)).
 
+### Contributable plugin preferences
+
+Plugins can now ship their own preferences ([#9308](https://github.com/napari/napari/pull/9308))!
+By declaring `configurations` in
+their `napari.yaml` manifest, plugins get their own settings — stored
+separately from napari's own settings, automatically added to and editable from
+the napari **Preferences** dialog, and accessible programmatically from Python:
+
+```python
+from napari.settings import get_plugin_settings
+
+settings = get_plugin_settings("my-plugin")
+settings.reader.lazy = True
+```
+
+Read more in the [Configurations Guide](https://napari.org/dev/plugins/building_a_plugin/guides.html#configurations)
+to learn more about how to add this new contribution to your own plugins.
+
+### Adjust grid rendering with hidden layers
+
+Speaking of grid mode: grid mode with hidden layers is much improved: empty
+grid spaces are never shown and stride operates on the *full* layer list, so
+layer grouping doesn't change when you show or hide layers ([#9244](https://github.com/napari/napari/pull/9244)).
 
 ### Fuzzy find in command palette
 
@@ -73,6 +96,38 @@ make use of it. It's automatically installed with `napari[all]` or
 fuzzy you want it to be in Preferences > Experimental > Fuzzy Search Threshold.
 
 [screenshot or movie to be provided by Lorenzo]
+
+### 2D slicing of surfaces
+
+Ever since we added surfaces, they have been invisible in 2D slices. Now,
+thanks to all the work done on [thick slicing](thick-slicing), surface
+slices appear in 2D view ([#8783](https://github.com/napari/napari/pull/8783)).
+This enhancement is accompanied by support for async slicing, which should
+improve viewer responsiveness when slicing large, time varying surfaces, for
+example.
+
+[movie of ND-cows and slicing]
+
+... And you can try this out yourself with common .obj surface files thanks to
+a new built-in reader plugin!
+([#9228](https://github.com/napari/napari/pull/9228))
+
+You should now be able to drag and drop .obj files into napari and see them
+instantly.
+
+### Public API for auto contrast limit
+
+For a very long time, it's been possible to set automatic contrast limits
+updating on a layer *only* through the graphical user interface. This means an
+extra click for many workflows and poorer reproducibility. Thanks to
+[#9271](https://github.com/napari/napari/pull/9271), you can now set the
+`auto_contrast` attribute on Image layers:
+
+```python
+image_layer = viewer.add_image(..., auto_contrast=True)
+# or
+image_layer.auto_contrast = True
+```
 
 ### The life-changing magic of tidying up the Viewer model
 
@@ -122,63 +177,6 @@ NEW -> viewer.canvas.size
 viewer.camera -> viewer.scene.camera
 viewer.axes -> viewer.scene.overlays.axes
 ```
-
-### Adjust grid rendering with hidden layers
-
-Speaking of grid mode: grid mode with hidden layers is much improved: empty
-grid spaces are never shown and stride operates on the *full* layer list, so
-layer grouping doesn't change when you show or hide layers ([#9244](https://github.com/napari/napari/pull/9244)).
-
-
-### Public API for auto contrast limit
-
-For a very long time, it's been possible to set automatic contrast limits
-updating on a layer *only* through the graphical user interface. This means an
-extra click for many workflows and poorer reproducibility. Thanks to
-[#9271](https://github.com/napari/napari/pull/9271), you can now set the
-`auto_contrast` attribute on Image layers:
-
-```python
-image_layer = viewer.add_image(..., auto_contrast=True)
-# or
-image_layer.auto_contrast = True
-```
-
-### Contributable plugin preferences
-
-Plugins can now ship their own preferences ([#9308](https://github.com/napari/napari/pull/9308))!
-By declaring `configurations` in
-their `napari.yaml` manifest, plugins get their own settings — stored
-separately from napari's own settings, automatically added to and editable from
-the napari **Preferences** dialog, and accessible programmatically from Python:
-
-```python
-from napari.settings import get_plugin_settings
-
-settings = get_plugin_settings("my-plugin")
-settings.reader.lazy = True
-```
-
-Read more in the [Configurations Guide](https://napari.org/dev/plugins/building_a_plugin/guides.html#configurations)
-to learn more about how to add this new contribution to your own plugins.
-
-### 2D slicing of surfaces
-
-Ever since we added surfaces, they have been invisible in 2D slices. Now,
-thanks to all the work done on [thick slicing](thick-slicing), surface
-slices appear in 2D view ([#8783](https://github.com/napari/napari/pull/8783)).
-This enhancement is accompanied by support for async slicing, which should
-improve viewer responsiveness when slicing large, time varying surfaces, for
-example.
-
-[movie of ND-cows and slicing]
-
-... And you can try this out yourself with common .obj surface files thanks to
-a new built-in reader plugin!
-([#9228](https://github.com/napari/napari/pull/9228))
-
-You should now be able to drag and drop .obj files into napari and see them
-instantly.
 
 ### Removal of translation code
 
