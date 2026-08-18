@@ -145,6 +145,24 @@ image_layer = viewer.add_image(..., auto_contrast=True)
 image_layer.auto_contrast = True
 ```
 
+### Contributable plugin preferences
+
+Plugins can now ship their own preferences ([#9308](https://github.com/napari/napari/pull/9308))!
+By declaring `configurations` in
+their `napari.yaml` manifest, plugins get their own settings — stored
+separately from napari's own settings, automatically added to and editable from
+the napari **Preferences** dialog, and accessible programmatically from Python:
+
+```python
+from napari.settings import get_plugin_settings
+
+settings = get_plugin_settings("my-plugin")
+settings.reader.lazy = True
+```
+
+Read more in the [Configurations Guide](https://napari.org/dev/plugins/building_a_plugin/guides.html#configurations)
+to learn more about how to add this new contribution to your own plugins.
+
 ### 2D slicing of surfaces
 
 Ever since we added surfaces, they have been invisible in 2D slices. Now,
