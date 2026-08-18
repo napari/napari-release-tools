@@ -29,6 +29,16 @@ where before they were limited to just integers. This means you can have more
 accurate physical estimates of your data coordinates when exploring data.
 ([#9287](https://github.com/napari/napari/pull/9287))
 
+### Xarray metadata is now inherited
+
+If you work with [Xarray](https://docs.xarray.dev/) — common in climate,
+geoscience, and many places where data ships with labelled coordinates — napari
+now reads metadata straight from your `DataArray`s. When you add an xarray
+object to the viewer, napari will use its dimension names as axis labels, infer
+`scale` and `translate` from the coordinate values, and pick up `units` from
+CF-convention `units` attributes on coordinates. ([#9316](https://github.com/napari/napari/pull/9316))
+This closed an 8-year old issue: [#14](https://github.com/napari/napari/issues/14)!
+
 ### Fuzzy find in command palette
 
 Have you used our [command palette](command-palette) yet? It's a great way to
