@@ -12,6 +12,10 @@ axes in the viewer:
 [suggestion for screenshot: [the flim
 ghost](https://us1.discourse-cdn.com/flex015/uploads/imagej/original/3X/6/7/67f30f24a32465ffdee330b59a7e342ec89e1ce1.png)]
 
+Additionaly,  when you create a new layer from an existing one using the
+buttons in the GUI, the new layer now inherits the axis labels of the layer(s)
+it was derived from. ([#9293](https://github.com/napari/napari/pull/9293))
+
 There is still work to be done here. For example, if layers have labels that
 are inconsistent with each other, napari will simply ignore layers with fewer
 dimensions, or layers added later. But, for most use cases, layer and viewer
