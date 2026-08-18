@@ -92,7 +92,7 @@ viewer.axes -> viewer.scene.overlays.axes
 Speaking of grid mode: grid mode with hidden layers is much improved: empty
 grid spaces will never be shown, regardless of stride, but stride operates on
 the *full* layer list, to prevent layer grouping from changing when layers are
-shown/hidden. ([#9244](https://github.com/napari/napari/pull/9244))
+shown/hidden. ([#9244](https://github.com/napari/napari/pull/9244), [#9397](https://github.com/napari/napari/pull/9397))
 
 ### Public API for auto contrast limit
 
@@ -146,3 +146,10 @@ from napari.utils import translations as trans
 ```
 
 please remove it. (For now, `trans._()` is a no-op.)
+
+
+### Guided tour
+
+If you are new to napari or want to share napari with others,
+you can now use the guided tour to get a quick overview of the
+viewer and its features. The tour is available from the Help menu ([#9290](https://github.com/napari/napari/pull/9290)).
