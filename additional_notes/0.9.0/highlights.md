@@ -11,7 +11,7 @@ axes in the viewer:
 
 ![napari screenshot showing inherited labeled viewer axes](https://us1.discourse-cdn.com/flex015/uploads/imagej/original/3X/6/7/67f30f24a32465ffdee330b59a7e342ec89e1ce1.png)]
 
-Additionaly,  when you create a new layer from an existing one using the
+Additionally, when you create a new layer from an existing one using the
 buttons in the GUI, the new layer now inherits the axis labels of the layer(s)
 it was derived from. ([#9293](https://github.com/napari/napari/pull/9293))
 
