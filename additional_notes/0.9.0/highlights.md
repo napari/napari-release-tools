@@ -160,3 +160,10 @@ from napari.utils import translations as trans
 ```
 
 please remove it. (For now, `trans._()` is a no-op.)
+
+
+### Guided tour
+
+If you are new to napari or want to share napari with others,
+you can now use the guided tour to get a quick overview of the
+viewer and its features. The tour is available from the Help menu ([#9290](https://github.com/napari/napari/pull/9290)).
