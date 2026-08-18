@@ -156,8 +156,6 @@ example.
 
 [movie of ND-cows and slicing]
 
-### Add built-in wavefront .obj file reader
-
 ... And you can try this out yourself with common .obj surface files thanks to
 a new built-in reader plugin!
 ([#9228](https://github.com/napari/napari/pull/9228))
