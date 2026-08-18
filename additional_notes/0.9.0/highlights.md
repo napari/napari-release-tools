@@ -39,6 +39,16 @@ object to the viewer, napari will use its dimension names as axis labels, infer
 CF-convention `units` attributes on coordinates. ([#9316](https://github.com/napari/napari/pull/9316))
 This closed an 8-year old issue: [#14](https://github.com/napari/napari/issues/14)!
 
+### Take a guided tour of the viewer
+
+New to napari, or just want a quick refresher on where everything lives? There's
+now a guided tour, available from **Help → Take a tour**. The tour highlights
+the main areas of the viewer — the canvas, the layer list, layer controls, the
+viewer buttons, the dimension sliders, and the status bar — so you can get your
+bearings in seconds. If the viewer is empty, napari opens the built-in *Balls*
+(3D) sample data so the walkthrough has something to show.
+([#9290](https://github.com/napari/napari/pull/9290))
+
 ### Fuzzy find in command palette
 
 Have you used our [command palette](command-palette) yet? It's a great way to
@@ -160,10 +170,3 @@ from napari.utils import translations as trans
 ```
 
 please remove it. (For now, `trans._()` is a no-op.)
-
-
-### Guided tour
-
-If you are new to napari or want to share napari with others,
-you can now use the guided tour to get a quick overview of the
-viewer and its features. The tour is available from the Help menu ([#9290](https://github.com/napari/napari/pull/9290)).
