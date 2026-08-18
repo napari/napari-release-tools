@@ -21,6 +21,19 @@ are inconsistent with each other, napari will simply ignore layers with fewer
 dimensions, or layers added later. But, for most use cases, layer and viewer
 metadata will now be much more informative!
 
+### Layer controls for multiple selected layers
+
+Until now, layer controls only appeared when a single layer was selected. Now,
+napari dynamically builds the layer controls from your selection, so
+when you select several layers at once you can see and use the controls that
+are shared between them. Pan-zoom is always available, while the layer-specific
+buttons still appear only when a single layer is selected.
+([#9318](https://github.com/napari/napari/pull/9318))
+
+There's also an experimental setting, *Generate GUI layer controls dynamically
+instead of using premade panels*, that makes napari use the new dynamic
+controls even for single layers.
+
 ### Status bar coordinates as floats
 
 Continuing on the theme of improved metadata, when scale and/or unit metadata
