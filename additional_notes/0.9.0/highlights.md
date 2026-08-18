@@ -49,7 +49,7 @@ geoscience, and many places where data ships with labelled coordinates — napar
 now reads metadata straight from your `DataArray`s. When you add an xarray
 object to the viewer, napari will use its dimension names as axis labels, infer
 `scale` and `translate` from the coordinate values, and pick up `units` from
-CF-convention `units` attributes on coordinates. ([#9316](https://github.com/napari/napari/pull/9316))
+CF-convention `units` attributes on coordinates ([#9316](https://github.com/napari/napari/pull/9316)). 
 This closed an 8-year old issue: [#14](https://github.com/napari/napari/issues/14)!
 
 ### Take a guided tour of the viewer
@@ -59,8 +59,8 @@ now a guided tour, available from **Help → Take a tour**. The tour highlights
 the main areas of the viewer — the canvas, the layer list, layer controls, the
 viewer buttons, the dimension sliders, and the status bar — so you can get your
 bearings in seconds. If the viewer is empty, napari opens the built-in *Balls*
-(3D) sample data so the walkthrough has something to show.
-([#9290](https://github.com/napari/napari/pull/9290))
+(3D) sample data so the walkthrough has something to show ([#9290](https://github.com/napari/napari/pull/9290)).
+
 
 ### Fuzzy find in command palette
 
@@ -128,8 +128,8 @@ viewer.axes -> viewer.scene.overlays.axes
 
 Speaking of grid mode: grid mode with hidden layers is much improved: empty
 grid spaces are never shown and stride operates on the *full* layer list, so
-layer grouping doesn't change when you show or hide layers.
-([#9244](https://github.com/napari/napari/pull/9244))
+layer grouping doesn't change when you show or hide layers ([#9244](https://github.com/napari/napari/pull/9244)).
+
 
 ### Public API for auto contrast limit
 
