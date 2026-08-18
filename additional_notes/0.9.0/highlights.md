@@ -48,7 +48,7 @@ geoscience, and many places where data ships with labelled coordinates — napar
 now reads metadata straight from your `DataArray`s. When you add an xarray
 object to the viewer, napari will use its dimension names as axis labels, infer
 `scale` and `translate` from the coordinate values, and pick up `units` from
-CF-convention `units` attributes on coordinates ([#9316](https://github.com/napari/napari/pull/9316)). 
+CF-convention `units` attributes on coordinates ([#9316](https://github.com/napari/napari/pull/9316)).
 This closed an 8-year old issue: [#14](https://github.com/napari/napari/issues/14)!
 
 ### Take a guided tour of the viewer
