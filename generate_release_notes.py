@@ -333,14 +333,22 @@ docs_authors -= BOT_LIST
 reviewers -= BOT_LIST
 docs_reviewers -= BOT_LIST
 
-USER_NAME_PATTERN = re.compile(r'@([\w-]+)')  # pattern for GitHub usernames
 GITHUB_PR_LINK_PATTERN = re.compile(
     GH + r'/(?P<owner>[\w-]+)/(?P<repo>[\w-]+)/pull/(?P<number>\d+)'
 )  # pattern for GitHub PR link
-
+USER_NAME_PATTERN = re.compile(r'@([\w-]+)')
+AUTHOR_SECTION_RE = re.compile(
+    r'^##\s+\d+\s+authors added to this release \(alphabetical\)\s*\n(?P<body>.*?)(?=^##\s+|\Z)',
+    re.M | re.S | re.I,
+)
+REVIEWER_SECTION_RE = re.compile(
+    r'^##\s+\d+\s+reviewers added to this release \(alphabetical\)\s*\n(?P<body>.*?)(?=^##\s+|\Z)',
+    re.M | re.S | re.I,
+)
+AUTHOR_LINE_RE = re.compile(r'- .*? - @([\w-]+)')
 
 old_contributors = set()
-
+old_reviewers = set()
 if args.target_directory is None:
     file_handle = sys.stdout
 else:
@@ -348,12 +356,21 @@ else:
     file_handle = open(
         args.target_directory / res_file_name, 'w', encoding='utf-8'
     )
+
     for file_path in args.target_directory.glob('release_*.md'):
         if file_path.name == res_file_name:
             continue
-        with open(file_path, encoding='utf-8') as f:
-            old_contributors.update(USER_NAME_PATTERN.findall(f.read()))
 
+        text = file_path.read_text(encoding='utf-8')
+        match = AUTHOR_SECTION_RE.search(text)
+        if match:
+            section_text = match.group('body')
+            old_contributors.update(AUTHOR_LINE_RE.findall(section_text))
+
+        match = REVIEWER_SECTION_RE.search(text)
+        if match:
+            section_text = match.group('body')
+            old_reviewers.update(AUTHOR_LINE_RE.findall(section_text))
 
 # Now generate the release notes
 title = f'# napari {args.milestone}'
@@ -466,15 +483,17 @@ for section, pull_request_dicts in highlights.items():
 
 
 contributors = {
-    'authors': authors | docs_authors,
-    'reviewers': reviewers | docs_reviewers,
+    'authors': (authors | docs_authors, old_contributors),
+    'reviewers': (reviewers | docs_reviewers, old_reviewers),
 }
 
 # ignore committers
 # contributors['committers'] = committers
-new_contributors = (authors | docs_authors) - old_contributors
 
-for section_name, contributor_set in contributors.items():
+for section_name, (
+    contributor_set,
+    old_contributor_set,
+) in contributors.items():
     print('', file=file_handle)
     if None in contributor_set:
         contributor_set.remove(None)
@@ -501,7 +520,7 @@ for section_name, contributor_set in contributors.items():
             first_repo_name = GH_DOCS_REPO
             second_repo_str = ''
 
-        first = ' +' if c in new_contributors else ''
+        first = ' +' if c not in old_contributor_set else ''
         commit_link = (
             f'https://{GH}/{GH_USER}/{first_repo_name}/commits?author={c}'
         )
