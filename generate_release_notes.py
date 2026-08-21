@@ -583,7 +583,7 @@ if non_merged_pr:
 
 if mentioned_pr_outside_sections:
     print(
-        f'There are {len(mentioned_pr_outside_sections)} PRs mentioned in the release notes that are do not have labels matching the sections:',
+        f'There are {len(mentioned_pr_outside_sections)} PRs mentioned in the release notes that do not have labels matching the sections:',
         file=sys.stderr,
     )
     for pr_info, section in mentioned_pr_outside_sections:
@@ -595,6 +595,6 @@ if mentioned_pr_outside_sections:
 
         file_name = f'{section.lower().replace(" ", "_")}.md'
         print(
-            f'PR {pr_info.to_str()} in {file_name} do not have {section_labels} so should not be in this section. Please check its labels.',
+            f'PR {pr_info.to_str()} in {file_name} does not have {section_labels} so should not be in this section. Please check its labels.',
             file=sys.stderr,
         )
