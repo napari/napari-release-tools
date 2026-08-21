@@ -218,6 +218,10 @@ label_to_section = {
     'release:breaking change': 'Breaking Changes',
 }
 
+section_to_label: dict[str, list[str]] = {}
+for label, section in label_to_section.items():
+    section_to_label.setdefault(section, []).append(label)
+
 
 def parse_pull(pull_number: int, user_name: str, repo_name: str) -> None:
     repo_ = get_repo(user_name, repo_name)
@@ -457,7 +461,7 @@ for section, pull_request_dicts in highlights.items():
         LOCAL_DIR
         / 'additional_notes'
         / args.milestone
-        / f'{section.lower()}.md'
+        / f'{section.lower().replace(" ", "_")}.md'
     )
 
     if not section_path.exists() and not pull_request_dicts:
@@ -579,11 +583,18 @@ if non_merged_pr:
 
 if mentioned_pr_outside_sections:
     print(
-        f'There are {len(mentioned_pr_outside_sections)} PRs mentioned in the release notes that are not in the highlights sections:',
+        f'There are {len(mentioned_pr_outside_sections)} PRs mentioned in the release notes that are do not have labels matching the sections:',
         file=sys.stderr,
     )
     for pr_info, section in mentioned_pr_outside_sections:
+        section_labels = ', '.join(section_to_label[section])
+        if len(section_to_label[section]) > 1:
+            section_labels = f'one of the labels: {section_labels}'
+        else:
+            section_labels = f'the label: {section_labels}'
+
+        file_name = f'{section.lower().replace(" ", "_")}.md'
         print(
-            f'PR {pr_info.to_str()} in {section.lower()}.md is not in this section of pull requests for this release. Please check its labels.',
+            f'PR {pr_info.to_str()} in {file_name} do not have {section_labels} so should not be in this section. Please check its labels.',
             file=sys.stderr,
         )
