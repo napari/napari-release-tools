@@ -78,6 +78,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from packaging.version import parse as parse_version
+from tqdm import tqdm
 
 from release_utils import (
     BOT_LIST,
@@ -103,6 +104,9 @@ class PRInfo(NamedTuple):
     user: str
     repo: str
     pr: int
+
+    def to_str(self):
+        return f'{self.user}/{self.repo}#{self.pr}'
 
 
 def parse_pr_num(pr_num):
@@ -184,7 +188,7 @@ users = {}
 
 non_merged_pr = []
 
-highlights = {
+highlights: dict[str, dict[PRInfo, dict[str, str]]] = {
     'Highlights': {},
     'New Features': {},
     'Breaking Changes': {},
@@ -197,7 +201,7 @@ highlights = {
     'Documentation': {},
 }
 
-other_pull_requests = {}
+other_pull_requests: dict[PRInfo, dict[str, str]] = {}
 
 label_to_section = {
     'bug': 'Bug Fixes',
@@ -214,9 +218,13 @@ label_to_section = {
     'release:breaking change': 'Breaking Changes',
 }
 
+section_to_label: dict[str, list[str]] = {}
+for label, section in label_to_section.items():
+    section_to_label.setdefault(section, []).append(label)
 
-def parse_pull(pull_number: int, repo_full_name: str):
-    repo_ = get_repo(*repo_full_name.split('/'))
+
+def parse_pull(pull_number: int, user_name: str, repo_name: str) -> None:
+    repo_ = get_repo(user_name, repo_name)
     pull = repo_.get_pull(pull_number)
 
     is_merged = pull.raw_data.get('merged')
@@ -230,6 +238,8 @@ def parse_pull(pull_number: int, repo_full_name: str):
         if pull.user is not None:
             add_to_users(users, pull.user)
             authors.add(pull.user.login)
+    else:
+        non_merged_pr.append(pull)
 
     summary = pull.title
 
@@ -241,35 +251,76 @@ def parse_pull(pull_number: int, repo_full_name: str):
     pr_labels = {label.name.lower() for label in pull.labels}
     for label_name, section in label_to_section.items():
         if label_name in pr_labels:
-            highlights[section][pull_number] = {
+            highlights[section][PRInfo(user_name, repo_name, pull_number)] = {
                 'summary': summary,
-                'repo': repo_full_name.split('/')[1],
+                'repo': repo_name,
             }
             assigned_to_section = True
 
     if not assigned_to_section:
-        other_pull_requests[pull_number] = {
+        other_pull_requests[PRInfo(user_name, repo_name, pull_number)] = {
             'summary': summary,
-            'repo': repo_full_name.split('/')[1],
+            'repo': repo_name,
         }
 
 
-pulls_to_parse = []
-for pull_ in iter_pull_request(f'milestone:{args.milestone} {args.merged}'):
-    is_merged = pull_.raw_data.get('merged')
+def parse_docs_pull(pull_number: int, user_name: str, repo_name: str) -> None:
+    repo_ = get_repo(user_name, repo_name)
+
+    pull = repo_.get_pull(pull_number)
+
+    is_merged = pull.raw_data.get('merged')
     if is_merged is None:
-        is_merged = pull_.merged
-    if not is_merged:
-        non_merged_pr.append(pull_)
-    pulls_to_parse.append((pull_.number, repo.full_name))
+        is_merged = pull.merged
+
+    if is_merged:
+        if pull.merged_by is not None:
+            add_to_users(users, pull.merged_by)
+            docs_committers.add(pull.merged_by.login)
+        if pull.user is not None:
+            add_to_users(users, pull.user)
+            docs_authors.add(pull.user.login)
+    else:
+        non_merged_pr.append(pull)
+
+    for review in pull.get_reviews():
+        if review.user is not None:
+            add_to_users(users, review.user)
+            docs_reviewers.add(review.user.login)
+
+    pr_labels = {label.name.lower() for label in pull.labels}
+    summary = pull.title
+    if 'highlight' in pr_labels:
+        highlights['Highlights'][PRInfo(user_name, repo_name, pull.number)] = {
+            'summary': summary,
+            'repo': GH_DOCS_REPO,
+        }
+    if 'maintenance' in pr_labels:
+        other_pull_requests[PRInfo(user_name, repo_name, pull.number)] = {
+            'summary': summary,
+            'repo': GH_DOCS_REPO,
+        }
+    else:
+        highlights['Documentation'][
+            PRInfo(user_name, repo_name, pull.number)
+        ] = {
+            'summary': summary,
+            'repo': GH_DOCS_REPO,
+        }
+
+
+pulls_to_parse = [
+    (x.number, GH_USER, GH_REPO)
+    for x in iter_pull_request(f'milestone:{args.milestone} {args.merged}')
+]
 
 if args.with_pr is not None:
     for pr_num in args.with_pr:
         if isinstance(pr_num, int):
-            pulls_to_parse.append((pr_num, repo.full_name))
+            pulls_to_parse.append((pr_num, GH_USER, GH_REPO))
         else:
             r = get_repo(pr_num.user, pr_num.repo)
-            pulls_to_parse.append((pr_num.pr, r.full_name))
+            pulls_to_parse.append((pr_num.pr, pr_num.user, pr_num.repo))
 
 doc_pulls = list(
     iter_pull_request(
@@ -277,48 +328,26 @@ doc_pulls = list(
     )
 )
 
-for pull in doc_pulls:
-    is_merged = pull.raw_data.get('merged')
-    if is_merged is None:
-        is_merged = pull.merged
-    if not is_merged:
-        non_merged_pr.append(pull)
+with ThreadPoolExecutor(max_workers=10) as executor:
+    list(
+        tqdm(
+            executor.map(lambda x: parse_pull(*x), pulls_to_parse),
+            desc='napari/napari parse',
+            total=len(pulls_to_parse),
+        )
+    )
 
 with ThreadPoolExecutor(max_workers=10) as executor:
-    list(executor.map(lambda x: parse_pull(*x), pulls_to_parse))
-
-for pull in doc_pulls:
-    issue = pull.as_issue()
-    add_to_users(users, issue.user)
-    docs_authors.add(issue.user.login)
-
-    summary = pull.title
-
-    with ThreadPoolExecutor(max_workers=10) as executor:
-        # We need reviews for docs PRs too
-        reviews = list(pull.get_reviews())
-        for review in reviews:
-            if review.user is not None:
-                add_to_users(users, review.user)
-                docs_reviewers.add(review.user.login)
-
-    assigned_to_section = False
-    pr_labels = {label.name.lower() for label in pull.labels}
-    if 'highlight' in pr_labels:
-        highlights['Highlights'][pull.number] = {
-            'summary': summary,
-            'repo': GH_DOCS_REPO,
-        }
-    if 'maintenance' in pr_labels:
-        other_pull_requests[pull.number] = {
-            'summary': summary,
-            'repo': GH_DOCS_REPO,
-        }
-    else:
-        highlights['Documentation'][pull.number] = {
-            'summary': summary,
-            'repo': GH_DOCS_REPO,
-        }
+    list(
+        tqdm(
+            executor.map(
+                lambda x: parse_docs_pull(*x),
+                [(pull.number, GH_USER, GH_DOCS_REPO) for pull in doc_pulls],
+            ),
+            desc='napari/docs parse',
+            total=len(doc_pulls),
+        )
+    )
 
 
 # add Other PRs to the ordered dict to make doc generation easier.
@@ -333,14 +362,22 @@ docs_authors -= BOT_LIST
 reviewers -= BOT_LIST
 docs_reviewers -= BOT_LIST
 
-USER_NAME_PATTERN = re.compile(r'@([\w-]+)')  # pattern for GitHub usernames
 GITHUB_PR_LINK_PATTERN = re.compile(
     GH + r'/(?P<owner>[\w-]+)/(?P<repo>[\w-]+)/pull/(?P<number>\d+)'
 )  # pattern for GitHub PR link
-
+USER_NAME_PATTERN = re.compile(r'@([\w-]+)')
+AUTHOR_SECTION_RE = re.compile(
+    r'^##\s+\d+\s+authors added to this release \(alphabetical\)\s*\n(?P<body>.*?)(?=^##\s+|\Z)',
+    re.M | re.S | re.I,
+)
+REVIEWER_SECTION_RE = re.compile(
+    r'^##\s+\d+\s+reviewers added to this release \(alphabetical\)\s*\n(?P<body>.*?)(?=^##\s+|\Z)',
+    re.M | re.S | re.I,
+)
+AUTHOR_LINE_RE = re.compile(r'- .*? - @([\w-]+)')
 
 old_contributors = set()
-
+old_reviewers = set()
 if args.target_directory is None:
     file_handle = sys.stdout
 else:
@@ -348,12 +385,21 @@ else:
     file_handle = open(
         args.target_directory / res_file_name, 'w', encoding='utf-8'
     )
+
     for file_path in args.target_directory.glob('release_*.md'):
         if file_path.name == res_file_name:
             continue
-        with open(file_path, encoding='utf-8') as f:
-            old_contributors.update(USER_NAME_PATTERN.findall(f.read()))
 
+        text = file_path.read_text(encoding='utf-8')
+        match = AUTHOR_SECTION_RE.search(text)
+        if match:
+            section_text = match.group('body')
+            old_contributors.update(AUTHOR_LINE_RE.findall(section_text))
+
+        match = REVIEWER_SECTION_RE.search(text)
+        if match:
+            section_text = match.group('body')
+            old_reviewers.update(AUTHOR_LINE_RE.findall(section_text))
 
 # Now generate the release notes
 title = f'# napari {args.milestone}'
@@ -423,6 +469,8 @@ effver_info = {
 effver_info = f"""napari follows [EffVer (Intended Effort Versioning)](https://effver.org/); {effver_info.get(effver_type)}
 """
 
+mentioned_pr_outside_sections = []
+
 print(effver_info, file=file_handle)
 
 for section, pull_request_dicts in highlights.items():
@@ -430,7 +478,7 @@ for section, pull_request_dicts in highlights.items():
         LOCAL_DIR
         / 'additional_notes'
         / args.milestone
-        / f'{section.lower()}.md'
+        / f'{section.lower().replace(" ", "_")}.md'
     )
 
     if not section_path.exists() and not pull_request_dicts:
@@ -443,38 +491,47 @@ for section, pull_request_dicts in highlights.items():
         with section_path.open(encoding='utf-8') as f:
             text = f.read()
         for owner, repo, pr_number in GITHUB_PR_LINK_PATTERN.findall(text):
-            mentioned_pr.add(PRInfo(user=owner, repo=repo, pr=int(pr_number)))
+            pr_info = PRInfo(user=owner, repo=repo, pr=int(pr_number))
+            if pr_info not in pull_request_dicts:
+                # raise ValueError(
+                #     f'PR {pr_info} in {section_path} is not in the list of pull requests for this release.'
+                # )
+                mentioned_pr_outside_sections.append((pr_info, section))
+
+            mentioned_pr.add(pr_info)
         print(text, file=file_handle)
         print('', file=file_handle)
 
-    for number, pull_request_info in sorted(
+    for pr_info, pull_request_info in sorted(
         pull_request_dicts.items(), key=lambda x: x[0]
     ):
         if (
-            PRInfo(user=GH_USER, repo=pull_request_info['repo'], pr=number)
+            PRInfo(user=GH_USER, repo=pull_request_info['repo'], pr=pr_info.pr)
             in mentioned_pr
         ):
             continue
         repo_str = pull_request_info['repo']
         repo_prefix = repo_str if repo_str != 'napari' else ''
         print(
-            f'- {pull_request_info["summary"]} ([{repo_prefix}#{number}]'
-            f'(https://{GH}/{GH_USER}/{repo_str}/pull/{number}))',
+            f'- {pull_request_info["summary"]} ([{repo_prefix}#{pr_info.pr}]'
+            f'(https://{GH}/{GH_USER}/{repo_str}/pull/{pr_info.pr}))',
             file=file_handle,
         )
     print('', file=file_handle)
 
 
 contributors = {
-    'authors': authors | docs_authors,
-    'reviewers': reviewers | docs_reviewers,
+    'authors': (authors | docs_authors, old_contributors),
+    'reviewers': (reviewers | docs_reviewers, old_reviewers),
 }
 
 # ignore committers
 # contributors['committers'] = committers
-new_contributors = (authors | docs_authors) - old_contributors
 
-for section_name, contributor_set in contributors.items():
+for section_name, (
+    contributor_set,
+    old_contributor_set,
+) in contributors.items():
     print('', file=file_handle)
     if None in contributor_set:
         contributor_set.remove(None)
@@ -501,7 +558,7 @@ for section_name, contributor_set in contributors.items():
             first_repo_name = GH_DOCS_REPO
             second_repo_str = ''
 
-        first = ' +' if c in new_contributors else ''
+        first = ' +' if c not in old_contributor_set else ''
         commit_link = (
             f'https://{GH}/{GH_USER}/{first_repo_name}/commits?author={c}'
         )
@@ -542,3 +599,21 @@ if non_merged_pr:
         print('#' * 50, file=sys.stderr)
         print(f'There are {len(non_merged_pr)} unmerged PRs:', file=sys.stderr)
         print('\n'.join(pr_info), file=sys.stderr)
+
+if mentioned_pr_outside_sections:
+    print(
+        f'There are {len(mentioned_pr_outside_sections)} PRs mentioned in the release notes that do not have labels matching the sections:',
+        file=sys.stderr,
+    )
+    for pr_info, section in mentioned_pr_outside_sections:
+        section_labels = ', '.join(section_to_label[section])
+        if len(section_to_label[section]) > 1:
+            section_labels = f'one of the labels: {section_labels}'
+        else:
+            section_labels = f'the label: {section_labels}'
+
+        file_name = f'{section.lower().replace(" ", "_")}.md'
+        print(
+            f'PR {pr_info.to_str()} in {file_name} does not have {section_labels} so should not be in this section. Please check its labels.',
+            file=sys.stderr,
+        )
