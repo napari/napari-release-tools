@@ -95,7 +95,7 @@ make use of it. It's automatically installed with `napari[all]` or
 `napari[optional]`. And if the search feels a bit off, you can set just how
 fuzzy you want it to be in Preferences > Experimental > Fuzzy Search Threshold.
 
-[screenshot or movie to be provided by Lorenzo]
+![Example of fuzzy find using "scle" to find "scale"](https://github.com/user-attachments/assets/88d4d2e1-36e1-4921-8df6-6f8ded4df12e)
 
 ### 2D slicing of surfaces
 
@@ -105,6 +105,19 @@ slices appear in 2D view ([#8783](https://github.com/napari/napari/pull/8783)).
 This enhancement is accompanied by support for async slicing, which should
 improve viewer responsiveness when slicing large, time varying surfaces, for
 example.
+
+```{raw} html
+<figure>
+  <video width="100%" controls autoplay loop muted playsinline>
+    <source src="../_static/images/slicing_surface.webm" type="video/webm" />
+    <source src="../_static/images/slicing_surface.mp4" type="video/mp4" />
+    <img src="../_static/images/slicing_surface.png"
+      title="Your browser does not support the video tag"
+      alt="Video showing a slicing of surface layers, with showing how to change thickness of slize and controling slice mmode."
+    >
+  </video>
+</figure>
+```
 
 [movie of ND-cows and slicing]
 
