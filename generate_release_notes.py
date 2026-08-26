@@ -239,7 +239,14 @@ def parse_pull(pull_number: int, user_name: str, repo_name: str) -> None:
             add_to_users(users, pull.user)
             authors.add(pull.user.login)
     else:
-        non_merged_pr.append(pull)
+        if pull.raw_data.get('state') == 'closed':
+            print(
+                f'Warning: PR {pull_number} in {user_name}/{repo_name} is closed but not merged. It will be ignored in the release notes.',
+                file=sys.stderr,
+            )
+            return
+        else:
+            non_merged_pr.append(pull)
 
     summary = pull.title
 
@@ -281,7 +288,13 @@ def parse_docs_pull(pull_number: int, user_name: str, repo_name: str) -> None:
             add_to_users(users, pull.user)
             docs_authors.add(pull.user.login)
     else:
-        non_merged_pr.append(pull)
+        if pull.raw_data.get('state') == 'closed':
+            print(
+                f'Warning: PR {pull_number} in {user_name}/{repo_name} is closed but not merged. It will be ignored in the release notes.',
+                file=sys.stderr,
+            )
+        else:
+            non_merged_pr.append(pull)
 
     for review in pull.get_reviews():
         if review.user is not None:
