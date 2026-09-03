@@ -1,0 +1,10 @@
+We're happy to announce the bugfix release of napari 0.9.1!
+napari is a fast, interactive, multi-dimensional image viewer for Python.
+It's designed for browsing, annotating, and analyzing large multi-dimensional
+images. It's built on top of Qt (for the GUI), vispy (for performant GPU-based
+rendering), and the scientific Python stack (numpy, scipy).
+
+This is special, not plansed release that fixes a bug with resizing of dock widgets in the viewer.
+
+For more information, examples, and documentation, please visit our website,
+https://napari.org.
