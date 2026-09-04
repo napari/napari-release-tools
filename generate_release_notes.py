@@ -74,6 +74,7 @@ import argparse
 import re
 import sys
 from concurrent.futures import ThreadPoolExecutor
+from enum import StrEnum
 from pathlib import Path
 from typing import NamedTuple
 
@@ -107,6 +108,13 @@ class PRInfo(NamedTuple):
 
     def to_str(self):
         return f'{self.user}/{self.repo}#{self.pr}'
+
+
+class ReleaseType(StrEnum):
+    MACRO = 'major'
+    MESO = 'meso'
+    MICRO = 'micro'
+    BUGFIX = 'bugfix'
 
 
 def parse_pr_num(pr_num):
@@ -147,6 +155,13 @@ parser.add_argument(
     '--no-cache',
     help='Disable caching of GitHub API requests. This may lead to slower execution and more requests to the GitHub API, but ensures that you are getting the most up-to-date information.',
     action='store_true',
+)
+
+parser.add_argument(
+    '--release-type',
+    help='The type of the release (e.g., major, minor, patch)',
+    default=None,
+    type=ReleaseType,
 )
 
 args = parser.parse_args()
@@ -453,31 +468,37 @@ https://napari.org.
 print(intro, file=file_handle)
 
 
-def detect_effver_type(milestone):
+def detect_effver_type(milestone, release_type=None) -> ReleaseType:
     """Detect if this is a MACRO, MESO, or MICRO release based on version number."""
     # Remove any pre-release suffixes (like 0.6.0rc1 -> 0.6.0)
+    if release_type is not None:
+        return release_type
+
     clean_version = milestone.split('rc')[0].split('a')[0].split('b')[0]
     parts = clean_version.split('.')
     vinfo = int(parts[0]), int(parts[1]), int(parts[2])
     match vinfo:
         case 0, _, 0:
-            return 'MACRO'
+            return ReleaseType.MACRO
         case 0, _, _:
-            return 'MESO'
+            return ReleaseType.MESO
         case _, 0, 0:
-            return 'MACRO'
+            return ReleaseType.MACRO
         case _, _, 0:
-            return 'MESO'
+            return ReleaseType.MESO
         case _:
-            return 'MICRO'
+            return ReleaseType.MICRO
 
 
-effver_type = detect_effver_type(args.milestone)
+effver_type = detect_effver_type(
+    args.milestone, release_type=args.release_type
+)
 
 effver_info = {
-    'MACRO': 'this is a **Macro** release containing awesome new features, but may require dedication of some significant time when upgrading projects to use this version.',
-    'MESO': 'this is a **Meso** release containing awesome new features, but some effort may be needed when updating previous projects to use this version.',
-    'MICRO': 'this is a **Micro** release containing awesome new features that are expected to be adoptable with no additional effort.',
+    ReleaseType.MACRO: 'this is a **Macro** release containing awesome new features, but may require dedication of some significant time when upgrading projects to use this version.',
+    ReleaseType.MESO: 'this is a **Meso** release containing awesome new features, but some effort may be needed when updating previous projects to use this version.',
+    ReleaseType.MICRO: 'this is a **Micro** release containing awesome new features that are expected to be adoptable with no additional effort.',
+    ReleaseType.BUGFIX: 'this is a **Micro** release containing bug fixes, so we encourage upgrading.',
 }
 effver_info = f"""napari follows [EffVer (Intended Effort Versioning)](https://effver.org/); {effver_info.get(effver_type)}
 """
