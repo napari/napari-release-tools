@@ -193,6 +193,7 @@ highlights: dict[str, dict[PRInfo, dict[str, str]]] = {
     'New Features': {},
     'Breaking Changes': {},
     'Improvements': {},
+    'Examples': {},
     'Performance': {},
     'Bug Fixes': {},
     'API Changes': {},
@@ -214,7 +215,7 @@ label_to_section = {
     'deprecation': 'Deprecations',
     'dependencies': 'Build Tools',
     'documentation': 'Documentation',
-    'example': 'Documentation',
+    'example': 'Examples',
     'release:breaking change': 'Breaking Changes',
 }
 
