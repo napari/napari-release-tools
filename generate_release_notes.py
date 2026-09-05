@@ -293,6 +293,7 @@ def parse_docs_pull(pull_number: int, user_name: str, repo_name: str) -> None:
                 f'Warning: PR {pull_number} in {user_name}/{repo_name} is closed but not merged. It will be ignored in the release notes.',
                 file=sys.stderr,
             )
+            return
         else:
             non_merged_pr.append(pull)
 
