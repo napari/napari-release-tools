@@ -78,6 +78,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import NamedTuple
 
+from github.PullRequest import PullRequest
 from packaging.version import parse as parse_version
 from tqdm import tqdm
 
@@ -239,30 +240,41 @@ for label, section in label_to_section.items():
     section_to_label.setdefault(section, []).append(label)
 
 
-def parse_pull(pull_number: int, user_name: str, repo_name: str) -> None:
-    repo_ = get_repo(user_name, repo_name)
-    pull = repo_.get_pull(pull_number)
+def _check_if_closed_but_not_merged(pull: PullRequest) -> bool:
+    """This check is performed on non merged PRs to see if they are closed but not merged.
 
+    If so, a warning is printed to stderr."""
     is_merged = pull.raw_data.get('merged')
     if is_merged is None:
         is_merged = pull.merged
 
     if is_merged:
-        if pull.merged_by is not None:
-            add_to_users(users, pull.merged_by)
-            committers.add(pull.merged_by.login)
-        if pull.user is not None:
-            add_to_users(users, pull.user)
-            authors.add(pull.user.login)
-    else:
-        if pull.raw_data.get('state') == 'closed':
-            print(
-                f'Warning: PR {pull_number} in {user_name}/{repo_name} is closed but not merged. It will be ignored in the release notes.',
-                file=sys.stderr,
-            )
-            return
-        else:
-            non_merged_pr.append(pull)
+        return False
+
+    if pull.raw_data.get('state') == 'closed':
+        print(
+            f'Warning: PR {pull.number} in {pull.base.repo.full_name} is closed but not merged. It will be ignored in the release notes.',
+            file=sys.stderr,
+        )
+        return True
+
+    non_merged_pr.append(pull)
+    return False
+
+
+def parse_pull(pull_number: int, user_name: str, repo_name: str) -> None:
+    repo_ = get_repo(user_name, repo_name)
+    pull = repo_.get_pull(pull_number)
+
+    if _check_if_closed_but_not_merged(pull):
+        return
+
+    if pull.merged_by is not None:
+        add_to_users(users, pull.merged_by)
+        committers.add(pull.merged_by.login)
+    if pull.user is not None:
+        add_to_users(users, pull.user)
+        authors.add(pull.user.login)
 
     summary = pull.title
 
@@ -289,29 +301,17 @@ def parse_pull(pull_number: int, user_name: str, repo_name: str) -> None:
 
 def parse_docs_pull(pull_number: int, user_name: str, repo_name: str) -> None:
     repo_ = get_repo(user_name, repo_name)
-
     pull = repo_.get_pull(pull_number)
 
-    is_merged = pull.raw_data.get('merged')
-    if is_merged is None:
-        is_merged = pull.merged
+    if _check_if_closed_but_not_merged(pull):
+        return
 
-    if is_merged:
-        if pull.merged_by is not None:
-            add_to_users(users, pull.merged_by)
-            docs_committers.add(pull.merged_by.login)
-        if pull.user is not None:
-            add_to_users(users, pull.user)
-            docs_authors.add(pull.user.login)
-    else:
-        if pull.raw_data.get('state') == 'closed':
-            print(
-                f'Warning: PR {pull_number} in {user_name}/{repo_name} is closed but not merged. It will be ignored in the release notes.',
-                file=sys.stderr,
-            )
-            return
-        else:
-            non_merged_pr.append(pull)
+    if pull.merged_by is not None:
+        add_to_users(users, pull.merged_by)
+        docs_committers.add(pull.merged_by.login)
+    if pull.user is not None:
+        add_to_users(users, pull.user)
+        docs_authors.add(pull.user.login)
 
     for review in pull.get_reviews():
         if review.user is not None:
