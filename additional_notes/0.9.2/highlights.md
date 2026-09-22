@@ -12,6 +12,6 @@ In [#9395](https://github.com/napari/napari/pull/9395) we decided to change from
 
 *add blogpost link here*
 
-### More strict release cadence
+### New release policy with regular cadence
 
-Based on our experience and feedback from the community, we decided to make our release cadence more strict. We decided to go to monthly cadence with exception for December. The formalization is added in [napari/docs#1126](https://github.com/napari/docs/pull/1126). The actual policy is [here](https://napari.org/stable/developers/coredev/release_policy.html).
+The napari team has been working hard to improve our release process, and based on our experience and feedback from the community, we have formally adopted a release policy ([napari/docs#1126](https://github.com/napari/docs/pull/1126)). Expect regular monthly releases and clearer communication about review and timing for contributions; read the [full policy](https://napari.org/stable/developers/coredev/release_policy.html).
