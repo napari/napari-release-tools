@@ -15,4 +15,6 @@ After deprecating it, we're finally removing this field completely. Now the only
 
 ### Unified default font sizes
 
-We previously hardcoded default font sizes for all visuals in the canvas. Now, they respond to the global application settings (`Preferences > Appearance > Font size`) unless the font size is explicitly set (by default it will be `None`). So if you use the `scale_bar`, or `Points.text` or other layers and overlays that display text and you don't like the new default, make sure to set your font size explicitly!
+We previously hardcoded default font sizes for all visuals in the canvas. Now, they respond to the global application settings (`Preferences > Appearance > Font size`) unless the font size is explicitly set for that specific model (by default it will be `None`).
+
+So if you use the `scale_bar`, or `Points.text` or other layers and overlays that display text and you don't like the new default, make sure to set your font size explicitly!
