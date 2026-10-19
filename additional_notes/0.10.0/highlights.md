@@ -1,10 +1,7 @@
-### Dropping support for Qt5 backend
-
-We started warning about this in release v0.8.0; it is now time to fully drop support of Qt5! Qt5 has reached End Of Life on the 26th of May 2025. We migrated our bundle to Qt6 (PySide6) a year ago.
-[#9650](https://github.com/napari/napari/pull/9650) is effectively removing PyQt5 support. PySide2 support was already removed in release [0.7.0](https://github.com/napari/napari/pull/8450), so we are now fully on Qt6!
+This release contains several new features and many, many enhancements and bugfixes. We also welcomed a ton of new contributors to the community!
 
 ### Grid Lines, axes and ticks
-This features has been requested for years, and we finally managed to get a version that we're happy with! You can now use `viewer.scene.overlays.grid_lines` to display a grid on your data, including unit-aware tick marks and axis labels! Try it out:
+This features has been requested for years, and we finally managed to get a version that we're happy with! With [#7827](https://github.com/napari/napari/pull/7827), you can now use `viewer.scene.overlays.grid_lines` to display a grid on your data, including unit-aware tick marks and axis labels! Try it out:
 
 ```py
 import napari
@@ -39,3 +36,15 @@ viewer.canvas.grid.stride = 2
 ```
 
 ![screenshot of the viewer with layer names overlays enabled, colored based on each layer's colormap](https://github.com/user-attachments/assets/629e63f5-381a-4a92-ba17-de02fa408edf)
+
+### Default dock area and tabify for plugin dock widgets
+
+Some plugin dock widgets are wider than they are tall, fitting poorly on the right-side dock and forcing users to manually move the widget to a different area every time on first launch. With [#9526](https://github.com/napari/napari/pull/9526)) and ([#9707](https://github.com/napari/napari/pull/9707), you can now specify a default dock area and tabify behaviour for a dock widget contribution, which will prevent the need for this manual step:
+
+```yaml
+  widgets:
+    - command: example-plugin.my_widget
+      display_name: My wide widget
+      default_dock_area: bottom
+      tabify: True
+```
