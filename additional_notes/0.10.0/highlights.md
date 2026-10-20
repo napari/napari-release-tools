@@ -20,7 +20,7 @@ viewer.scene.overlays.grid_lines.visible = True
 
 ### Colorful names
 
-Another long-requested feature: displaying layer names on the canvas with colormap-aware colors ([#9598](https://github.com/napari/napari/pull/9598))! This comes with some fancy machinery to ensure that colors are shifted enough to be always readable.
+Another long-requested feature: displaying [layer names](https://napari.org/stable/getting_started/layers.html#layer-overlays) on the canvas now has colormap-aware colors ([#9598](https://github.com/napari/napari/pull/9598))! This comes with some fancy machinery to ensure that colors are shifted enough to be always readable.
 
 ```py
 import napari
@@ -36,6 +36,12 @@ viewer.canvas.grid.stride = 2
 ```
 
 ![screenshot of the viewer with layer names overlays enabled, colored based on each layer's colormap](https://github.com/user-attachments/assets/629e63f5-381a-4a92-ba17-de02fa408edf)
+
+### Cursor crosshair
+
+Ever use the [grid mode](https://napari.org/stable/gallery/grid_mode.html#grid-mode) for your miltichannel data but then struggle to know where you're clicking? Struggle no more! You can now enable the new crosshair overlay ([#8017](https://github.com/napari/napari/pull/8017)) to always locate your exact position in every viewbox.
+
+![screenshot of the viewer with grid-mode and the crosshair enabled](https://github.com/user-attachments/assets/62f1b045-60cc-4e4a-808b-c7e9934d683d)
 
 ### Default dock area and tabify for plugin dock widgets
 

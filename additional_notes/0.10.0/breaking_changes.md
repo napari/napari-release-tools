@@ -11,10 +11,10 @@ A notable change is that `mouse_move` callbacks previously did not work during `
 
 ### Removed `scale_bar.unit`
 
-After deprecating it, we're finally removing this field completely. Now the only way to set the unit on the scale bar is by [setting units on the layers themselves](https://napari.org/stable/guides/units.html#scale-and-units-live-on-layers)!
+After deprecating it, we're finally removing this field completely ([#9218](https://github.com/napari/napari/pull/9218)). Now the only way to set the unit on the scale bar is by [setting units on the layers themselves](https://napari.org/stable/guides/units.html#scale-and-units-live-on-layers)!
 
 ### Unified default font sizes
 
-We previously hardcoded default font sizes for all visuals in the canvas. Now, they respond to the global application settings (`Preferences > Appearance > Font size`) unless the font size is explicitly set for that specific model (by default it will be `None`).
+We previously hardcoded default font sizes for all visuals in the canvas. Now ([#8667](https://github.com/napari/napari/pull/8667), [#9524](https://github.com/napari/napari/pull/9524)), they respond to the global application settings (`Preferences > Appearance > Font size`) unless the font size is explicitly set for that specific model (by default it will be `None`).
 
 So if you use the `scale_bar`, or `Points.text` or other layers and overlays that display text and you don't like the new default, make sure to set your font size explicitly!
