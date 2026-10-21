@@ -41,7 +41,7 @@ viewer.canvas.grid.stride = 2
 
 Ever use the [grid mode](https://napari.org/stable/gallery/grid_mode.html#grid-mode) for your multichannel data but then struggle to know where you're clicking? Struggle no more! You can now enable the new crosshair overlay ([#8017](https://github.com/napari/napari/pull/8017)) to always locate your exact position in every viewbox.
 
-![screenshot of the viewer with grid-mode and the crosshair enabled](https://github.com/user-attachments/assets/62f1b045-60cc-4e4a-808b-c7e9934d683d)
+![screenshot of the viewer with grid-mode and the crosshair enabled](https://github.com/user-attachments/assets/cff866f3-fa28-42a8-a8df-94062b118573)
 
 ### Default dock area and tabify for plugin dock widgets
 
