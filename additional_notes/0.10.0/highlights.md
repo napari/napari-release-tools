@@ -1,4 +1,4 @@
-This release contains several new features and many, many enhancements and bugfixes. We also welcomed a ton of new contributors to the community!
+This release contains several new features and many enhancements and bugfixes. We also welcomed a ton of new contributors to the community!
 
 ### Grid Lines, axes and ticks
 This features has been requested for years, and we finally managed to get a version that we're happy with! With [#7827](https://github.com/napari/napari/pull/7827), you can now use `viewer.scene.overlays.grid_lines` to display a grid on your data, including unit-aware tick marks and axis labels! Try it out:
@@ -39,7 +39,7 @@ viewer.canvas.grid.stride = 2
 
 ### Cursor crosshair
 
-Ever use the [grid mode](https://napari.org/stable/gallery/grid_mode.html#grid-mode) for your miltichannel data but then struggle to know where you're clicking? Struggle no more! You can now enable the new crosshair overlay ([#8017](https://github.com/napari/napari/pull/8017)) to always locate your exact position in every viewbox.
+Ever use the [grid mode](https://napari.org/stable/gallery/grid_mode.html#grid-mode) for your multichannel data but then struggle to know where you're clicking? Struggle no more! You can now enable the new crosshair overlay ([#8017](https://github.com/napari/napari/pull/8017)) to always locate your exact position in every viewbox.
 
 ![screenshot of the viewer with grid-mode and the crosshair enabled](https://github.com/user-attachments/assets/62f1b045-60cc-4e4a-808b-c7e9934d683d)
 

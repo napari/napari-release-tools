@@ -5,7 +5,7 @@ We started warning about this in release v0.8.0; it is now time to fully drop su
 
 ### Tidied up mouse callbacks
 
-Custom mouse callbacks can be [defined via generators](https://napari.org/stable/howtos/extending/connecting_events.html#listening-for-mouse-events). Some quirks with this machinery have been smoothed out and some bugs fixed ([#9513](https://github.com/napari/napari/pull/9513)); this might result in some callbacks to no longer work as before. In principle, this should only affect callbacks that relied on buggy behaviour, but please make sure to check if your old callbacks are still working, and open an issue on the napari repository if that's not the case.
+Custom mouse callbacks can be [defined via generators](https://napari.org/stable/howtos/extending/connecting_events.html#listening-for-mouse-events). Some quirks with this machinery have been smoothed out and some bugs fixed ([#9513](https://github.com/napari/napari/pull/9513)); this might cause some callbacks to no longer work as before. In principle, this should only affect callbacks that relied on buggy behavior, but please make sure to check if your old callbacks are still working, and open an issue on the napari repository if that's not the case.
 
 A notable change is that `mouse_move` callbacks previously did not work during `drag`, but now they do. If that's not what you want, guard your callback with `if not event.is_dragging`!
 
