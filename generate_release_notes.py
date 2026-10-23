@@ -206,8 +206,8 @@ non_merged_pr = []
 
 highlights: dict[str, dict[PRInfo, dict[str, str]]] = {
     'Highlights': {},
-    'New Features': {},
     'Breaking Changes': {},
+    'New Features': {},
     'Improvements': {},
     'Examples': {},
     'Performance': {},
